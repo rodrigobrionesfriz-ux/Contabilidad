@@ -287,7 +287,7 @@ td.err{color:var(--err);font-weight:600}
       <span id="user-name" style="font-weight:600"></span>
       <span id="user-role" style="color:var(--mt);font-size:9px;text-transform:uppercase;letter-spacing:.04em"></span>
     </div>
-    <button onclick="logout()" style="background:none;border:none;color:var(--mt);cursor:pointer;padding:2px 6px;font-size:12px" title="Cerrar sesión">🚪</button>
+    <button onclick="logout()" style="background:var(--sf2,rgba(248,81,73,.12));border:1px solid var(--bd);color:var(--err,#f85149);cursor:pointer;padding:4px 10px;font-size:11px;border-radius:100px;font-weight:600;margin-left:4px;display:flex;align-items:center;gap:4px" title="Cerrar sesión">🚪 Salir</button>
   </div>
 </header>
 <div class="layout">
@@ -1231,9 +1231,12 @@ async function verificarUsuarioAutorizado(fbUser){
     const email=fbUser.email.toLowerCase();
     const doc=await FS.db.collection('usuarios').doc(email).get();
 
-    // ¿Es el primer usuario del sistema?
-    const snap=await FS.db.collection('usuarios').limit(1).get();
-    const esPrimerUsuario=snap.empty;
+    // ¿Cuántos usuarios hay en el sistema? (para detectar "primer/único usuario")
+    const todos=await FS.db.collection('usuarios').limit(2).get();
+    const esPrimerUsuario=todos.empty;
+    // Red de seguridad: si el ÚNICO documento del sistema es el de este mismo usuario,
+    // debe ser admin (evita quedar bloqueado si el registro inicial falló a medias).
+    const esUnicoYPropio=todos.size===1&&todos.docs[0].id===email;
 
     let userData;
     if(!doc.exists){
@@ -1271,6 +1274,13 @@ async function verificarUsuarioAutorizado(fbUser){
       }
     }else{
       userData={...doc.data(),email};
+      // Red de seguridad: si eres el ÚNICO usuario del sistema pero tu doc quedó
+      // inactivo o sin rol admin (registro inicial fallido), auto-promover a admin.
+      if(esUnicoYPropio&&(!userData.activo||userData.rol!=='admin')){
+        userData.rol='admin';userData.activo=true;userData.pendiente=false;
+        try{await FS.db.collection('usuarios').doc(email).update({rol:'admin',activo:true,pendiente:false});}catch(e){}
+        console.log('Único usuario del sistema — auto-promovido a admin:',email);
+      }
       if(!userData.activo){
         errEl.style.display='';loadEl.style.display='none';
         if(userData.pendiente){
@@ -2116,9 +2126,12 @@ function nav(s){
   curSec=s;renderSec(s);
 }
 function renderSec(s){
-  // Verificar permiso de acceso a la sección
-  if(AUTH.user&&!puedeVer(s)&&s!=='empresa'){
-    document.querySelector('.section.active').innerHTML='<div class="empty"><div class="ei">🚫</div>No tienes permiso para acceder a esta sección.<br><br>Contacta a un administrador para solicitar acceso.</div>';
+  // Verificar permiso de acceso a la sección.
+  // 'empresa' y 'usuarios' se excluyen del bloqueo genérico: empresa es la landing,
+  // y usuarios tiene su propio control de admin dentro de renderUsuarios().
+  if(AUTH.user&&s!=='empresa'&&s!=='usuarios'&&!puedeVer(s)){
+    const sec=document.getElementById('s-'+s);
+    if(sec)sec.innerHTML='<div class="empty"><div class="ei">🚫</div>No tienes permiso para acceder a esta sección.<br><br>Contacta a un administrador para solicitar acceso.</div>';
     return;
   }
   if(s==='empresa')fillEmpresaForm();

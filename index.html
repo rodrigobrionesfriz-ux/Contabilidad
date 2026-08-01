@@ -202,6 +202,39 @@ td.err{color:var(--err);font-weight:600}
 .linea-aux .rut-dv-ln{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:10px;color:var(--mt);pointer-events:none;font-weight:700}
 .linea-aux .rut-dv-ln.ok{color:var(--ach)}
 .linea-aux .rut-dv-ln.bad{color:var(--err)}
+/* RESPONSIVE MÓVIL */
+@media (max-width:768px){
+  #nav-toggle{display:block!important}
+  header{padding:0 12px;gap:8px;height:52px}
+  header .logo span{display:none} /* solo el ícono del logo en móvil */
+  .hdr-empresa{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
+  /* Header: ocultar botones de utilidad; quedan accesibles desde el nav */
+  header #db-status,header #btn-conectar-bd{display:none}
+  .btn-save-all{font-size:11px;padding:6px 10px}
+  #user-badge{display:none!important} /* el usuario/logout vive en el nav en móvil */
+  /* Nav como drawer deslizable */
+  nav{position:fixed;top:0;left:0;height:100vh;width:250px;max-width:82vw;z-index:60;
+    transform:translateX(-100%);transition:transform .25s ease;box-shadow:2px 0 16px rgba(0,0,0,.4);padding-top:14px}
+  nav.open{transform:translateX(0)}
+  #nav-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:55}
+  #nav-overlay.open{display:block!important}
+  .nav-item{padding:11px 16px;font-size:14px} /* táctil más grande */
+  .nav-mobile-only{display:block!important}
+  main{padding:14px 12px}
+  .sec-hdr{flex-direction:column;align-items:stretch;gap:10px}
+  .sec-title{font-size:17px}
+  /* Formularios y grids a una columna */
+  .fg{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .bal-layout{grid-template-columns:1fr!important;display:block}
+  /* Botones más táctiles */
+  .btn{padding:8px 12px;font-size:12px}
+  .filter-row{gap:6px}
+  .filter-row input,.filter-row select{font-size:13px}
+  /* Tablas: el scroll horizontal ya existe en .tw; asegurar que no rompan el layout */
+  table{font-size:11px}
+  th,td{padding:6px 8px}
+}
 /* PRINT */
 @media print{
   header,nav,.btn,.save-row,.as-actions,.doc-form,.filter-row,.aux-tabs{display:none!important}
@@ -267,8 +300,10 @@ td.err{color:var(--err);font-weight:600}
 </div>
 
 <header>
+  <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
   <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span></div>
   <div class="hdr-empresa" id="hdr-empresa">Configure los datos de empresa</div>
+  <button onclick="abrirBusqueda()" title="Buscar (Ctrl+K)" style="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mt);font-size:13px;cursor:pointer;padding:5px 10px;line-height:1">🔍</button>
   <select class="year-sel" id="year-sel" onchange="changeYear(+this.value)"></select>
   <div id="db-status" style="display:flex;align-items:center;gap:12px;margin-right:8px">
     <span id="fs-indicator" style="font-size:11px;color:var(--mt);display:flex;align-items:center;gap:5px" title="Estado de sincronización con Firestore"></span>
@@ -291,16 +326,19 @@ td.err{color:var(--err);font-weight:600}
   </div>
 </header>
 <div class="layout">
+<div id="nav-overlay" onclick="toggleNav()" style="display:none"></div>
 <nav>
   <div class="nav-label">Configuración</div>
   <div class="nav-item active" onclick="nav('empresa')" data-s="empresa"><span class="nav-icon">🏢</span>Empresa</div>
   <div class="nav-item" onclick="nav('pdc')" data-s="pdc"><span class="nav-icon">📋</span>Plan de Cuentas</div>
   <div class="nav-item" onclick="nav('apertura')" data-s="apertura"><span class="nav-icon">🔰</span>Balance de Apertura</div>
   <div class="nav-item" onclick="nav('usuarios')" data-s="usuarios" id="nav-usuarios" style="display:none"><span class="nav-icon">👥</span>Usuarios</div>
+  <div class="nav-item" onclick="nav('auditlog')" data-s="auditlog" id="nav-auditlog" style="display:none"><span class="nav-icon">📜</span>Registro de Actividad</div>
   <div class="nav-label">Registros</div>
   <div class="nav-item" onclick="nav('ventas')" data-s="ventas"><span class="nav-icon">🛒</span>Libro de Ventas</div>
   <div class="nav-item" onclick="nav('compras')" data-s="compras"><span class="nav-icon">🧾</span>Libro de Compras</div>
   <div class="nav-item" onclick="nav('honorarios')" data-s="honorarios"><span class="nav-icon">📝</span>Honorarios</div>
+  <div class="nav-item" onclick="nav('remuneraciones')" data-s="remuneraciones"><span class="nav-icon">👷</span>Remuneraciones<span class="nav-badge" id="nb-rem">0</span></div>
   <div class="nav-item" onclick="nav('asientos')" data-s="asientos"><span class="nav-icon">✏️</span>Asientos Manuales<span class="nav-badge" id="nb-as">0</span></div>
   <div class="nav-item" onclick="nav('auxiliares')" data-s="auxiliares"><span class="nav-icon">📒</span>Auxiliares<span class="nav-badge" id="nb-aux">0</span></div>
   <div class="nav-label">Reportes</div>
@@ -308,11 +346,32 @@ td.err{color:var(--err);font-weight:600}
   <div class="nav-item" onclick="nav('mayor')" data-s="mayor"><span class="nav-icon">📊</span>Libro Mayor</div>
   <div class="nav-item" onclick="nav('balance')" data-s="balance"><span class="nav-icon">⚖️</span>Balance General</div>
   <div class="nav-item" onclick="nav('resultados')" data-s="resultados"><span class="nav-icon">📈</span>Resultados</div>
+  <div class="nav-item" onclick="nav('flujocaja')" data-s="flujocaja"><span class="nav-icon">💵</span>Flujo de Caja</div>
   <div class="nav-label">Tributario SII</div>
   <div class="nav-item" onclick="nav('f29')" data-s="f29"><span class="nav-icon">📄</span>Formulario 29</div>
   <div class="nav-item" onclick="nav('ppm')" data-s="ppm"><span class="nav-icon">💰</span>PPM</div>
   <div class="nav-label">Activo Fijo</div>
   <div class="nav-item" onclick="nav('activofijo')" data-s="activofijo"><span class="nav-icon">🏗️</span>Activos Fijos<span class="nav-badge" id="nb-af">0</span></div>
+  <div class="nav-label">Cierre de Ejercicio</div>
+  <div class="nav-item" onclick="nav('provisiones')" data-s="provisiones"><span class="nav-icon">📋</span>Provisiones</div>
+  <div class="nav-item" onclick="nav('correccion')" data-s="correccion"><span class="nav-icon">📊</span>Corrección Monetaria</div>
+  <div class="nav-item" onclick="nav('cierre')" data-s="cierre"><span class="nav-icon">🔒</span>Cierre del Ejercicio</div>
+  <!-- Acciones y usuario (solo visibles en móvil; en escritorio están en el header) -->
+  <div class="nav-mobile-only" style="display:none;margin-top:16px;padding:12px 14px;border-top:1px solid var(--bd)">
+    <div class="nav-label" style="padding:0 0 8px 0">Acciones</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <button class="btn btn-p" onclick="saveAll();cerrarNavMovil()" style="justify-content:flex-start">💾 Guardar Todo</button>
+      <button class="btn btn-i" onclick="exportarExcelManual();cerrarNavMovil()" style="justify-content:flex-start">📥 Exportar Excel</button>
+      <button class="btn btn-i" onclick="document.getElementById('imp-bd-file').click()" style="justify-content:flex-start">📤 Importar Excel</button>
+      <button class="btn btn-i" onclick="fsBackupToCloud();cerrarNavMovil()" style="justify-content:flex-start">☁️⬆ Subir a nube</button>
+      <button class="btn btn-i" onclick="fsRestoreFromCloud()" style="justify-content:flex-start">☁️⬇ Descargar de nube</button>
+    </div>
+    <div id="nav-user-block-m" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)">
+      <div style="font-size:12px;font-weight:600" id="nav-user-name-m"></div>
+      <div style="font-size:9px;color:var(--mt);text-transform:uppercase;margin-bottom:8px" id="nav-user-role-m"></div>
+      <button onclick="logout()" style="width:100%;background:rgba(248,81,73,.12);border:1px solid var(--err,#f85149);color:var(--err,#f85149);cursor:pointer;padding:8px;font-size:12px;border-radius:8px;font-weight:600">🚪 Cerrar sesión</button>
+    </div>
+  </div>
 </nav>
 <main>
 
@@ -446,6 +505,15 @@ td.err{color:var(--err);font-weight:600}
   </div>
 
   <div id="us-content"></div>
+</section>
+
+<!-- REGISTRO DE ACTIVIDAD (AUDIT LOG) -->
+<section class="section" id="s-auditlog">
+  <div class="sec-hdr">
+    <div><div class="sec-title">📜 Registro de Actividad</div><div class="sec-sub">Historial de cambios en el sistema</div></div>
+    <button class="btn btn-g" onclick="renderAuditLog()">🔄 Actualizar</button>
+  </div>
+  <div id="audit-content"></div>
 </section>
 
 <!-- BALANCE DE APERTURA -->
@@ -665,6 +733,50 @@ td.err{color:var(--err);font-weight:600}
   <div class="save-row"><button class="btn btn-p" onclick="saveHon()">💾 Guardar</button></div>
 </section>
 
+<!-- REMUNERACIONES -->
+<section class="section" id="s-remuneraciones">
+  <div class="sec-hdr"><div><div class="sec-title">Remuneraciones</div><div class="sec-sub">Libro de sueldos y liquidaciones</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-p" onclick="abrirFormTrabajador()">+ Trabajador</button>
+      <button class="btn btn-g" onclick="window.print()">🖨️</button>
+    </div>
+  </div>
+  <!-- Parámetros previsionales -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">⚙️ Parámetros del mes</div>
+    <div class="fg">
+      <div class="grp"><label>Mes de liquidación</label><select id="rem-mes" onchange="renderRemuneraciones()"></select></div>
+      <div class="grp"><label>Valor UF</label><input type="number" id="rem-uf" step="0.01" oninput="onParamRem()"></div>
+      <div class="grp"><label>Valor UTM</label><input type="number" id="rem-utm" step="1" oninput="onParamRem()"></div>
+    </div>
+    <div style="font-size:11px;color:var(--mt)">Topes 2026: AFP/salud 90 UF · cesantía 135,2 UF · IUSC exento hasta 13,5 UTM. Actualiza UF/UTM del mes (previred.com / sii.cl).</div>
+  </div>
+  <!-- Formulario trabajador -->
+  <div class="card" id="rem-form" style="display:none;margin-bottom:14px">
+    <div class="card-title" id="remf-title">Nuevo Trabajador</div>
+    <div class="fg">
+      <div class="grp full"><label>Nombre completo</label><input type="text" id="remf-nombre" placeholder="Ej: Juan Pérez González"></div>
+      <div class="grp"><label>RUT</label><input type="text" id="remf-rut" placeholder="12.345.678-9"></div>
+      <div class="grp"><label>Cargo</label><input type="text" id="remf-cargo" placeholder="Ej: Operario"></div>
+      <div class="grp"><label>Sueldo base mensual</label><input type="number" id="remf-base" placeholder="0" oninput="previewLiq()"></div>
+      <div class="grp"><label>Gratificación legal</label><input type="number" id="remf-grat" placeholder="0" value="0" oninput="previewLiq()"></div>
+      <div class="grp"><label>Otros haberes imponibles</label><input type="number" id="remf-otros" placeholder="0" value="0" oninput="previewLiq()"></div>
+      <div class="grp"><label>Colación (no imponible)</label><input type="number" id="remf-colacion" placeholder="0" value="0" oninput="previewLiq()"></div>
+      <div class="grp"><label>Movilización (no imponible)</label><input type="number" id="remf-movilizacion" placeholder="0" value="0" oninput="previewLiq()"></div>
+      <div class="grp"><label>AFP</label><select id="remf-afp" onchange="previewLiq()"></select></div>
+      <div class="grp"><label>Salud</label><select id="remf-salud" onchange="onSaludChange()"><option value="fonasa">Fonasa (7%)</option><option value="isapre">Isapre (plan UF)</option></select></div>
+      <div class="grp" id="remf-plan-wrap" style="display:none"><label>Plan Isapre (UF)</label><input type="number" id="remf-plan" step="0.01" placeholder="0" oninput="previewLiq()"></div>
+      <div class="grp"><label>Contrato</label><select id="remf-contrato" onchange="previewLiq()"><option value="indefinido">Indefinido (cesantía 0,6%)</option><option value="plazo">Plazo fijo (sin aporte trab.)</option></select></div>
+    </div>
+    <div id="remf-preview" style="margin:12px 0"></div>
+    <div class="save-row" style="display:flex;gap:8px">
+      <button class="btn btn-p" onclick="guardarTrabajador()">💾 Guardar</button>
+      <button class="btn btn-g" onclick="cerrarFormTrabajador()">Cancelar</button>
+    </div>
+  </div>
+  <div id="rem-content"></div>
+</section>
+
 <!-- ASIENTOS MANUALES -->
 <section class="section" id="s-asientos">
   <div class="sec-hdr">
@@ -775,6 +887,20 @@ td.err{color:var(--err);font-weight:600}
   <div id="resultados-content"></div>
 </section>
 
+<!-- FLUJO DE CAJA -->
+<section class="section" id="s-flujocaja">
+  <div class="sec-hdr"><div><div class="sec-title">Flujo de Caja</div><div class="sec-sub">Movimiento de efectivo realizado y proyectado</div></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="aux-tabs" style="margin:0">
+        <div class="aux-tab active" id="fc-tab-real" onclick="setFCView('realizado')">📊 Realizado</div>
+        <div class="aux-tab" id="fc-tab-proy" onclick="setFCView('proyectado')">🔮 Proyectado</div>
+      </div>
+      <button class="btn btn-g" onclick="window.print()">🖨️</button>
+    </div>
+  </div>
+  <div id="fc-content"></div>
+</section>
+
 <!-- FORMULARIO 29 -->
 <section class="section" id="s-f29">
   <div class="sec-hdr"><div><div class="sec-title">Formulario 29</div><div class="sec-sub">Declaración mensual de IVA y PPM</div></div>
@@ -823,7 +949,37 @@ td.err{color:var(--err);font-weight:600}
   <div id="af-content"></div>
 </section>
 
+<!-- PROVISIONES -->
+<section class="section" id="s-provisiones">
+  <div class="sec-hdr"><div><div class="sec-title">Provisiones</div><div class="sec-sub">Estimaciones de cierre (incobrables, feriado legal)</div></div></div>
+  <div id="prov-content"></div>
+</section>
+
+<!-- CORRECCIÓN MONETARIA -->
+<section class="section" id="s-correccion">
+  <div class="sec-hdr"><div><div class="sec-title">Corrección Monetaria</div><div class="sec-sub">Reajuste Art. 41 LIR</div></div></div>
+  <div id="cm-content"></div>
+</section>
+
+<!-- CIERRE DEL EJERCICIO -->
+<section class="section" id="s-cierre">
+  <div class="sec-hdr"><div><div class="sec-title">Cierre del Ejercicio</div><div class="sec-sub">Traspaso de resultado a Resultados Acumulados</div></div></div>
+  <div id="cierre-content"></div>
+</section>
+
 </main>
+</div>
+
+<!-- BÚSQUEDA GLOBAL (Ctrl+K) -->
+<div id="search-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;padding-top:10vh" onclick="if(event.target===this)cerrarBusqueda()">
+  <div style="max-width:640px;margin:0 auto;background:var(--sf);border:1px solid var(--bd);border-radius:12px;box-shadow:0 12px 48px rgba(0,0,0,.5);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">
+      <span style="font-size:16px">🔍</span>
+      <input id="search-input" type="text" placeholder="Buscar documentos, asientos, cuentas, personas..." oninput="ejecutarBusqueda()" onkeydown="navBusqueda(event)" style="flex:1;background:none;border:none;color:var(--tx);font-size:15px;outline:none">
+      <span style="font-size:10px;color:var(--mt);border:1px solid var(--bd);border-radius:5px;padding:2px 6px">ESC</span>
+    </div>
+    <div id="search-results" style="max-height:60vh;overflow-y:auto;padding:6px"></div>
+  </div>
 </div>
 
 <!-- MODAL DTE (para asientos manuales de proveedores/clientes) -->
@@ -1065,15 +1221,21 @@ const SECCIONES=[
   {id:'ventas',lbl:'Libro de Ventas'},
   {id:'compras',lbl:'Libro de Compras'},
   {id:'honorarios',lbl:'Honorarios'},
+  {id:'remuneraciones',lbl:'Remuneraciones'},
   {id:'asientos',lbl:'Asientos Manuales'},
   {id:'auxiliares',lbl:'Auxiliares'},
   {id:'diario',lbl:'Libro Diario'},
   {id:'mayor',lbl:'Libro Mayor'},
   {id:'balance',lbl:'Balance General'},
   {id:'resultados',lbl:'Estado de Resultados'},
+  {id:'flujocaja',lbl:'Flujo de Caja'},
+  {id:'auditlog',lbl:'Registro de Actividad'},
   {id:'f29',lbl:'Formulario 29'},
   {id:'ppm',lbl:'PPM'},
-  {id:'activofijo',lbl:'Activos Fijos'}
+  {id:'activofijo',lbl:'Activos Fijos'},
+  {id:'provisiones',lbl:'Provisiones'},
+  {id:'correccion',lbl:'Corrección Monetaria'},
+  {id:'cierre',lbl:'Cierre del Ejercicio'}
 ];
 
 // Permisos por rol (por defecto)
@@ -1315,10 +1477,19 @@ async function verificarUsuarioAutorizado(fbUser){
       const av=document.getElementById('user-avatar');
       av.src=userData.foto;av.style.display='';
     }
+    // Bloque de usuario en el nav móvil
+    const nub=document.getElementById('nav-user-block-m');
+    if(nub){
+      nub.style.display='';
+      document.getElementById('nav-user-name-m').textContent=userData.nombre||email;
+      document.getElementById('nav-user-role-m').innerHTML=`${rolInfo.icon} ${rolInfo.label}`;
+    }
     // Mostrar item Usuarios si es admin
     if(esAdmin()){
       document.getElementById('nav-usuarios').style.display='';
+      const na=document.getElementById('nav-auditlog');if(na)na.style.display='';
     }
+    logAccion('Inició sesión','');
     // Aplicar filtros de permisos a la UI
     aplicarPermisosUI();
     // Iniciar la app si aún no ha iniciado
@@ -2014,8 +2185,10 @@ let S={
   honorarios:[],
   asientos:[],
   activos:[],   // [{id,desc,cat,cuentaActivo,cuentaDeprAcum,cuentaGasto,fecha,valor,residual,vida,metodo}]
+  trabajadores:[], // [{id,nombre,rut,cargo,base,grat,otros,colacion,movilizacion,afp,salud,plan,contrato}]
   apertura:null  // {fecha,glosa,movs:[{cd,nm,desc,debe,haber,rutCodigo?,rutDV?,razonSocial?}]}
 };
+let REMF={editId:null};        // form trabajador
 let AFB={editId:null};         // form activo fijo (bien)
 let VF={editId:null};          // form ventas
 let CF={editId:null,dist:[]};  // form compras
@@ -2040,12 +2213,13 @@ async function saveAll(){
     await window.storage.set('honorarios-'+y,JSON.stringify(S.honorarios));
     await window.storage.set('asientos-'+y,JSON.stringify(S.asientos));
     if(S.activos&&S.activos.length)await window.storage.set('activos',JSON.stringify(S.activos));
+    if(S.trabajadores&&S.trabajadores.length)await window.storage.set('trabajadores',JSON.stringify(S.trabajadores));
     toast('✅ Todos los datos guardados');
   }catch(e){toast('❌ Error: '+e.message,'e');}
   btn.textContent='💾 Guardar Todo';
 }
 async function loadYear(y){
-  S.ventas=[];S.compras=[];S.honorarios=[];S.asientos=[];S.apertura=null;S.activos=[];
+  S.ventas=[];S.compras=[];S.honorarios=[];S.asientos=[];S.apertura=null;S.activos=[];S.trabajadores=[];
   for(const[k,d] of [['ventas-'+y,'ventas'],['compras-'+y,'compras'],['honorarios-'+y,'honorarios'],['asientos-'+y,'asientos']]){
     try{
       const r=await window.storage.get(k);
@@ -2068,6 +2242,11 @@ async function loadYear(y){
   try{
     const r=await window.storage.get('activos');
     if(r){const p=JSON.parse(r.value);if(Array.isArray(p))S.activos=p;}
+  }catch(e){}
+  // Trabajadores: clave GLOBAL (persisten entre meses/años)
+  try{
+    const r=await window.storage.get('trabajadores');
+    if(r){const p=JSON.parse(r.value);if(Array.isArray(p))S.trabajadores=p;}
   }catch(e){}
 }
 async function changeYear(y){S.empresa.anio=y;await loadYear(y);rerender();}
@@ -2118,18 +2297,31 @@ async function initApp(){
 
 // ═══ NAV ═══
 let curSec='empresa';
+function toggleNav(){
+  const nav=document.querySelector('nav');
+  const ov=document.getElementById('nav-overlay');
+  const abierto=nav.classList.toggle('open');
+  if(ov)ov.classList.toggle('open',abierto);
+}
+function cerrarNavMovil(){
+  const nav=document.querySelector('nav');
+  const ov=document.getElementById('nav-overlay');
+  if(nav)nav.classList.remove('open');
+  if(ov)ov.classList.remove('open');
+}
 function nav(s){
   document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   document.getElementById('s-'+s).classList.add('active');
   document.querySelector('[data-s="'+s+'"]').classList.add('active');
   curSec=s;renderSec(s);
+  cerrarNavMovil(); // en móvil, cerrar el drawer tras elegir sección
 }
 function renderSec(s){
   // Verificar permiso de acceso a la sección.
   // 'empresa' y 'usuarios' se excluyen del bloqueo genérico: empresa es la landing,
   // y usuarios tiene su propio control de admin dentro de renderUsuarios().
-  if(AUTH.user&&s!=='empresa'&&s!=='usuarios'&&!puedeVer(s)){
+  if(AUTH.user&&s!=='empresa'&&s!=='usuarios'&&s!=='auditlog'&&!puedeVer(s)){
     const sec=document.getElementById('s-'+s);
     if(sec)sec.innerHTML='<div class="empty"><div class="ei">🚫</div>No tienes permiso para acceder a esta sección.<br><br>Contacta a un administrador para solicitar acceso.</div>';
     return;
@@ -2138,18 +2330,24 @@ function renderSec(s){
   else if(s==='pdc')renderPDC();
   else if(s==='apertura')renderApertura();
   else if(s==='usuarios')renderUsuarios();
+  else if(s==='auditlog')renderAuditLog();
   else if(s==='ventas')renderVentas();
   else if(s==='compras')renderCompras();
   else if(s==='honorarios')renderHon();
+  else if(s==='remuneraciones')renderRemuneraciones();
   else if(s==='asientos')renderAsientos();
   else if(s==='auxiliares')renderAuxiliares();
   else if(s==='diario')renderDiario();
   else if(s==='mayor')renderMayor();
   else if(s==='balance')renderBalance();
   else if(s==='resultados')renderResultados();
+  else if(s==='flujocaja')renderFlujoCaja();
   else if(s==='f29')renderF29();
   else if(s==='ppm')renderPPM();
   else if(s==='activofijo')renderActivoFijo();
+  else if(s==='provisiones')renderProvisiones();
+  else if(s==='correccion')renderCorreccion();
+  else if(s==='cierre')renderCierre();
 }
 function rerender(){updateHdr();renderSec(curSec);}
 
@@ -2179,6 +2377,7 @@ function updateHdr(){
   const cs=document.getElementById('compras-sub');if(cs)cs.textContent='Registro por documento — '+S.empresa.anio;
   const nba=document.getElementById('nb-as');if(nba)nba.textContent=S.asientos.length||'0';
   const nbaf=document.getElementById('nb-af');if(nbaf)nbaf.textContent=(S.activos&&S.activos.length)||'0';
+  const nbrem=document.getElementById('nb-rem');if(nbrem)nbrem.textContent=(S.trabajadores&&S.trabajadores.length)||'0';
   const nbx=document.getElementById('nb-aux');if(nbx){
     const cli=new Set(),prv=new Set();
     S.ventas.forEach(v=>{if(v.rutCodigo&&v.formaPago==='clientes')cli.add(v.rutCodigo);});
@@ -3257,8 +3456,8 @@ function guardarVenta(){
   }
 
   const doc={id:VF.editId||'v_'+Date.now(),fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,neto,exento,iva,otrosImpuestos,total,formaPago};
-  if(VF.editId){const i=S.ventas.findIndex(x=>x.id===VF.editId);if(i>=0)S.ventas[i]=doc;toast('✅ Documento actualizado');}
-  else{S.ventas.push(doc);toast('✅ Documento registrado');}
+  if(VF.editId){const i=S.ventas.findIndex(x=>x.id===VF.editId);if(i>=0)S.ventas[i]=doc;toast('✅ Documento actualizado');logAccion('Editó venta',`DTE ${doc.tipoDTE} N°${doc.numero} · ${fmtC(doc.total)}`);}
+  else{S.ventas.push(doc);toast('✅ Documento registrado');logAccion('Registró venta',`DTE ${doc.tipoDTE} N°${doc.numero} · ${doc.razonSocial} · ${fmtC(doc.total)}`);}
   window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas)).catch(()=>{});
   cerrarVF();rerender();
 }
@@ -3539,8 +3738,8 @@ function guardarCompra(){
   }
 
   const doc={id:CF.editId||'c_'+Date.now(),fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,neto,exento,iva,otrosImpuestos,total,dist};
-  if(CF.editId){const i=S.compras.findIndex(x=>x.id===CF.editId);if(i>=0)S.compras[i]=doc;toast('✅ Documento actualizado');}
-  else{S.compras.push(doc);toast('✅ Documento registrado');}
+  if(CF.editId){const i=S.compras.findIndex(x=>x.id===CF.editId);if(i>=0)S.compras[i]=doc;toast('✅ Documento actualizado');logAccion('Editó compra',`DTE ${doc.tipoDTE} N°${doc.numero} · ${fmtC(doc.total)}`);}
+  else{S.compras.push(doc);toast('✅ Documento registrado');logAccion('Registró compra',`DTE ${doc.tipoDTE} N°${doc.numero} · ${doc.razonSocial} · ${fmtC(doc.total)}`);}
   window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>{});
   cerrarCF();rerender();
 }
@@ -4523,12 +4722,12 @@ function anularAsiento(id){
     if(!confirm(`¿Reactivar asiento N°${a.n||''} — "${a.glosa}"?\nVolverá a afectar Mayor, Balance y auxiliares.`))return;
     a.anulado=false;
     window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos)).catch(()=>{});
-    rerender();toast('↩️ Asiento N°'+(a.n||'')+' reactivado');
+    rerender();toast('↩️ Asiento N°'+(a.n||'')+' reactivado');logAccion('Reactivó asiento',`N°${a.n} — ${a.glosa}`);
   }else{
     if(!confirm(`¿Anular asiento N°${a.n||''} — "${a.glosa}"?\n\nNo borra el número de correlativo, pero excluye sus efectos de Libro Mayor, Balance, Estado de Resultados y auxiliares.\n\nPodrás reactivarlo después.`))return;
     a.anulado=true;
     window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos)).catch(()=>{});
-    rerender();toast('🚫 Asiento N°'+(a.n||'')+' anulado');
+    rerender();toast('🚫 Asiento N°'+(a.n||'')+' anulado');logAccion('Anuló asiento',`N°${a.n} — ${a.glosa}`);
   }
 }
 
@@ -4659,6 +4858,7 @@ function guardarAsiento(){
   // Asiento nuevo
   folioGuardado=proxFolioAsiento();
   S.asientos.push({id:'as_'+Date.now(),n:folioGuardado,fecha,glosa,movs:movsClean});
+  logAccion('Creó asiento',`N°${folioGuardado} — ${glosa}`);
   toast('✅ Asiento N°'+folioGuardado+' registrado');
   window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos)).catch(()=>toast('❌ Error al guardar en storage','e'));
 
@@ -4675,7 +4875,7 @@ function eliminarAsiento(id){
   if(!confirm(`¿Eliminar asiento N°${a.n||''} — "${a.glosa}"?\nEsta acción no se puede deshacer.`))return;
   S.asientos=S.asientos.filter(x=>x.id!==id);
   window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos)).catch(()=>{});
-  renderAsientos();toast('🗑 Asiento eliminado');
+  renderAsientos();toast('🗑 Asiento eliminado');logAccion('Eliminó asiento',`N°${a.n} — ${a.glosa}`);
 }
 
 // ═══ LIBRO DIARIO (auto + manuales) ═══
@@ -5168,9 +5368,10 @@ async function renderBalance(){
   // El resultado del ejercicio (ingresos 04 − costos 03) se calcula aparte y se suma al patrimonio.
   const grpPrefijo=(pref,title)=>{
     let tot=0;
-    // Cuentas correctoras de activo (depreciación/amortización acumulada): restan del activo.
-    // Patrón: 5º dígito '2' dentro del grupo 12 (ej: 1201202, 1202201, 1207201).
-    const esCorrectoraActivo=cd=>cd.startsWith('12')&&cd[4]==='2';
+    // Cuentas correctoras de activo (restan del activo, saldo acreedor):
+    //  - Depreciación/amortización acumulada: grupo 12 con 5º dígito '2' (ej 1201202)
+    //  - Estimación de incobrables: subgrupo 1105 (ej 1105001)
+    const esCorrectoraActivo=cd=>(cd.startsWith('12')&&cd[4]==='2')||cd.startsWith('1105');
     const cds=Object.keys(M).filter(cd=>cd.length===7&&pref.some(p=>cd.startsWith(p))&&Math.abs(M[cd].saldo)>=0.5)
       .sort();
     const rows=cds.map(cd=>{
@@ -5701,6 +5902,793 @@ function renderActivoFijo(){
   <div style="margin-top:10px;font-size:10px;color:var(--mt)">Vida útil según tabla normal del SII. La depreciación comienza el 1 de enero del año siguiente a la compra. El método acelerado usa 1/3 de la vida normal (mínimo 3 años).</div>`;
 }
 
+// ═══ FASE 4: AJUSTES DE CIERRE ═══
+
+// ── CIERRE DEL EJERCICIO ──
+// Calcula el resultado del ejercicio (ingresos − gastos) y prepara el asiento de cierre
+// que salda todas las cuentas de resultado (grupos 3 y 4) contra Resultados Acumulados (2303001).
+const CUENTA_RESULTADOS_ACUM='2303001';
+function calcularResultadoEjercicio(){
+  const M=buildMayor();
+  // Cuentas de resultado con saldo
+  const cuentasRes=Object.keys(M).filter(k=>k.length===7&&(k.startsWith('3')||k.startsWith('4'))&&Math.abs(M[k].saldo)>=0.5);
+  const ingresos=cuentasRes.filter(k=>k.startsWith('4')).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
+  const gastos=cuentasRes.filter(k=>k.startsWith('3')).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
+  const resultado=ingresos-gastos;
+  return {M,cuentasRes,ingresos,gastos,resultado};
+}
+function renderCierre(){
+  const anio=S.empresa.anio;
+  const {cuentasRes,ingresos,gastos,resultado}=calcularResultadoEjercicio();
+  const el=document.getElementById('cierre-content');
+  const yaCerrado=S.asientos.find(a=>a.glosa&&a.glosa.includes('Cierre del ejercicio '+anio));
+  el.innerHTML=`<div class="card" style="max-width:640px">
+    <div class="info-tip" style="margin-bottom:16px">🔒 El <strong>cierre del ejercicio</strong> traspasa el resultado del año (utilidad o pérdida) a la cuenta <strong>Resultados Acumulados</strong>, dejando en cero las cuentas de ingresos y gastos para comenzar el año siguiente.</div>
+    <table style="margin-bottom:16px"><tbody>
+      <tr><td class="tl" style="padding:8px 12px;font-size:13px">Total Ingresos (grupo 4)</td><td style="font-family:var(--mono);text-align:right;color:var(--ach)">${fmtC(ingresos)}</td></tr>
+      <tr><td class="tl" style="padding:8px 12px;font-size:13px">Total Gastos y Costos (grupo 3)</td><td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(gastos)}</td></tr>
+      <tr style="background:${resultado>=0?'rgba(46,160,67,.12)':'rgba(248,81,73,.12)'}"><td class="tl" style="padding:11px 12px;font-weight:700;font-size:14px">${resultado>=0?'UTILIDAD':'PÉRDIDA'} DEL EJERCICIO</td><td style="font-family:var(--mono);text-align:right;font-weight:700;font-size:14px;color:${resultado>=0?'var(--ach)':'var(--err)'}">${fmtC(resultado)}</td></tr>
+    </tbody></table>
+    ${cuentasRes.length===0?'<div class="empty"><div class="ei">📭</div>No hay cuentas de resultado con movimientos para cerrar.</div>':
+    yaCerrado?`<div class="info-tip" style="background:rgba(210,153,34,.10);border-color:var(--warn)">⚠️ Ya existe un asiento de cierre para ${anio} (N°${yaCerrado.n}). Generar otro duplicaría el efecto.</div>
+      <div style="margin-top:12px"><button class="btn btn-g" onclick="generarAsientoCierre()">Generar otro de todas formas</button></div>`:
+    `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="generarAsientoCierre()">🔒 Generar asiento de cierre ${anio}</button>
+      <span style="font-size:11px;color:var(--mt)">Saldará ${cuentasRes.length} cuentas de resultado contra Resultados Acumulados al 31/dic/${anio}.</span>
+    </div>`}
+    <div style="margin-top:14px;font-size:10px;color:var(--mt)">Cuenta destino: ${CUENTA_RESULTADOS_ACUM} · ${pdcNm(CUENTA_RESULTADOS_ACUM)}. Recomendado hacerlo después de registrar depreciación y provisiones del año.</div>
+  </div>`;
+}
+function generarAsientoCierre(){
+  const anio=S.empresa.anio;
+  const {M,cuentasRes,resultado}=calcularResultadoEjercicio();
+  if(!cuentasRes.length){toast('⚠️ No hay cuentas de resultado que cerrar','e');return;}
+  if(!confirm(`¿Generar el asiento de cierre del ejercicio ${anio}?\n\nSaldará todas las cuentas de ingresos y gastos y traspasará el resultado (${fmtC(resultado)}) a Resultados Acumulados.\n\nEste asiento se registra al 31/dic/${anio}.`))return;
+  const movs=[];
+  // Saldar cada cuenta de resultado con el movimiento contrario a su saldo
+  cuentasRes.forEach(cd=>{
+    const saldo=M[cd].saldo; // deudora>0 (gastos), acreedora<0 (ingresos)
+    if(saldo>0){ // cuenta de gasto (saldo deudor) → abonar para saldar
+      movs.push({cd,nm:M[cd].nm||pdcNm(cd),debe:0,haber:saldo});
+    }else{ // cuenta de ingreso (saldo acreedor) → cargar para saldar
+      movs.push({cd,nm:M[cd].nm||pdcNm(cd),debe:-saldo,haber:0});
+    }
+  });
+  // Contrapartida: Resultados Acumulados. Utilidad → se abona (haber); Pérdida → se carga (debe)
+  if(resultado>=0){
+    movs.push({cd:CUENTA_RESULTADOS_ACUM,nm:pdcNm(CUENTA_RESULTADOS_ACUM),debe:0,haber:resultado,desc:'Utilidad del ejercicio '+anio});
+  }else{
+    movs.push({cd:CUENTA_RESULTADOS_ACUM,nm:pdcNm(CUENTA_RESULTADOS_ACUM),debe:-resultado,haber:0,desc:'Pérdida del ejercicio '+anio});
+  }
+  const folio=proxFolioAsiento();
+  S.asientos.push({id:'as_'+Date.now(),n:folio,fecha:anio+'-12-31',glosa:'Cierre del ejercicio '+anio,movs});
+  window.storage.set('asientos-'+anio,JSON.stringify(S.asientos)).catch(()=>{});
+  toast('✅ Asiento N°'+folio+' de cierre generado ('+fmtC(resultado)+')');
+  renderCierre();updateHdr();
+}
+
+// ── PROVISIONES ──
+function renderProvisiones(){
+  const anio=S.empresa.anio;
+  const el=document.getElementById('prov-content');
+  // Base incobrables: saldo de clientes por cobrar (auxiliar). Base feriado: sueldos del año.
+  const M=buildMayor();
+  const saldoClientes=M['1104001']?Math.abs(M['1104001'].saldo):0;
+  const sueldosAnio=Object.keys(M).filter(k=>k.startsWith('3201')&&Math.abs(M[k].saldo)>=0.5).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
+  el.innerHTML=`<div class="card" style="max-width:640px;margin-bottom:16px">
+    <div class="card-title">🔻 Provisión de Incobrables</div>
+    <div class="info-tip" style="margin-bottom:12px">Estima el % de las cuentas por cobrar que probablemente no se cobrarán. Genera: cargo a <strong>Castigo Incobrables</strong> (gasto) / abono a <strong>Estimación Clientes Incobrables</strong> (correctora del activo).</div>
+    <div class="fg">
+      <div class="grp"><label>Saldo Clientes por Cobrar</label><input type="text" value="${fmtC(saldoClientes)}" readonly style="color:var(--mt)"></div>
+      <div class="grp"><label>% Incobrable estimado</label><input type="number" id="prov-inc-pct" step="0.1" min="0" max="100" value="2" oninput="previewProvInc()"></div>
+    </div>
+    <div id="prov-inc-preview" style="margin:10px 0"></div>
+    <button class="btn btn-p" onclick="generarProvisionIncobrables()">📝 Generar provisión incobrables</button>
+  </div>
+  <div class="card" style="max-width:640px">
+    <div class="card-title">🏖️ Provisión de Feriado Legal (Vacaciones)</div>
+    <div class="info-tip" style="margin-bottom:12px">Estima el costo de los días de vacaciones acumulados por el personal. Genera: cargo a <strong>Vacaciones</strong> (gasto) / abono a <strong>Provisión Vacaciones</strong> (pasivo).</div>
+    <div class="fg">
+      <div class="grp"><label>Monto a provisionar</label><input type="number" id="prov-fer-monto" placeholder="0" oninput="previewProvFer()"></div>
+    </div>
+    <div style="font-size:11px;color:var(--mt);margin-bottom:8px">Referencia: sueldos del año = ${fmtC(sueldosAnio)}. Regla general: ~1,25 días por mes trabajado por remuneración diaria.</div>
+    <div id="prov-fer-preview" style="margin:10px 0"></div>
+    <button class="btn btn-p" onclick="generarProvisionFeriado()">📝 Generar provisión feriado</button>
+  </div>`;
+  previewProvInc();
+}
+function previewProvInc(){
+  const M=buildMayor();
+  const saldo=M['1104001']?Math.abs(M['1104001'].saldo):0;
+  const pct=+document.getElementById('prov-inc-pct').value||0;
+  const monto=Math.round(saldo*pct/100);
+  const el=document.getElementById('prov-inc-preview');
+  if(el)el.innerHTML=monto>0?`<div class="info-tip" style="font-size:12px">Provisión: <strong>${fmtC(monto)}</strong> (${pct}% de ${fmtC(saldo)})</div>`:'';
+}
+function previewProvFer(){
+  const monto=+document.getElementById('prov-fer-monto').value||0;
+  const el=document.getElementById('prov-fer-preview');
+  if(el)el.innerHTML=monto>0?`<div class="info-tip" style="font-size:12px">Provisión feriado: <strong>${fmtC(monto)}</strong></div>`:'';
+}
+function generarProvisionIncobrables(){
+  const anio=S.empresa.anio;
+  const M=buildMayor();
+  const saldo=M['1104001']?Math.abs(M['1104001'].saldo):0;
+  const pct=+document.getElementById('prov-inc-pct').value||0;
+  const monto=Math.round(saldo*pct/100);
+  if(monto<=0){toast('⚠️ El monto de la provisión es 0','e');return;}
+  if(!confirm(`¿Generar provisión de incobrables por ${fmtC(monto)} (${pct}% de las cuentas por cobrar)?`))return;
+  const movs=[
+    {cd:'3302001',nm:pdcNm('3302001'),debe:monto,haber:0,desc:'Provisión incobrables '+anio},
+    {cd:'1105001',nm:pdcNm('1105001'),debe:0,haber:monto,desc:'Estimación clientes incobrables'},
+  ];
+  const folio=proxFolioAsiento();
+  S.asientos.push({id:'as_'+Date.now(),n:folio,fecha:anio+'-12-31',glosa:'Provisión incobrables '+anio,movs});
+  window.storage.set('asientos-'+anio,JSON.stringify(S.asientos)).catch(()=>{});
+  toast('✅ Asiento N°'+folio+' — provisión incobrables '+fmtC(monto));
+  renderProvisiones();updateHdr();
+}
+function generarProvisionFeriado(){
+  const anio=S.empresa.anio;
+  const monto=+document.getElementById('prov-fer-monto').value||0;
+  if(monto<=0){toast('⚠️ Ingresa el monto a provisionar','e');return;}
+  if(!confirm(`¿Generar provisión de feriado legal por ${fmtC(monto)}?`))return;
+  const movs=[
+    {cd:'3201011',nm:pdcNm('3201011'),debe:monto,haber:0,desc:'Provisión feriado '+anio},
+    {cd:'2105004',nm:pdcNm('2105004'),debe:0,haber:monto,desc:'Provisión vacaciones'},
+  ];
+  const folio=proxFolioAsiento();
+  S.asientos.push({id:'as_'+Date.now(),n:folio,fecha:anio+'-12-31',glosa:'Provisión feriado '+anio,movs});
+  window.storage.set('asientos-'+anio,JSON.stringify(S.asientos)).catch(()=>{});
+  toast('✅ Asiento N°'+folio+' — provisión feriado '+fmtC(monto));
+  renderProvisiones();updateHdr();
+}
+
+// ── CORRECCIÓN MONETARIA (informativa; 14 D N°3 está exento) ──
+function renderCorreccion(){
+  const anio=S.empresa.anio;
+  const el=document.getElementById('cm-content');
+  const M=buildMayor();
+  const capital=Object.keys(M).filter(k=>k.startsWith('23')&&Math.abs(M[k].saldo)>=0.5).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
+  const factorDefault=(S.empresa.factorCM!=null?+S.empresa.factorCM:3.4);
+  el.innerHTML=`<div class="card" style="max-width:640px">
+    <div class="info-tip" style="margin-bottom:16px;background:rgba(210,153,34,.10);border-color:var(--warn)">⚠️ <strong>Tu empresa está en régimen 14 D N°3 Pro-Pyme General, que NO está sujeto a corrección monetaria</strong> del Art. 41 de la LIR (los contribuyentes de este régimen no reajustan sus registros empresariales). Este módulo es solo <strong>informativo/referencial</strong> por si cambias de régimen o lo necesitas para análisis.</div>
+    <div class="card-title">Cálculo referencial de reajuste</div>
+    <div class="fg">
+      <div class="grp"><label>Capital Propio (patrimonio)</label><input type="text" value="${fmtC(capital)}" readonly style="color:var(--mt)"></div>
+      <div class="grp"><label>Factor de reajuste anual (%)</label><input type="number" id="cm-factor" step="0.1" value="${factorDefault}" oninput="previewCM()"></div>
+    </div>
+    <div style="font-size:11px;color:var(--mt);margin-bottom:8px">Factor oficial SII 2025 (regímenes sujetos a CM): 3,4%. Actualízalo según el año en el sitio del SII.</div>
+    <div id="cm-preview"></div>
+    <div class="info-tip" style="margin-top:14px;font-size:10px">El SII publica el factor anual de reajuste del capital propio. Referencia: sii.cl → Valores y Fechas → Corrección Monetaria. Para 14 D N°3 no se registra ningún asiento por este concepto.</div>
+  </div>`;
+  previewCM();
+}
+function previewCM(){
+  const M=buildMayor();
+  const capital=Object.keys(M).filter(k=>k.startsWith('23')&&Math.abs(M[k].saldo)>=0.5).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
+  const factor=+document.getElementById('cm-factor').value||0;
+  const reajuste=Math.round(capital*factor/100);
+  const el=document.getElementById('cm-preview');
+  if(el)el.innerHTML=`<div class="info-tip" style="font-size:12px">Reajuste referencial del capital propio: <strong>${fmtC(reajuste)}</strong> (${factor}% de ${fmtC(capital)})<br><span style="color:var(--mt);font-size:11px">En regímenes sujetos a CM: cargo a Corrección Monetaria (resultado) / abono a Fondo Revalorización Capital Propio.</span></div>`;
+}
+
+// ═══ FASE 5: REMUNERACIONES ═══
+// Parámetros previsionales 2026 (Superintendencia de Pensiones / SII)
+const REM_PARAMS={
+  topeAFP_UF:90.0,       // tope imponible AFP/salud
+  topeCesantia_UF:135.2, // tope imponible seguro cesantía
+  tasaAFP:0.10,          // cotización obligatoria AFP
+  tasaSalud:0.07,        // salud mínimo (Fonasa 7%)
+  tasaCesantiaTrab:0.006,// cesantía trabajador (contrato indefinido)
+  ingresoMinimo:539000,
+};
+// AFP con sus comisiones (% adicional sobre imponible) — actualizables
+const AFP_LISTA=[
+  {k:'capital',   nm:'Capital',    comision:0.0144},
+  {k:'cuprum',    nm:'Cuprum',     comision:0.0144},
+  {k:'habitat',   nm:'Habitat',    comision:0.0127},
+  {k:'planvital', nm:'PlanVital',  comision:0.0116},
+  {k:'provida',   nm:'ProVida',    comision:0.0145},
+  {k:'modelo',    nm:'Modelo',     comision:0.0058},
+  {k:'uno',       nm:'AFP Uno',    comision:0.0049},
+];
+const afpInfo=k=>AFP_LISTA.find(a=>a.k===k)||AFP_LISTA[0];
+// Tabla IUSC en UTM (Art. 43 LIR) — factores y rebajas estables; solo cambia la UTM
+const IUSC_TABLA=[
+  {desde:0,    hasta:13.5, factor:0,     rebajaUTM:0},
+  {desde:13.5, hasta:30,   factor:0.04,  rebajaUTM:0.54},
+  {desde:30,   hasta:50,   factor:0.08,  rebajaUTM:1.74},
+  {desde:50,   hasta:70,   factor:0.135, rebajaUTM:4.49},
+  {desde:70,   hasta:90,   factor:0.23,  rebajaUTM:11.14},
+  {desde:90,   hasta:120,  factor:0.304, rebajaUTM:17.80},
+  {desde:120,  hasta:310,  factor:0.35,  rebajaUTM:23.32},
+  {desde:310,  hasta:1e9,  factor:0.40,  rebajaUTM:38.82},
+];
+function calcularIUSC(baseTributable,utm){
+  if(!utm||utm<=0)return 0;
+  const baseUTM=baseTributable/utm;
+  const t=IUSC_TABLA.find(x=>baseUTM>x.desde&&baseUTM<=x.hasta)||IUSC_TABLA[IUSC_TABLA.length-1];
+  return Math.max(0,Math.round(baseTributable*t.factor-t.rebajaUTM*utm));
+}
+// UF/UTM del mes: guardadas en empresa (editables). Defaults referenciales.
+function getUF(){return +document.getElementById('rem-uf')?.value||S.empresa.remUF||69751;}
+function getUTM(){return +document.getElementById('rem-utm')?.value||S.empresa.remUTM||71506;}
+
+// Calcula la liquidación completa de un trabajador con UF/UTM dados
+function calcularLiquidacion(t,uf,utm){
+  const base=+t.base||0, grat=+t.grat||0, otros=+t.otros||0;
+  const colacion=+t.colacion||0, movilizacion=+t.movilizacion||0;
+  // Total imponible (haberes que cotizan)
+  const totalImponible=base+grat+otros;
+  const totalNoImponible=colacion+movilizacion;
+  const totalHaberes=totalImponible+totalNoImponible;
+  // Topes
+  const topeAFP=Math.round(REM_PARAMS.topeAFP_UF*uf);
+  const topeCes=Math.round(REM_PARAMS.topeCesantia_UF*uf);
+  const baseAFP=Math.min(totalImponible,topeAFP);
+  const baseCes=Math.min(totalImponible,topeCes);
+  // Descuentos previsionales
+  const afp=afpInfo(t.afp);
+  const descAFP=Math.round(baseAFP*(REM_PARAMS.tasaAFP+afp.comision));
+  const descAFP_pension=Math.round(baseAFP*REM_PARAMS.tasaAFP);
+  const descAFP_comision=descAFP-descAFP_pension;
+  // Salud: Fonasa 7%, Isapre = mayor entre 7% y plan en UF
+  let descSalud;
+  if(t.salud==='isapre'&&t.plan){
+    const planPesos=Math.round((+t.plan||0)*uf);
+    descSalud=Math.max(Math.round(baseAFP*REM_PARAMS.tasaSalud),planPesos);
+  }else{
+    descSalud=Math.round(baseAFP*REM_PARAMS.tasaSalud);
+  }
+  // Cesantía trabajador (solo contrato indefinido)
+  const descCesantia=t.contrato==='indefinido'?Math.round(baseCes*REM_PARAMS.tasaCesantiaTrab):0;
+  // Total cotizaciones previsionales
+  const totalPrevisional=descAFP+descSalud+descCesantia;
+  // Base tributable = imponible − cotizaciones previsionales
+  const baseTributable=totalImponible-totalPrevisional;
+  // Impuesto único
+  const iusc=calcularIUSC(baseTributable,utm);
+  // Total descuentos y líquido
+  const totalDescuentos=totalPrevisional+iusc;
+  const liquido=totalHaberes-totalDescuentos;
+  return {totalImponible,totalNoImponible,totalHaberes,baseAFP,baseCes,
+    descAFP,descAFP_pension,descAFP_comision,descSalud,descCesantia,
+    totalPrevisional,baseTributable,iusc,totalDescuentos,liquido,
+    afpNm:afp.nm};
+}
+
+function abrirFormTrabajador(){
+  REMF={editId:null};
+  const f=document.getElementById('rem-form');f.style.display='block';
+  document.getElementById('remf-title').textContent='Nuevo Trabajador';
+  document.getElementById('remf-afp').innerHTML=AFP_LISTA.map(a=>`<option value="${a.k}">${a.nm} (${(a.comision*100).toFixed(2)}%)</option>`).join('');
+  ['nombre','rut','cargo','base','plan'].forEach(x=>{const e=document.getElementById('remf-'+x);if(e)e.value='';});
+  ['grat','otros','colacion','movilizacion'].forEach(x=>{const e=document.getElementById('remf-'+x);if(e)e.value='0';});
+  document.getElementById('remf-salud').value='fonasa';
+  document.getElementById('remf-contrato').value='indefinido';
+  document.getElementById('remf-plan-wrap').style.display='none';
+  document.getElementById('remf-preview').innerHTML='';
+  f.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cerrarFormTrabajador(){document.getElementById('rem-form').style.display='none';REMF={editId:null};}
+function onSaludChange(){
+  const isIsapre=document.getElementById('remf-salud').value==='isapre';
+  document.getElementById('remf-plan-wrap').style.display=isIsapre?'':'none';
+  previewLiq();
+}
+function leerFormTrabajador(){
+  return {
+    nombre:document.getElementById('remf-nombre').value.trim(),
+    rut:document.getElementById('remf-rut').value.trim(),
+    cargo:document.getElementById('remf-cargo').value.trim(),
+    base:+document.getElementById('remf-base').value||0,
+    grat:+document.getElementById('remf-grat').value||0,
+    otros:+document.getElementById('remf-otros').value||0,
+    colacion:+document.getElementById('remf-colacion').value||0,
+    movilizacion:+document.getElementById('remf-movilizacion').value||0,
+    afp:document.getElementById('remf-afp').value,
+    salud:document.getElementById('remf-salud').value,
+    plan:+document.getElementById('remf-plan').value||0,
+    contrato:document.getElementById('remf-contrato').value,
+  };
+}
+function previewLiq(){
+  const t=leerFormTrabajador();
+  const el=document.getElementById('remf-preview');
+  if(!t.base){el.innerHTML='';return;}
+  const uf=getUF(),utm=getUTM();
+  const l=calcularLiquidacion(t,uf,utm);
+  el.innerHTML=`<div class="info-tip" style="font-size:12px">
+    <div style="display:grid;grid-template-columns:1fr auto;gap:2px 16px">
+      <span>Total haberes</span><span style="font-family:var(--mono);text-align:right">${fmtC(l.totalHaberes)}</span>
+      <span style="color:var(--mt)">AFP ${l.afpNm} (10% + comisión)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.descAFP)}</span>
+      <span style="color:var(--mt)">Salud (7%)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.descSalud)}</span>
+      <span style="color:var(--mt)">Cesantía (0,6%)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.descCesantia)}</span>
+      <span style="color:var(--mt)">Impuesto único</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.iusc)}</span>
+      <span style="font-weight:700;border-top:1px solid var(--bd);padding-top:4px">LÍQUIDO A PAGAR</span><span style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach);border-top:1px solid var(--bd);padding-top:4px">${fmtC(l.liquido)}</span>
+    </div>
+  </div>`;
+}
+function guardarTrabajador(){
+  const t=leerFormTrabajador();
+  if(!t.nombre){toast('⚠️ Ingresa el nombre','e');return;}
+  if(t.base<=0){toast('⚠️ Ingresa el sueldo base','e');return;}
+  if(t.base<REM_PARAMS.ingresoMinimo){
+    if(!confirm(`El sueldo base (${fmtC(t.base)}) es menor al ingreso mínimo (${fmtC(REM_PARAMS.ingresoMinimo)}). ¿Continuar de todas formas?`))return;
+  }
+  const bien={id:REMF.editId||'tr_'+Date.now(),...t};
+  if(REMF.editId){const i=S.trabajadores.findIndex(x=>x.id===REMF.editId);if(i>=0)S.trabajadores[i]=bien;toast('✅ Trabajador actualizado');}
+  else{S.trabajadores.push(bien);toast('✅ Trabajador registrado');}
+  window.storage.set('trabajadores',JSON.stringify(S.trabajadores)).catch(()=>toast('❌ Error al guardar','e'));
+  cerrarFormTrabajador();renderRemuneraciones();updateHdr();
+}
+function editarTrabajador(id){
+  const t=S.trabajadores.find(x=>x.id===id);if(!t)return;
+  REMF={editId:id};
+  const f=document.getElementById('rem-form');f.style.display='block';
+  document.getElementById('remf-title').textContent='Editando Trabajador';
+  document.getElementById('remf-afp').innerHTML=AFP_LISTA.map(a=>`<option value="${a.k}" ${a.k===t.afp?'selected':''}>${a.nm} (${(a.comision*100).toFixed(2)}%)</option>`).join('');
+  document.getElementById('remf-nombre').value=t.nombre;
+  document.getElementById('remf-rut').value=t.rut||'';
+  document.getElementById('remf-cargo').value=t.cargo||'';
+  document.getElementById('remf-base').value=t.base;
+  document.getElementById('remf-grat').value=t.grat||0;
+  document.getElementById('remf-otros').value=t.otros||0;
+  document.getElementById('remf-colacion').value=t.colacion||0;
+  document.getElementById('remf-movilizacion').value=t.movilizacion||0;
+  document.getElementById('remf-salud').value=t.salud||'fonasa';
+  document.getElementById('remf-plan').value=t.plan||0;
+  document.getElementById('remf-contrato').value=t.contrato||'indefinido';
+  onSaludChange();previewLiq();
+  f.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function eliminarTrabajador(id){
+  const t=S.trabajadores.find(x=>x.id===id);if(!t)return;
+  if(!confirm(`¿Eliminar al trabajador "${t.nombre}"?`))return;
+  S.trabajadores=S.trabajadores.filter(x=>x.id!==id);
+  window.storage.set('trabajadores',JSON.stringify(S.trabajadores)).catch(()=>{});
+  renderRemuneraciones();updateHdr();toast('🗑 Trabajador eliminado');
+}
+function onParamRem(){
+  // Guardar UF/UTM en empresa y re-render
+  S.empresa.remUF=getUF();S.empresa.remUTM=getUTM();
+  window.storage.set('empresa',JSON.stringify(S.empresa)).catch(()=>{});
+  renderRemuneraciones();
+  if(document.getElementById('rem-form').style.display!=='none')previewLiq();
+}
+function renderRemuneraciones(){
+  // Poblar selector de mes y UF/UTM
+  const selMes=document.getElementById('rem-mes');
+  if(selMes&&selMes.options.length===0){
+    selMes.innerHTML=MESES.map((nm,i)=>`<option value="${i+1}">${nm} ${S.empresa.anio}</option>`).join('');
+    const hoyMes=new Date().getMonth()+1;selMes.value=(S.empresa.anio===new Date().getFullYear())?hoyMes:1;
+  }
+  const ufEl=document.getElementById('rem-uf'),utmEl=document.getElementById('rem-utm');
+  if(ufEl&&!ufEl.value)ufEl.value=S.empresa.remUF||69751;
+  if(utmEl&&!utmEl.value)utmEl.value=S.empresa.remUTM||71506;
+  const uf=getUF(),utm=getUTM();
+  const el=document.getElementById('rem-content');
+  if(!S.trabajadores.length){
+    el.innerHTML=`<div class="empty"><div class="ei">👷</div>No hay trabajadores registrados.<br><br><button class="btn btn-p" onclick="abrirFormTrabajador()">+ Registrar primer trabajador</button></div>`;
+    return;
+  }
+  let totHab=0,totLiq=0,totPrev=0,totIusc=0;
+  const filas=S.trabajadores.map(t=>{
+    const l=calcularLiquidacion(t,uf,utm);
+    totHab+=l.totalHaberes;totLiq+=l.liquido;totPrev+=l.totalPrevisional;totIusc+=l.iusc;
+    return `<tr>
+      <td class="tl" style="font-size:12px">${t.nombre}<div style="font-size:10px;color:var(--mt)">${t.cargo||''} ${t.rut?'· '+t.rut:''}</div></td>
+      <td style="font-family:var(--mono);text-align:right">${fmtC(l.totalHaberes)}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(l.descAFP)}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(l.descSalud)}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(l.descCesantia)}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(l.iusc)}</td>
+      <td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach)">${fmtC(l.liquido)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn btn-i" onclick="verLiquidacion('${t.id}')" title="Ver liquidación">📄</button>
+        <button class="btn btn-i" onclick="editarTrabajador('${t.id}')">✏️</button>
+        <button class="btn btn-d" onclick="eliminarTrabajador('${t.id}')">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi"><div class="kpi-lbl">Total Haberes</div><div class="kpi-val">${fmtC(totHab)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Cotizaciones</div><div class="kpi-val neg">${fmtC(totPrev)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Impuesto Único</div><div class="kpi-val neg">${fmtC(totIusc)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Líquido a Pagar</div><div class="kpi-val pos">${fmtC(totLiq)}</div></div>
+  </div>
+  <div class="card-np"><div class="tw"><table>
+    <thead><tr><th class="tl">TRABAJADOR</th><th style="text-align:right">HABERES</th><th style="text-align:right">AFP</th><th style="text-align:right">SALUD</th><th style="text-align:right">CESANTÍA</th><th style="text-align:right">IUSC</th><th style="text-align:right">LÍQUIDO</th><th></th></tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot><tr style="background:rgba(88,166,255,.08)"><td class="tl" style="font-weight:700">TOTALES (${S.trabajadores.length})</td><td style="font-family:var(--mono);text-align:right;font-weight:700">${fmtC(totHab)}</td><td colspan="4"></td><td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach)">${fmtC(totLiq)}</td><td></td></tr></tfoot>
+  </table></div></div>
+  <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-p" onclick="generarAsientoRemuneraciones()">📝 Generar asiento de remuneraciones</button>
+    <span style="font-size:11px;color:var(--mt)">Crea el asiento mensual: sueldos a gasto, cotizaciones e impuesto a pasivos, líquido por pagar.</span>
+  </div>
+  <div style="margin-top:8px;font-size:10px;color:var(--mt)">Cálculo con UF ${fmtC(uf)} y UTM ${fmtC(utm)}. Topes: AFP/salud 90 UF, cesantía 135,2 UF. Referencial — verifica en Previred antes de declarar.</div>`;
+}
+function verLiquidacion(id){
+  const t=S.trabajadores.find(x=>x.id===id);if(!t)return;
+  const uf=getUF(),utm=getUTM();
+  const l=calcularLiquidacion(t,uf,utm);
+  const mes=MESES[(+document.getElementById('rem-mes').value||1)-1];
+  const row=(lbl,val,neg,bold)=>`<tr><td class="tl" style="padding:5px 10px;font-size:12px;${bold?'font-weight:700':''}">${lbl}</td><td style="font-family:var(--mono);text-align:right;${bold?'font-weight:700;':''}color:${neg?'var(--err)':(bold?'var(--ach)':'var(--tx)')}">${neg?'−':''}${fmtC(val)}</td></tr>`;
+  const html=`<div class="card" style="max-width:480px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700">Liquidación de Sueldo</div>
+      <div style="font-size:12px;color:var(--mt)">${mes} ${S.empresa.anio} · ${S.empresa.nombre||''}</div>
+    </div>
+    <div style="margin-bottom:10px"><strong>${t.nombre}</strong><div style="font-size:11px;color:var(--mt)">${t.cargo||''} ${t.rut?'· '+t.rut:''} · ${l.afpNm} · ${t.salud==='isapre'?'Isapre':'Fonasa'}</div></div>
+    <table><tbody>
+      <tr class="rth"><td colspan="2" class="tl" style="padding:6px 10px">HABERES</td></tr>
+      ${row('Sueldo base',+t.base)}
+      ${+t.grat?row('Gratificación legal',+t.grat):''}
+      ${+t.otros?row('Otros imponibles',+t.otros):''}
+      ${+t.colacion?row('Colación (no imp.)',+t.colacion):''}
+      ${+t.movilizacion?row('Movilización (no imp.)',+t.movilizacion):''}
+      ${row('Total haberes',l.totalHaberes,false,true)}
+      <tr class="rth"><td colspan="2" class="tl" style="padding:6px 10px">DESCUENTOS</td></tr>
+      ${row('AFP '+l.afpNm+' (pensión 10%)',l.descAFP_pension,true)}
+      ${row('AFP comisión',l.descAFP_comision,true)}
+      ${row('Salud 7%',l.descSalud,true)}
+      ${l.descCesantia?row('Seguro cesantía 0,6%',l.descCesantia,true):''}
+      ${l.iusc?row('Impuesto único 2ª cat.',l.iusc,true):''}
+      ${row('Total descuentos',l.totalDescuentos,true,true)}
+      <tr style="background:rgba(46,160,67,.14)"><td class="tl" style="padding:11px 10px;font-weight:700;font-size:14px">LÍQUIDO A PAGAR</td><td style="font-family:var(--mono);text-align:right;font-weight:700;font-size:14px;color:var(--ach)">${fmtC(l.liquido)}</td></tr>
+    </tbody></table>
+    <div style="font-size:10px;color:var(--mt);margin-top:8px">Base tributable: ${fmtC(l.baseTributable)} · UF ${fmtC(uf)} · UTM ${fmtC(utm)}</div>
+    <div style="margin-top:12px;text-align:right"><button class="btn btn-g" onclick="renderRemuneraciones()">← Volver</button> <button class="btn btn-g" onclick="window.print()">🖨️ Imprimir</button></div>
+  </div>`;
+  document.getElementById('rem-content').innerHTML=html;
+}
+function generarAsientoRemuneraciones(){
+  const anio=S.empresa.anio;
+  const mesNum=+document.getElementById('rem-mes').value||1;
+  const uf=getUF(),utm=getUTM();
+  if(!S.trabajadores.length){toast('⚠️ No hay trabajadores','e');return;}
+  // Acumular
+  let totSueldo=0,totColMov=0,totAFP=0,totSalud=0,totCes=0,totIusc=0,totLiq=0;
+  S.trabajadores.forEach(t=>{
+    const l=calcularLiquidacion(t,uf,utm);
+    totSueldo+=l.totalImponible;totColMov+=l.totalNoImponible;
+    totAFP+=l.descAFP;totSalud+=l.descSalud;totCes+=l.descCesantia;totIusc+=l.iusc;totLiq+=l.liquido;
+  });
+  if(totSueldo<=0){toast('⚠️ No hay montos','e');return;}
+  const fecha=`${anio}-${String(mesNum).padStart(2,'0')}-30`;
+  if(!confirm(`¿Generar asiento de remuneraciones de ${MESES[mesNum-1]} ${anio}?\n\n${S.trabajadores.length} trabajadores · Líquido a pagar: ${fmtC(totLiq)}`))return;
+  const movs=[];
+  // DEBE: gasto en sueldos (imponible + no imponible)
+  movs.push({cd:'3201001',nm:pdcNm('3201001'),debe:totSueldo,haber:0,desc:'Sueldos '+MESES[mesNum-1]});
+  if(totColMov)movs.push({cd:'3201003',nm:pdcNm('3201003'),debe:totColMov,haber:0,desc:'Colación y movilización'});
+  // HABER: retenciones previsionales e impuesto (por pagar), líquido por pagar
+  const totPrev=totAFP+totSalud+totCes;
+  if(totPrev)movs.push({cd:'2104001',nm:pdcNm('2104001'),debe:0,haber:totPrev,desc:'Instituciones previsionales por pagar'});
+  if(totIusc)movs.push({cd:'2104002',nm:pdcNm('2104002'),debe:0,haber:totIusc,desc:'Impuesto único por pagar'});
+  movs.push({cd:'2104005',nm:pdcNm('2104005'),debe:0,haber:totLiq,desc:'Líquidos por pagar'});
+  const folio=proxFolioAsiento();
+  S.asientos.push({id:'as_'+Date.now(),n:folio,fecha,glosa:`Remuneraciones ${MESES[mesNum-1]} ${anio}`,movs});
+  window.storage.set('asientos-'+anio,JSON.stringify(S.asientos)).catch(()=>{});
+  toast('✅ Asiento N°'+folio+' de remuneraciones ('+fmtC(totLiq)+' líquido)');
+  renderRemuneraciones();updateHdr();
+}
+
+// ═══ FASE 6: FLUJO DE CAJA ═══
+let FC_VIEW='realizado'; // 'realizado' | 'proyectado'
+// Cuentas de efectivo: caja y bancos (prefijo 1101)
+const esCuentaEfectivo=cd=>cd.length===7&&cd.startsWith('1101');
+function setFCView(v){
+  FC_VIEW=v;
+  document.getElementById('fc-tab-real').classList.toggle('active',v==='realizado');
+  document.getElementById('fc-tab-proy').classList.toggle('active',v==='proyectado');
+  renderFlujoCaja();
+}
+function renderFlujoCaja(){
+  if(FC_VIEW==='proyectado')renderFlujoProyectado();
+  else renderFlujoRealizado();
+}
+// FLUJO REALIZADO: entradas y salidas efectivas de las cuentas de caja/banco, por mes
+function renderFlujoRealizado(){
+  const anio=S.empresa.anio;
+  const M=buildMayor();
+  const el=document.getElementById('fc-content');
+  // Saldo inicial de efectivo (de la apertura): saldo de cuentas 1101 al inicio
+  // Movimientos por mes de las cuentas de efectivo
+  const meses=Array.from({length:12},()=>({entradas:0,salidas:0}));
+  let saldoInicial=0;
+  Object.keys(M).filter(esCuentaEfectivo).forEach(cd=>{
+    M[cd].movs.forEach(m=>{
+      // Apertura → saldo inicial; resto → mes correspondiente
+      if(m.glosa&&(m.glosa.includes('Apertura')||m.glosa.includes('apertura'))){
+        saldoInicial+=(m.debe||0)-(m.haber||0);
+        return;
+      }
+      const mesN=+(m.fecha||'').slice(5,7);
+      if(mesN>=1&&mesN<=12){
+        meses[mesN-1].entradas+=m.debe||0;
+        meses[mesN-1].salidas+=m.haber||0;
+      }
+    });
+  });
+  // Construir tabla con saldo acumulado
+  let saldo=saldoInicial,totE=0,totS=0;
+  const rows=meses.map((m,i)=>{
+    const neto=m.entradas-m.salidas;
+    saldo+=neto;totE+=m.entradas;totS+=m.salidas;
+    const vacio=m.entradas===0&&m.salidas===0;
+    return `<tr${vacio?' style="opacity:.4"':''}>
+      <td class="tl" style="font-size:12px">${MESES[i]}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--ach)">${m.entradas?fmtC(m.entradas):'–'}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--err)">${m.salidas?fmtC(m.salidas):'–'}</td>
+      <td style="font-family:var(--mono);text-align:right;color:${neto>=0?'var(--ach)':'var(--err)'}">${fmtC(neto)}</td>
+      <td style="font-family:var(--mono);text-align:right;font-weight:600;color:${saldo>=0?'var(--tx)':'var(--err)'}">${fmtC(saldo)}</td>
+    </tr>`;
+  }).join('');
+  const saldoFinal=saldo;
+  el.innerHTML=`<div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi"><div class="kpi-lbl">Saldo Inicial</div><div class="kpi-val">${fmtC(saldoInicial)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Total Entradas</div><div class="kpi-val pos">${fmtC(totE)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Total Salidas</div><div class="kpi-val neg">${fmtC(totS)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Saldo Final</div><div class="kpi-val ${saldoFinal>=0?'pos':'neg'}">${fmtC(saldoFinal)}</div></div>
+  </div>
+  <div class="info-tip" style="margin-bottom:14px">💵 Movimiento real de efectivo (caja y bancos) durante ${anio}. Entradas = cargos al banco, Salidas = abonos. El saldo acumulado parte del saldo inicial de la apertura.</div>
+  <div class="card-np"><div class="tw"><table>
+    <thead><tr><th class="tl">MES</th><th style="text-align:right">ENTRADAS</th><th style="text-align:right">SALIDAS</th><th style="text-align:right">FLUJO NETO</th><th style="text-align:right">SALDO ACUM.</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr style="background:rgba(88,166,255,.08)"><td class="tl" style="font-weight:700">TOTAL AÑO</td><td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach)">${fmtC(totE)}</td><td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--err)">${fmtC(totS)}</td><td style="font-family:var(--mono);text-align:right;font-weight:700">${fmtC(totE-totS)}</td><td style="font-family:var(--mono);text-align:right;font-weight:700">${fmtC(saldoFinal)}</td></tr></tfoot>
+  </table></div></div>
+  <div style="margin-top:10px;font-size:10px;color:var(--mt)">Cuentas consideradas: Caja y Bancos (código 1101xxx).</div>`;
+}
+// FLUJO PROYECTADO: posición de caja futura según vencimientos por cobrar y por pagar
+function renderFlujoProyectado(){
+  const el=document.getElementById('fc-content');
+  const hoy=today();
+  const M=buildMayor();
+  // Saldo de efectivo actual
+  const saldoEfectivo=Object.keys(M).filter(esCuentaEfectivo).reduce((s,cd)=>s+M[cd].saldo,0);
+  // Por cobrar: DTEs de clientes con saldo pendiente (usar vencimiento; si no hay, la fecha)
+  // Por pagar: DTEs de proveedores + honorarios pendientes
+  // Agrupar por "bucket" temporal según vencimiento
+  const buckets={vencido:{cobrar:0,pagar:0},b30:{cobrar:0,pagar:0},b60:{cobrar:0,pagar:0},b90:{cobrar:0,pagar:0},futuro:{cobrar:0,pagar:0}};
+  const clasificar=fechaVto=>{
+    const d=Math.round((new Date(fechaVto+'T00:00:00')-new Date(hoy+'T00:00:00'))/86400000);
+    if(d<0)return 'vencido';
+    if(d<=30)return 'b30';
+    if(d<=60)return 'b60';
+    if(d<=90)return 'b90';
+    return 'futuro';
+  };
+  // Cuentas por cobrar (clientes)
+  todosDocsVentas().forEach(d=>{
+    if(d.origen==='libro'&&d.formaPago!=='clientes')return; // solo crédito
+    const signo=(dteV(d.tipoDTE)?.signo)||1;
+    const monto=(d.total||0)*signo;
+    if(monto<=0)return;
+    const vto=d.fechaVencimiento||d.fecha;
+    buckets[clasificar(vto)].cobrar+=monto;
+  });
+  // Cuentas por pagar (proveedores)
+  todosDocsCompras().forEach(d=>{
+    const signo=(dteC(d.tipoDTE)?.signo)||1;
+    const monto=(d.total||0)*signo;
+    if(monto<=0)return;
+    const vto=d.fechaVencimiento||d.fecha;
+    buckets[clasificar(vto)].pagar+=monto;
+  });
+  // Honorarios pendientes (retención se paga, líquido se paga)
+  // (los honorarios ya registrados se consideran pagados en el mes; se omiten aquí por simplicidad)
+  const orden=[
+    {k:'vencido',lbl:'Vencido',color:'var(--err)'},
+    {k:'b30',lbl:'0–30 días',color:'#d29922'},
+    {k:'b60',lbl:'31–60 días',color:'#58a6ff'},
+    {k:'b90',lbl:'61–90 días',color:'var(--info)'},
+    {k:'futuro',lbl:'+90 días',color:'var(--mt)'},
+  ];
+  let saldoProy=saldoEfectivo,totCobrar=0,totPagar=0;
+  const rows=orden.map(b=>{
+    const c=buckets[b.k].cobrar,p=buckets[b.k].pagar,neto=c-p;
+    saldoProy+=neto;totCobrar+=c;totPagar+=p;
+    return `<tr>
+      <td class="tl" style="font-size:12px"><span style="color:${b.color}">●</span> ${b.lbl}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--ach)">${c?fmtC(c):'–'}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--err)">${p?fmtC(p):'–'}</td>
+      <td style="font-family:var(--mono);text-align:right;color:${neto>=0?'var(--ach)':'var(--err)'}">${fmtC(neto)}</td>
+      <td style="font-family:var(--mono);text-align:right;font-weight:600;color:${saldoProy>=0?'var(--tx)':'var(--err)'}">${fmtC(saldoProy)}</td>
+    </tr>`;
+  }).join('');
+  const posicionFinal=saldoEfectivo+totCobrar-totPagar;
+  el.innerHTML=`<div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi"><div class="kpi-lbl">Efectivo Actual</div><div class="kpi-val">${fmtC(saldoEfectivo)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Por Cobrar</div><div class="kpi-val pos">${fmtC(totCobrar)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Por Pagar</div><div class="kpi-val neg">${fmtC(totPagar)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Posición Proyectada</div><div class="kpi-val ${posicionFinal>=0?'pos':'neg'}">${fmtC(posicionFinal)}</div></div>
+  </div>
+  <div class="info-tip" style="margin-bottom:14px">🔮 Proyección de caja según vencimientos de documentos pendientes. Parte del efectivo actual (${fmtC(saldoEfectivo)}) y suma lo por cobrar menos lo por pagar en cada tramo.</div>
+  <div class="card-np"><div class="tw"><table>
+    <thead><tr><th class="tl">VENCIMIENTO</th><th style="text-align:right">POR COBRAR</th><th style="text-align:right">POR PAGAR</th><th style="text-align:right">FLUJO NETO</th><th style="text-align:right">POSICIÓN</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr style="background:rgba(88,166,255,.08)"><td class="tl" style="font-weight:700">TOTAL</td><td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach)">${fmtC(totCobrar)}</td><td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--err)">${fmtC(totPagar)}</td><td style="font-family:var(--mono);text-align:right;font-weight:700">${fmtC(totCobrar-totPagar)}</td><td style="font-family:var(--mono);text-align:right;font-weight:700">${fmtC(posicionFinal)}</td></tr></tfoot>
+  </table></div></div>
+  ${buckets.vencido.cobrar>0||buckets.vencido.pagar>0?`<div class="info-tip" style="margin-top:12px;background:rgba(248,81,73,.08);border-color:var(--err);font-size:11px">⚠️ Tienes ${fmtC(buckets.vencido.cobrar)} por cobrar y ${fmtC(buckets.vencido.pagar)} por pagar <strong>vencidos</strong> (fecha de vencimiento ya pasó).</div>`:''}
+  <div style="margin-top:10px;font-size:10px;color:var(--mt)">Proyección basada en fechas de vencimiento de los documentos. Los documentos sin vencimiento usan su fecha de emisión.</div>`;
+}
+
+// ═══ FASE 6: BÚSQUEDA GLOBAL (Ctrl+K) ═══
+let SEARCH_SEL=0; // índice seleccionado en resultados
+function abrirBusqueda(){
+  document.getElementById('search-overlay').style.display='block';
+  const inp=document.getElementById('search-input');
+  inp.value='';document.getElementById('search-results').innerHTML='';SEARCH_SEL=0;
+  setTimeout(()=>inp.focus(),50);
+}
+function cerrarBusqueda(){
+  document.getElementById('search-overlay').style.display='none';
+}
+// Construye el índice de todos los registros buscables
+function construirIndiceBusqueda(){
+  const items=[];
+  // Ventas
+  todosDocsVentas().forEach(d=>{
+    items.push({tipo:'Venta',ico:'🛒',sec:'ventas',
+      titulo:`${d.razonSocial||'(sin razón)'} — DTE ${d.tipoDTE} N°${d.numero||''}`,
+      sub:`${d.fecha} · ${fmtC(d.total)} · ${rutFmt(d.rutCodigo,d.rutDV)}`,
+      texto:`${d.razonSocial} ${d.rutCodigo} ${d.numero} ${d.total} ${d.fecha}`.toLowerCase()});
+  });
+  // Compras
+  todosDocsCompras().forEach(d=>{
+    items.push({tipo:'Compra',ico:'🧾',sec:'compras',
+      titulo:`${d.razonSocial||'(sin razón)'} — DTE ${d.tipoDTE} N°${d.numero||''}`,
+      sub:`${d.fecha} · ${fmtC(d.total)} · ${rutFmt(d.rutCodigo,d.rutDV)}`,
+      texto:`${d.razonSocial} ${d.rutCodigo} ${d.numero} ${d.total} ${d.fecha}`.toLowerCase()});
+  });
+  // Asientos manuales
+  S.asientos.forEach(a=>{
+    const total=a.movs.reduce((s,m)=>s+(m.debe||0),0);
+    items.push({tipo:'Asiento',ico:'✏️',sec:'asientos',id:a.id,
+      titulo:`N°${a.n} — ${a.glosa||'(sin glosa)'}`,
+      sub:`${a.fecha} · ${fmtC(total)}${a.anulado?' · ANULADO':''}`,
+      texto:`${a.n} ${a.glosa} ${a.fecha} ${a.movs.map(m=>m.cd+' '+(m.nm||'')).join(' ')}`.toLowerCase()});
+  });
+  // Honorarios
+  S.honorarios.forEach(h=>{
+    items.push({tipo:'Honorario',ico:'📝',sec:'honorarios',
+      titulo:`${h.profesional||h.nombre||'(sin nombre)'}`,
+      sub:`${MESES[(h.mes||1)-1]||''} · ${fmtC(h.bruto||0)} bruto`,
+      texto:`${h.profesional||h.nombre} ${h.rut} ${h.bruto}`.toLowerCase()});
+  });
+  // Trabajadores
+  (S.trabajadores||[]).forEach(t=>{
+    items.push({tipo:'Trabajador',ico:'👷',sec:'remuneraciones',
+      titulo:`${t.nombre}`,
+      sub:`${t.cargo||''} · ${fmtC(t.base)} base · ${t.rut||''}`,
+      texto:`${t.nombre} ${t.cargo} ${t.rut}`.toLowerCase()});
+  });
+  // Activos fijos
+  (S.activos||[]).forEach(a=>{
+    items.push({tipo:'Activo',ico:'🏗️',sec:'activofijo',
+      titulo:`${a.desc}`,
+      sub:`${a.fecha} · ${fmtC(a.valor)}`,
+      texto:`${a.desc} ${a.fecha} ${a.valor}`.toLowerCase()});
+  });
+  // Cuentas del PDC
+  PDC.filter(c=>c.nat).forEach(c=>{
+    items.push({tipo:'Cuenta',ico:'📋',sec:'pdc',
+      titulo:`${c.cd} — ${c.nm}`,
+      sub:`Plan de cuentas`,
+      texto:`${c.cd} ${c.nm}`.toLowerCase()});
+  });
+  return items;
+}
+function ejecutarBusqueda(){
+  const q=document.getElementById('search-input').value.toLowerCase().trim();
+  const cont=document.getElementById('search-results');
+  if(q.length<2){cont.innerHTML='<div style="padding:20px;text-align:center;color:var(--mt);font-size:13px">Escribe al menos 2 letras para buscar…</div>';return;}
+  const idx=construirIndiceBusqueda();
+  // Filtrar: todas las palabras del query deben aparecer
+  const palabras=q.split(/\s+/);
+  const res=idx.filter(it=>palabras.every(p=>it.texto.includes(p))).slice(0,40);
+  SEARCH_SEL=0;
+  if(!res.length){cont.innerHTML='<div style="padding:20px;text-align:center;color:var(--mt);font-size:13px">Sin resultados para "'+q+'"</div>';return;}
+  window._searchRes=res;
+  cont.innerHTML=res.map((it,i)=>`<div class="search-item" data-i="${i}" onclick="irAResultado(${i})" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;cursor:pointer;${i===0?'background:var(--sf2,rgba(88,166,255,.12))':''}">
+    <span style="font-size:18px">${it.ico}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.titulo}</div>
+      <div style="font-size:11px;color:var(--mt)">${it.sub}</div>
+    </div>
+    <span style="font-size:9px;color:var(--mt);text-transform:uppercase;border:1px solid var(--bd);border-radius:4px;padding:2px 6px">${it.tipo}</span>
+  </div>`).join('');
+}
+function navBusqueda(e){
+  if(e.key==='Escape'){cerrarBusqueda();return;}
+  const res=window._searchRes||[];
+  if(!res.length)return;
+  if(e.key==='ArrowDown'){e.preventDefault();SEARCH_SEL=Math.min(SEARCH_SEL+1,res.length-1);actualizarSeleccion();}
+  else if(e.key==='ArrowUp'){e.preventDefault();SEARCH_SEL=Math.max(SEARCH_SEL-1,0);actualizarSeleccion();}
+  else if(e.key==='Enter'){e.preventDefault();irAResultado(SEARCH_SEL);}
+}
+function actualizarSeleccion(){
+  document.querySelectorAll('.search-item').forEach((el,i)=>{
+    el.style.background=i===SEARCH_SEL?'var(--sf2,rgba(88,166,255,.12))':'';
+    if(i===SEARCH_SEL)el.scrollIntoView({block:'nearest'});
+  });
+}
+function irAResultado(i){
+  const res=window._searchRes||[];
+  const it=res[i];if(!it)return;
+  cerrarBusqueda();
+  if(!puedeVer(it.sec)){toast('⚠️ No tienes permiso para ver esa sección','e');return;}
+  nav(it.sec);
+  // Si es un asiento, abrirlo para editar
+  if(it.tipo==='Asiento'&&it.id){setTimeout(()=>{if(typeof editarAsiento==='function')editarAsiento(it.id);},150);}
+}
+// Atajo de teclado global Ctrl+K / Cmd+K
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){
+    e.preventDefault();
+    if(AUTH.user)abrirBusqueda();
+  }
+});
+
+// ═══ FASE 6: AUDIT LOG (registro de actividad) ═══
+// Registra una acción en Firestore. No bloquea la operación si falla.
+function logAccion(accion,detalle){
+  if(!FS.enabled||!FS.db)return; // sin Firestore no se registra
+  try{
+    const email=(AUTH.user&&AUTH.user.email)||'desconocido';
+    const nombre=(AUTH.user&&AUTH.user.nombre)||email;
+    FS.db.collection('audit_log').add({
+      accion,detalle:detalle||'',
+      usuario:email,nombre,
+      anio:S.empresa.anio,
+      ts:firebase.firestore.FieldValue.serverTimestamp(),
+      tsLocal:new Date().toISOString()
+    }).catch(()=>{});
+  }catch(e){}
+}
+async function renderAuditLog(){
+  const el=document.getElementById('audit-content');
+  if(!esAdmin()){
+    el.innerHTML='<div class="empty"><div class="ei">🚫</div>Solo los administradores pueden ver el registro de actividad.</div>';return;
+  }
+  if(!FS.enabled||!FS.db){
+    el.innerHTML='<div class="empty"><div class="ei">☁️</div>El registro de actividad requiere conexión con Firestore.</div>';return;
+  }
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--mt)">⏳ Cargando actividad...</div>';
+  try{
+    const snap=await FS.db.collection('audit_log').orderBy('ts','desc').limit(200).get();
+    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">📜</div>No hay actividad registrada aún.</div>';return;}
+    const icoAccion=a=>{
+      if(a.includes('creó')||a.includes('registró')||a.includes('Creó'))return '➕';
+      if(a.includes('eliminó')||a.includes('Eliminó'))return '🗑';
+      if(a.includes('anuló')||a.includes('Anuló'))return '🚫';
+      if(a.includes('editó')||a.includes('actualizó')||a.includes('Editó'))return '✏️';
+      if(a.includes('cerró')||a.includes('cierre'))return '🔒';
+      return '📝';
+    };
+    let rows='';
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const fecha=d.tsLocal?new Date(d.tsLocal):(d.ts&&d.ts.toDate?d.ts.toDate():null);
+      const fechaStr=fecha?fecha.toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+      rows+=`<tr>
+        <td style="text-align:center;font-size:15px">${icoAccion(d.accion||'')}</td>
+        <td class="tl" style="font-size:12px">${d.accion||''}${d.detalle?`<div style="font-size:10px;color:var(--mt)">${d.detalle}</div>`:''}</td>
+        <td class="tl" style="font-size:11px">${d.nombre||d.usuario||''}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:10px;color:var(--mt)">${fechaStr}</td>
+      </tr>`;
+    });
+    el.innerHTML=`<div class="info-tip" style="margin-bottom:14px">📜 Últimas ${snap.size} acciones registradas. Se guarda automáticamente quién crea, edita, elimina o anula registros.</div>
+    <div class="card-np"><div class="tw"><table>
+      <thead><tr><th style="width:40px"></th><th class="tl">ACCIÓN</th><th class="tl">USUARIO</th><th class="tl">FECHA</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div></div>`;
+  }catch(e){
+    el.innerHTML='<div class="empty"><div class="ei">⚠️</div>Error al cargar el registro: '+e.message+'</div>';
+  }
+}
+
 // ═══ TOAST ═══
 function toast(msg,tipo='ok'){
   document.querySelectorAll('.toast').forEach(t=>t.remove());
@@ -5799,6 +6787,11 @@ function construirWorkbookBD(){
   const afHdr=['id','desc','cat','fecha','valor','residual','vida','metodo','cuentaActivo','cuentaDeprAcum','cuentaGasto'];
   const afRows=(S.activos||[]).map(a=>afHdr.map(k=>a[k]!==undefined?a[k]:''));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([afHdr,...afRows]),'ActivosFijos');
+
+  // TRABAJADORES (remuneraciones)
+  const trHdr=['id','nombre','rut','cargo','base','grat','otros','colacion','movilizacion','afp','salud','plan','contrato'];
+  const trRows=(S.trabajadores||[]).map(t=>trHdr.map(k=>t[k]!==undefined?t[k]:''));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([trHdr,...trRows]),'Trabajadores');
 
   // PLAN DE CUENTAS (solo referencia, no se importa)
   const pdcHdr=['Código','Nombre','Naturaleza','Tipo'];
@@ -6087,6 +7080,17 @@ async function importarExcelBD(file){
       }));
     }
 
+    // Restaurar trabajadores (clave global)
+    if(hojas.includes('Trabajadores')){
+      const trRows=XLSX.utils.sheet_to_json(wb.Sheets['Trabajadores']);
+      S.trabajadores=trRows.map(r=>({
+        id:r.id||'tr_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+        nombre:r.nombre||'',rut:String(r.rut||''),cargo:r.cargo||'',
+        base:+r.base||0,grat:+r.grat||0,otros:+r.otros||0,colacion:+r.colacion||0,movilizacion:+r.movilizacion||0,
+        afp:r.afp||'modelo',salud:r.salud||'fonasa',plan:+r.plan||0,contrato:r.contrato||'indefinido'
+      }));
+    }
+
     // Restaurar empresa si viene
     if(hojas.includes('Empresa')){
       const emp=XLSX.utils.sheet_to_json(wb.Sheets['Empresa'],{header:1});
@@ -6106,6 +7110,7 @@ async function importarExcelBD(file){
     if(S.apertura)await window.storage.set('apertura-'+anio,JSON.stringify(S.apertura));
     else try{await window.storage.delete('apertura-'+anio);}catch(e){}
     if(S.activos&&S.activos.length)await window.storage.set('activos',JSON.stringify(S.activos));
+    if(S.trabajadores&&S.trabajadores.length)await window.storage.set('trabajadores',JSON.stringify(S.trabajadores));
     await window.storage.set('empresa',JSON.stringify(S.empresa));
 
     const apMsg=S.apertura?' · Apertura':'';

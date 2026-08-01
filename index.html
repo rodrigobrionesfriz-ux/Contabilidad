@@ -225,21 +225,43 @@ td.err{color:var(--err);font-weight:600}
 
 <!-- OVERLAY DE LOGIN — bloquea el acceso hasta autenticarse -->
 <div id="login-overlay" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:420px;width:100%;text-align:center">
-    <div style="font-size:48px;margin-bottom:12px">📊</div>
-    <div style="font-size:24px;font-weight:700;margin-bottom:6px">Contabilidad</div>
-    <div style="color:var(--mt);font-size:13px;margin-bottom:30px">Inicia sesión para acceder al sistema</div>
+  <div style="max-width:400px;width:100%">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:48px;margin-bottom:12px">📊</div>
+      <div style="font-size:24px;font-weight:700;margin-bottom:6px">Contabilidad</div>
+      <div style="color:var(--mt);font-size:13px" id="login-mode-sub">Inicia sesión para acceder al sistema</div>
+    </div>
 
-    <button id="btn-login-google" onclick="loginConGoogle()" style="width:100%;padding:12px 20px;background:#fff;color:#1a1a1a;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px">
-      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-      <span>Continuar con Google</span>
-    </button>
+    <!-- FORM LOGIN -->
+    <div id="login-form-box" style="background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:22px">
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Email</label>
+        <input type="email" id="login-email" placeholder="tu@correo.com" autocomplete="email" style="width:100%;padding:10px 12px;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()">
+      </div>
+      <div style="margin-bottom:6px">
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Contraseña</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" style="width:100%;padding:10px 12px;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')submitLogin()">
+      </div>
+      <div id="login-password-hint" style="font-size:10px;color:var(--mt);margin-bottom:14px;display:none">Mínimo 6 caracteres</div>
+      <div id="login-name-wrap" style="margin-bottom:14px;display:none">
+        <label style="display:block;font-size:11px;font-weight:600;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Nombre completo</label>
+        <input type="text" id="login-name" placeholder="Tu nombre" style="width:100%;padding:10px 12px;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;box-sizing:border-box">
+      </div>
+      <button id="btn-submit-login" onclick="submitLogin()" style="width:100%;padding:11px 16px;background:var(--ach);color:#0d1117;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px" id="btn-login-submit">
+        🔐 Iniciar Sesión
+      </button>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:10px">
+        <button onclick="toggleLoginMode()" id="toggle-mode-btn" style="background:none;border:none;color:var(--info);cursor:pointer;padding:2px 4px;text-decoration:underline;font-size:11px">¿Primer usuario? Regístrate</button>
+        <button onclick="recuperarPassword()" style="background:none;border:none;color:var(--mt);cursor:pointer;padding:2px 4px;text-decoration:underline;font-size:11px">¿Olvidaste tu contraseña?</button>
+      </div>
 
-    <div id="login-error" style="color:var(--err);font-size:12px;margin-top:16px;display:none"></div>
-    <div id="login-loading" style="color:var(--mt);font-size:12px;margin-top:16px;display:none">⏳ Verificando permisos...</div>
+      <div id="login-error" style="color:var(--err);font-size:12px;margin-top:14px;display:none;padding:8px 12px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:6px"></div>
+      <div id="login-loading" style="color:var(--mt);font-size:12px;margin-top:14px;display:none;text-align:center">⏳ Verificando...</div>
+      <div id="login-success" style="color:var(--ach);font-size:12px;margin-top:14px;display:none;padding:8px 12px;background:rgba(46,160,67,.08);border:1px solid rgba(46,160,67,.25);border-radius:6px"></div>
+    </div>
 
-    <div style="margin-top:40px;padding:14px 16px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;font-size:11px;color:var(--mt);text-align:left">
-      🔒 <strong>Acceso restringido.</strong> Solo usuarios autorizados pueden acceder. Si eres el primer usuario, quedarás automáticamente como <strong>Administrador</strong>. Los demás usuarios deben ser aprobados por un admin.
+    <div style="margin-top:20px;padding:12px 14px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;font-size:11px;color:var(--mt);text-align:left">
+      🔒 <strong>Acceso restringido.</strong> Solo usuarios autorizados. El primer usuario que se registre queda automáticamente como <strong>Administrador</strong>; los siguientes deben ser aprobados o invitados por un admin.
     </div>
   </div>
 </div>
@@ -388,7 +410,7 @@ td.err{color:var(--err);font-weight:600}
       <button class="btn btn-g" style="padding:4px 10px;font-size:11px" onclick="cerrarUsuarioForm()">✕ Cancelar</button>
     </div>
     <div class="doc-grid" style="grid-template-columns:1fr 1fr 180px">
-      <div class="grp"><label>Email de Google</label><input type="email" id="us-email" placeholder="usuario@gmail.com"></div>
+      <div class="grp"><label>Email</label><input type="email" id="us-email" placeholder="usuario@correo.com"></div>
       <div class="grp"><label>Nombre (opcional)</label><input type="text" id="us-nombre" placeholder="Nombre para identificarlo"></div>
       <div class="grp"><label>Rol</label>
         <select id="us-rol">
@@ -397,6 +419,9 @@ td.err{color:var(--err);font-weight:600}
           <option value="admin">👑 Administrador (edición + usuarios)</option>
         </select>
       </div>
+    </div>
+    <div style="background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.25);color:var(--info);padding:9px 12px;border-radius:6px;font-size:11px;margin-bottom:14px">
+      💡 <strong>Cómo funciona:</strong> Al invitar un usuario, se pre-autoriza su email. Luego el usuario debe <strong>registrarse en la pantalla de login</strong> con "¿Primer usuario? Regístrate", usando el mismo email y creando su propia contraseña. Al hacerlo, entrará directamente con el rol asignado (sin quedar pendiente).
     </div>
     <div style="font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Permisos por Sección (opcional — sobrescriben el rol)</div>
     <div id="us-perms" style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin-bottom:14px"></div>
@@ -1013,24 +1038,90 @@ async function initAuth(){
   });
 }
 
-async function loginConGoogle(){
-  const btn=document.getElementById('btn-login-google');
+// Modo del formulario: 'login' (inicio de sesión) o 'register' (registro nuevo usuario)
+let LOGIN_MODE='login';
+
+function toggleLoginMode(){
+  LOGIN_MODE=LOGIN_MODE==='login'?'register':'login';
+  const isReg=LOGIN_MODE==='register';
+  document.getElementById('login-mode-sub').textContent=isReg?'Crea tu cuenta para acceder':'Inicia sesión para acceder al sistema';
+  document.getElementById('btn-submit-login').innerHTML=isReg?'📝 Crear Cuenta':'🔐 Iniciar Sesión';
+  document.getElementById('toggle-mode-btn').textContent=isReg?'← Volver a inicio de sesión':'¿Primer usuario? Regístrate';
+  document.getElementById('login-name-wrap').style.display=isReg?'':'none';
+  document.getElementById('login-password-hint').style.display=isReg?'':'none';
+  document.getElementById('login-password').setAttribute('autocomplete',isReg?'new-password':'current-password');
+  document.getElementById('login-error').style.display='none';
+  document.getElementById('login-success').style.display='none';
+}
+
+async function submitLogin(){
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const password=document.getElementById('login-password').value;
+  const nombre=document.getElementById('login-name').value.trim();
   const errEl=document.getElementById('login-error');
   const loadEl=document.getElementById('login-loading');
+  const okEl=document.getElementById('login-success');
+  const btn=document.getElementById('btn-submit-login');
+
+  errEl.style.display='none';okEl.style.display='none';
+
+  if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    errEl.style.display='';errEl.textContent='⚠️ Ingresa un email válido';return;
+  }
+  if(!password||password.length<6){
+    errEl.style.display='';errEl.textContent='⚠️ La contraseña debe tener al menos 6 caracteres';return;
+  }
+  if(LOGIN_MODE==='register'&&!nombre){
+    errEl.style.display='';errEl.textContent='⚠️ Ingresa tu nombre';return;
+  }
+
+  btn.disabled=true;btn.style.opacity='0.6';
+  loadEl.style.display='';loadEl.textContent=LOGIN_MODE==='register'?'⏳ Creando cuenta...':'⏳ Iniciando sesión...';
+
   try{
-    errEl.style.display='none';
-    btn.disabled=true;btn.style.opacity='0.6';
-    loadEl.style.display='';loadEl.textContent='⏳ Abriendo Google...';
-    const provider=new firebase.auth.GoogleAuthProvider();
-    await AUTH.auth.signInWithPopup(provider);
-    // El onAuthStateChanged tomará el control desde aquí
+    if(LOGIN_MODE==='register'){
+      await AUTH.auth.createUserWithEmailAndPassword(email,password);
+      // Actualizar el displayName con el nombre ingresado
+      try{await AUTH.auth.currentUser.updateProfile({displayName:nombre});}catch(e){}
+    }else{
+      await AUTH.auth.signInWithEmailAndPassword(email,password);
+    }
+    // El onAuthStateChanged toma el control
   }catch(e){
-    console.error('Error login:',e);
+    console.error('Error auth:',e);
     btn.disabled=false;btn.style.opacity='1';
     loadEl.style.display='none';
     errEl.style.display='';
-    if(e.code==='auth/popup-closed-by-user')errEl.textContent='Cerraste la ventana. Intenta de nuevo.';
-    else if(e.code==='auth/popup-blocked')errEl.textContent='El navegador bloqueó la ventana emergente. Permítela e intenta de nuevo.';
+    const map={
+      'auth/user-not-found':'⚠️ No existe una cuenta con este email',
+      'auth/wrong-password':'⚠️ Contraseña incorrecta',
+      'auth/invalid-credential':'⚠️ Email o contraseña incorrectos',
+      'auth/invalid-email':'⚠️ Email inválido',
+      'auth/email-already-in-use':'⚠️ Este email ya está registrado. Intenta iniciar sesión.',
+      'auth/weak-password':'⚠️ La contraseña es muy débil (mínimo 6 caracteres)',
+      'auth/too-many-requests':'⚠️ Demasiados intentos. Espera unos minutos.',
+      'auth/network-request-failed':'⚠️ Sin conexión a internet',
+      'auth/operation-not-allowed':'⚠️ Registro por email/contraseña no habilitado en Firebase Console'
+    };
+    errEl.textContent=map[e.code]||('Error: '+(e.message||e.code));
+  }
+}
+
+async function recuperarPassword(){
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const errEl=document.getElementById('login-error');
+  const okEl=document.getElementById('login-success');
+  errEl.style.display='none';okEl.style.display='none';
+  if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+    errEl.style.display='';errEl.textContent='⚠️ Ingresa tu email primero y luego haz clic en "¿Olvidaste tu contraseña?"';return;
+  }
+  try{
+    await AUTH.auth.sendPasswordResetEmail(email);
+    okEl.style.display='';
+    okEl.innerHTML=`✅ Enviamos un enlace de recuperación a <strong>${email}</strong>.<br>Revisa tu bandeja de entrada (y la carpeta de spam).`;
+  }catch(e){
+    errEl.style.display='';
+    if(e.code==='auth/user-not-found')errEl.textContent='⚠️ No existe una cuenta con ese email';
     else errEl.textContent='Error: '+(e.message||e.code);
   }
 }
@@ -1057,9 +1148,9 @@ async function verificarUsuarioAutorizado(fbUser){
 
     let userData;
     if(!doc.exists){
-      // Usuario no registrado
+      // Usuario no registrado en /usuarios/
       if(esPrimerUsuario){
-        // ¡Primer usuario! → auto-admin
+        // ¡Primer usuario del sistema! → auto-admin
         userData={
           email,
           nombre:fbUser.displayName||email.split('@')[0],
@@ -1073,7 +1164,7 @@ async function verificarUsuarioAutorizado(fbUser){
         await FS.db.collection('usuarios').doc(email).set(userData);
         console.log('Primer usuario del sistema — asignado como admin:',email);
       }else{
-        // Usuario no autorizado → crear como pendiente
+        // No es primer usuario y no está en /usuarios/ → crear como pendiente
         userData={
           email,
           nombre:fbUser.displayName||email.split('@')[0],
@@ -1085,7 +1176,7 @@ async function verificarUsuarioAutorizado(fbUser){
         };
         try{await FS.db.collection('usuarios').doc(email).set(userData);}catch(e){}
         errEl.style.display='';loadEl.style.display='none';
-        errEl.innerHTML=`⏳ Tu solicitud de acceso fue enviada.<br><br>Un administrador debe aprobar tu cuenta (<strong>${email}</strong>) antes de que puedas entrar.<br><br>Contacta al administrador del sistema.`;
+        errEl.innerHTML=`⏳ Cuenta creada. Tu solicitud de acceso está <strong>pendiente de aprobación</strong> por un administrador.<br><br>Email: <strong>${email}</strong><br><br>Contacta al administrador para que apruebe tu cuenta.`;
         setTimeout(async()=>{await AUTH.auth.signOut();},8000);
         return;
       }
@@ -1144,8 +1235,9 @@ function mostrarLogin(){
   document.getElementById('login-overlay').style.display='flex';
   document.getElementById('login-error').style.display='none';
   document.getElementById('login-loading').style.display='none';
-  const btn=document.getElementById('btn-login-google');
-  btn.disabled=false;btn.style.opacity='1';
+  document.getElementById('login-success').style.display='none';
+  const btn=document.getElementById('btn-submit-login');
+  if(btn){btn.disabled=false;btn.style.opacity='1';}
   document.getElementById('user-badge').style.display='none';
   AUTH.user=null;
 }

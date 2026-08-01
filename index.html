@@ -203,6 +203,10 @@ td.err{color:var(--err);font-weight:600}
 .linea-aux .rut-dv-ln.ok{color:var(--ach)}
 .linea-aux .rut-dv-ln.bad{color:var(--err)}
 /* RESPONSIVE MÓVIL */
+@media (min-width:901px){
+  /* Solo en escritorio amplio el logout está en el header; ocultar el del nav para no duplicar */
+  #nav-user-block-m{display:none!important}
+}
 @media (max-width:768px){
   #nav-toggle{display:block!important}
   header{padding:0 12px;gap:8px;height:52px}
@@ -212,6 +216,7 @@ td.err{color:var(--err);font-weight:600}
   header #db-status,header #btn-conectar-bd{display:none}
   .btn-save-all{font-size:11px;padding:6px 10px}
   #user-badge{display:none!important} /* el usuario/logout vive en el nav en móvil */
+  #nav-user-block-m{margin-top:16px}
   /* Nav como drawer deslizable */
   nav{position:fixed;top:0;left:0;height:100vh;width:250px;max-width:82vw;z-index:60;
     transform:translateX(-100%);transition:transform .25s ease;box-shadow:2px 0 16px rgba(0,0,0,.4);padding-top:14px}
@@ -356,7 +361,7 @@ td.err{color:var(--err);font-weight:600}
   <div class="nav-item" onclick="nav('provisiones')" data-s="provisiones"><span class="nav-icon">📋</span>Provisiones</div>
   <div class="nav-item" onclick="nav('correccion')" data-s="correccion"><span class="nav-icon">📊</span>Corrección Monetaria</div>
   <div class="nav-item" onclick="nav('cierre')" data-s="cierre"><span class="nav-icon">🔒</span>Cierre del Ejercicio</div>
-  <!-- Acciones y usuario (solo visibles en móvil; en escritorio están en el header) -->
+  <!-- Acciones de utilidad (solo en móvil; en escritorio están en el header) -->
   <div class="nav-mobile-only" style="display:none;margin-top:16px;padding:12px 14px;border-top:1px solid var(--bd)">
     <div class="nav-label" style="padding:0 0 8px 0">Acciones</div>
     <div style="display:flex;flex-direction:column;gap:6px">
@@ -366,11 +371,12 @@ td.err{color:var(--err);font-weight:600}
       <button class="btn btn-i" onclick="fsBackupToCloud();cerrarNavMovil()" style="justify-content:flex-start">☁️⬆ Subir a nube</button>
       <button class="btn btn-i" onclick="fsRestoreFromCloud()" style="justify-content:flex-start">☁️⬇ Descargar de nube</button>
     </div>
-    <div id="nav-user-block-m" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--bd)">
-      <div style="font-size:12px;font-weight:600" id="nav-user-name-m"></div>
-      <div style="font-size:9px;color:var(--mt);text-transform:uppercase;margin-bottom:8px" id="nav-user-role-m"></div>
-      <button onclick="logout()" style="width:100%;background:rgba(248,81,73,.12);border:1px solid var(--err,#f85149);color:var(--err,#f85149);cursor:pointer;padding:8px;font-size:12px;border-radius:8px;font-weight:600">🚪 Cerrar sesión</button>
-    </div>
+  </div>
+  <!-- Usuario y cerrar sesión: SIEMPRE visible al final del menú -->
+  <div id="nav-user-block-m" style="display:none;margin-top:16px;padding:12px 14px;border-top:1px solid var(--bd)">
+    <div style="font-size:12px;font-weight:600" id="nav-user-name-m"></div>
+    <div style="font-size:9px;color:var(--mt);text-transform:uppercase;margin-bottom:8px" id="nav-user-role-m"></div>
+    <button onclick="logout()" style="width:100%;background:rgba(248,81,73,.12);border:1px solid var(--err,#f85149);color:var(--err,#f85149);cursor:pointer;padding:10px;font-size:13px;border-radius:8px;font-weight:600">🚪 Cerrar sesión</button>
   </div>
 </nav>
 <main>

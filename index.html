@@ -219,8 +219,31 @@ td.err{color:var(--err);font-weight:600}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 </head>
 <body>
+
+<!-- OVERLAY DE LOGIN — bloquea el acceso hasta autenticarse -->
+<div id="login-overlay" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:420px;width:100%;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">📊</div>
+    <div style="font-size:24px;font-weight:700;margin-bottom:6px">Contabilidad</div>
+    <div style="color:var(--mt);font-size:13px;margin-bottom:30px">Inicia sesión para acceder al sistema</div>
+
+    <button id="btn-login-google" onclick="loginConGoogle()" style="width:100%;padding:12px 20px;background:#fff;color:#1a1a1a;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      <span>Continuar con Google</span>
+    </button>
+
+    <div id="login-error" style="color:var(--err);font-size:12px;margin-top:16px;display:none"></div>
+    <div id="login-loading" style="color:var(--mt);font-size:12px;margin-top:16px;display:none">⏳ Verificando permisos...</div>
+
+    <div style="margin-top:40px;padding:14px 16px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;font-size:11px;color:var(--mt);text-align:left">
+      🔒 <strong>Acceso restringido.</strong> Solo usuarios autorizados pueden acceder. Si eres el primer usuario, quedarás automáticamente como <strong>Administrador</strong>. Los demás usuarios deben ser aprobados por un admin.
+    </div>
+  </div>
+</div>
+
 <header>
   <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span></div>
   <div class="hdr-empresa" id="hdr-empresa">Configure los datos de empresa</div>
@@ -236,6 +259,14 @@ td.err{color:var(--err);font-weight:600}
   <button class="btn btn-i" style="font-size:11px;margin-right:6px" onclick="document.getElementById('imp-bd-file').click()" title="Restaurar datos desde un archivo Excel">📤 Importar</button>
   <input type="file" id="imp-bd-file" accept=".xlsx,.xls" style="display:none">
   <button class="btn-save-all" onclick="saveAll()">💾 Guardar Todo</button>
+  <div id="user-badge" style="display:none;align-items:center;gap:8px;margin-left:12px;padding:5px 10px;background:var(--sf);border:1px solid var(--bd);border-radius:100px;font-size:11px">
+    <img id="user-avatar" src="" style="width:22px;height:22px;border-radius:50%;display:none">
+    <div style="display:flex;flex-direction:column;line-height:1.15">
+      <span id="user-name" style="font-weight:600"></span>
+      <span id="user-role" style="color:var(--mt);font-size:9px;text-transform:uppercase;letter-spacing:.04em"></span>
+    </div>
+    <button onclick="logout()" style="background:none;border:none;color:var(--mt);cursor:pointer;padding:2px 6px;font-size:12px" title="Cerrar sesión">🚪</button>
+  </div>
 </header>
 <div class="layout">
 <nav>
@@ -243,6 +274,7 @@ td.err{color:var(--err);font-weight:600}
   <div class="nav-item active" onclick="nav('empresa')" data-s="empresa"><span class="nav-icon">🏢</span>Empresa</div>
   <div class="nav-item" onclick="nav('pdc')" data-s="pdc"><span class="nav-icon">📋</span>Plan de Cuentas</div>
   <div class="nav-item" onclick="nav('apertura')" data-s="apertura"><span class="nav-icon">🔰</span>Balance de Apertura</div>
+  <div class="nav-item" onclick="nav('usuarios')" data-s="usuarios" id="nav-usuarios" style="display:none"><span class="nav-icon">👥</span>Usuarios</div>
   <div class="nav-label">Registros</div>
   <div class="nav-item" onclick="nav('ventas')" data-s="ventas"><span class="nav-icon">🛒</span>Libro de Ventas</div>
   <div class="nav-item" onclick="nav('compras')" data-s="compras"><span class="nav-icon">🧾</span>Libro de Compras</div>
@@ -331,6 +363,50 @@ td.err{color:var(--err);font-weight:600}
   </div>
 
   <div id="pdc-content"></div>
+</section>
+
+<!-- USUARIOS -->
+<section class="section" id="s-usuarios">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">👥 Gestión de Usuarios</div>
+      <div class="sec-sub" id="us-sub">Administra el acceso al sistema</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-p" onclick="abrirInvitarUsuario()">+ Invitar Usuario</button>
+    </div>
+  </div>
+
+  <div class="info-tip" style="margin-bottom:14px">
+    💡 Los usuarios inician sesión con su cuenta de Google. Como administrador, puedes <strong>invitar</strong> a usuarios (agregándolos por email antes de que se conecten), <strong>aprobar</strong> a los que ya intentaron entrar, cambiar su <strong>rol</strong>, o <strong>desactivar</strong> el acceso.
+  </div>
+
+  <!-- FORM INVITAR -->
+  <div class="doc-form" id="us-form" style="display:none">
+    <div class="doc-form-title">
+      <span id="us-form-title">Invitar nuevo usuario</span>
+      <button class="btn btn-g" style="padding:4px 10px;font-size:11px" onclick="cerrarUsuarioForm()">✕ Cancelar</button>
+    </div>
+    <div class="doc-grid" style="grid-template-columns:1fr 1fr 180px">
+      <div class="grp"><label>Email de Google</label><input type="email" id="us-email" placeholder="usuario@gmail.com"></div>
+      <div class="grp"><label>Nombre (opcional)</label><input type="text" id="us-nombre" placeholder="Nombre para identificarlo"></div>
+      <div class="grp"><label>Rol</label>
+        <select id="us-rol">
+          <option value="consulta">👁 Consulta (solo lectura)</option>
+          <option value="contador" selected>📝 Contador (edición total)</option>
+          <option value="admin">👑 Administrador (edición + usuarios)</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Permisos por Sección (opcional — sobrescriben el rol)</div>
+    <div id="us-perms" style="background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin-bottom:14px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-g" onclick="cerrarUsuarioForm()">Cancelar</button>
+      <button class="btn btn-p" onclick="guardarUsuario()">💾 Guardar Usuario</button>
+    </div>
+  </div>
+
+  <div id="us-content"></div>
 </section>
 
 <!-- BALANCE DE APERTURA -->
@@ -845,6 +921,433 @@ async function initFirestore(){
     console.error('Error Firestore:',e);
     fsStatusSet('error',e.code||e.message);
   }
+}
+
+// ═══ SISTEMA DE AUTENTICACIÓN Y USUARIOS ═══
+// Estructura de un usuario en Firestore (colección "usuarios", doc.id = email):
+// {
+//   email, nombre, foto, rol: 'admin'|'contador'|'consulta',
+//   activo: true|false,          // false = acceso revocado
+//   pendiente: false|true,       // true = intentó entrar pero admin no lo aprobó
+//   creadoEn, ultimoLogin,
+//   permisos: {                  // opcional; sobrescribe el rol para secciones específicas
+//     empresa: 'none'|'read'|'write',
+//     pdc: '...', apertura: '...',
+//     ventas: '...', compras: '...', honorarios: '...',
+//     asientos: '...', auxiliares: '...',
+//     diario: '...', mayor: '...', balance: '...', resultados: '...'
+//   }
+// }
+
+// Roles y sus permisos por defecto
+const ROLES={
+  admin:{icon:'👑',label:'Administrador',color:'var(--ach)',descripcion:'Acceso total + gestión de usuarios'},
+  contador:{icon:'📝',label:'Contador',color:'var(--info)',descripcion:'Edición de todos los datos contables'},
+  consulta:{icon:'👁',label:'Consulta',color:'var(--mt)',descripcion:'Solo lectura de reportes'}
+};
+
+// Secciones a las que se aplican permisos
+const SECCIONES=[
+  {id:'empresa',lbl:'Empresa'},
+  {id:'pdc',lbl:'Plan de Cuentas'},
+  {id:'apertura',lbl:'Balance de Apertura'},
+  {id:'ventas',lbl:'Libro de Ventas'},
+  {id:'compras',lbl:'Libro de Compras'},
+  {id:'honorarios',lbl:'Honorarios'},
+  {id:'asientos',lbl:'Asientos Manuales'},
+  {id:'auxiliares',lbl:'Auxiliares'},
+  {id:'diario',lbl:'Libro Diario'},
+  {id:'mayor',lbl:'Libro Mayor'},
+  {id:'balance',lbl:'Balance General'},
+  {id:'resultados',lbl:'Estado de Resultados'}
+];
+
+// Permisos por rol (por defecto)
+function permisosDeRol(rol){
+  const p={};
+  SECCIONES.forEach(s=>{
+    if(rol==='admin'||rol==='contador')p[s.id]='write';
+    else if(rol==='consulta')p[s.id]='read';
+    else p[s.id]='none';
+  });
+  return p;
+}
+
+// Estado global del usuario actual
+let AUTH={
+  user:null,          // {email, nombre, foto, rol, permisos, activo}
+  ready:false,
+  auth:null           // instancia firebase.auth()
+};
+
+// Retorna el permiso efectivo del usuario para una sección: 'none' | 'read' | 'write'
+function permiso(seccion){
+  if(!AUTH.user||!AUTH.user.activo)return 'none';
+  // Permisos custom sobrescriben rol
+  if(AUTH.user.permisos&&AUTH.user.permisos[seccion])return AUTH.user.permisos[seccion];
+  return permisosDeRol(AUTH.user.rol)[seccion]||'none';
+}
+
+function puedeVer(seccion){return permiso(seccion)!=='none';}
+function puedeEditar(seccion){return permiso(seccion)==='write';}
+function esAdmin(){return AUTH.user&&AUTH.user.activo&&AUTH.user.rol==='admin';}
+
+async function initAuth(){
+  if(typeof firebase==='undefined'||!firebase.auth){
+    console.warn('Firebase Auth no disponible');
+    document.getElementById('login-error').style.display='';
+    document.getElementById('login-error').textContent='Sistema de autenticación no disponible. Verifica tu conexión.';
+    return;
+  }
+  AUTH.auth=firebase.auth();
+
+  // Listener de cambios de sesión
+  AUTH.auth.onAuthStateChanged(async(user)=>{
+    if(!user){
+      // No hay sesión → mostrar login
+      mostrarLogin();
+      return;
+    }
+    // Hay sesión → verificar autorización en Firestore
+    await verificarUsuarioAutorizado(user);
+  });
+}
+
+async function loginConGoogle(){
+  const btn=document.getElementById('btn-login-google');
+  const errEl=document.getElementById('login-error');
+  const loadEl=document.getElementById('login-loading');
+  try{
+    errEl.style.display='none';
+    btn.disabled=true;btn.style.opacity='0.6';
+    loadEl.style.display='';loadEl.textContent='⏳ Abriendo Google...';
+    const provider=new firebase.auth.GoogleAuthProvider();
+    await AUTH.auth.signInWithPopup(provider);
+    // El onAuthStateChanged tomará el control desde aquí
+  }catch(e){
+    console.error('Error login:',e);
+    btn.disabled=false;btn.style.opacity='1';
+    loadEl.style.display='none';
+    errEl.style.display='';
+    if(e.code==='auth/popup-closed-by-user')errEl.textContent='Cerraste la ventana. Intenta de nuevo.';
+    else if(e.code==='auth/popup-blocked')errEl.textContent='El navegador bloqueó la ventana emergente. Permítela e intenta de nuevo.';
+    else errEl.textContent='Error: '+(e.message||e.code);
+  }
+}
+
+async function verificarUsuarioAutorizado(fbUser){
+  const errEl=document.getElementById('login-error');
+  const loadEl=document.getElementById('login-loading');
+  loadEl.style.display='';loadEl.textContent='⏳ Verificando permisos...';
+
+  if(!FS.enabled||!FS.db){
+    // Firestore no cargó, no podemos verificar. Bloquear con reintento.
+    errEl.style.display='';errEl.textContent='No hay conexión con la base de datos. Reintentando en 3s...';
+    setTimeout(()=>verificarUsuarioAutorizado(fbUser),3000);
+    return;
+  }
+
+  try{
+    const email=fbUser.email.toLowerCase();
+    const doc=await FS.db.collection('usuarios').doc(email).get();
+
+    // ¿Es el primer usuario del sistema?
+    const snap=await FS.db.collection('usuarios').limit(1).get();
+    const esPrimerUsuario=snap.empty;
+
+    let userData;
+    if(!doc.exists){
+      // Usuario no registrado
+      if(esPrimerUsuario){
+        // ¡Primer usuario! → auto-admin
+        userData={
+          email,
+          nombre:fbUser.displayName||email.split('@')[0],
+          foto:fbUser.photoURL||'',
+          rol:'admin',
+          activo:true,
+          pendiente:false,
+          creadoEn:firebase.firestore.FieldValue.serverTimestamp(),
+          ultimoLogin:firebase.firestore.FieldValue.serverTimestamp()
+        };
+        await FS.db.collection('usuarios').doc(email).set(userData);
+        console.log('Primer usuario del sistema — asignado como admin:',email);
+      }else{
+        // Usuario no autorizado → crear como pendiente
+        userData={
+          email,
+          nombre:fbUser.displayName||email.split('@')[0],
+          foto:fbUser.photoURL||'',
+          rol:'consulta',
+          activo:false,
+          pendiente:true,
+          creadoEn:firebase.firestore.FieldValue.serverTimestamp()
+        };
+        try{await FS.db.collection('usuarios').doc(email).set(userData);}catch(e){}
+        errEl.style.display='';loadEl.style.display='none';
+        errEl.innerHTML=`⏳ Tu solicitud de acceso fue enviada.<br><br>Un administrador debe aprobar tu cuenta (<strong>${email}</strong>) antes de que puedas entrar.<br><br>Contacta al administrador del sistema.`;
+        setTimeout(async()=>{await AUTH.auth.signOut();},8000);
+        return;
+      }
+    }else{
+      userData={...doc.data(),email};
+      if(!userData.activo){
+        errEl.style.display='';loadEl.style.display='none';
+        if(userData.pendiente){
+          errEl.innerHTML=`⏳ Tu cuenta <strong>${email}</strong> está pendiente de aprobación por un administrador.`;
+        }else{
+          errEl.innerHTML=`🚫 Tu acceso ha sido revocado. Contacta al administrador.`;
+        }
+        setTimeout(async()=>{await AUTH.auth.signOut();},6000);
+        return;
+      }
+      // Actualizar último login (sin bloquear)
+      FS.db.collection('usuarios').doc(email).update({
+        ultimoLogin:firebase.firestore.FieldValue.serverTimestamp(),
+        // Actualizar foto/nombre por si cambió en Google
+        foto:fbUser.photoURL||userData.foto||'',
+        nombre:userData.nombre||fbUser.displayName||email.split('@')[0]
+      }).catch(()=>{});
+    }
+
+    AUTH.user=userData;
+    AUTH.ready=true;
+
+    // Ocultar login, mostrar app
+    document.getElementById('login-overlay').style.display='none';
+    // Mostrar badge de usuario
+    const badge=document.getElementById('user-badge');
+    badge.style.display='flex';
+    document.getElementById('user-name').textContent=userData.nombre||email;
+    const rolInfo=ROLES[userData.rol]||ROLES.consulta;
+    document.getElementById('user-role').innerHTML=`${rolInfo.icon} ${rolInfo.label}`;
+    if(userData.foto){
+      const av=document.getElementById('user-avatar');
+      av.src=userData.foto;av.style.display='';
+    }
+    // Mostrar item Usuarios si es admin
+    if(esAdmin()){
+      document.getElementById('nav-usuarios').style.display='';
+    }
+    // Aplicar filtros de permisos a la UI
+    aplicarPermisosUI();
+    // Iniciar la app si aún no ha iniciado
+    if(!window._appInited){window._appInited=true;initApp();}
+  }catch(e){
+    console.error('Error verificando usuario:',e);
+    errEl.style.display='';loadEl.style.display='none';
+    errEl.textContent='Error verificando permisos: '+e.message;
+  }
+}
+
+function mostrarLogin(){
+  document.getElementById('login-overlay').style.display='flex';
+  document.getElementById('login-error').style.display='none';
+  document.getElementById('login-loading').style.display='none';
+  const btn=document.getElementById('btn-login-google');
+  btn.disabled=false;btn.style.opacity='1';
+  document.getElementById('user-badge').style.display='none';
+  AUTH.user=null;
+}
+
+async function logout(){
+  if(!confirm('¿Cerrar sesión?'))return;
+  try{await AUTH.auth.signOut();}catch(e){}
+  location.reload();
+}
+
+// Ocultar items del nav para secciones sin acceso
+function aplicarPermisosUI(){
+  document.querySelectorAll('.nav-item[data-s]').forEach(item=>{
+    const s=item.getAttribute('data-s');
+    if(s==='usuarios')return; // se maneja aparte (solo admin)
+    if(!puedeVer(s))item.style.display='none';
+    else item.style.display='';
+  });
+}
+
+// ═══ GESTIÓN DE USUARIOS (solo admin) ═══
+let US={usuarios:[],editEmail:null,permCustom:false};
+
+async function cargarUsuarios(){
+  if(!FS.enabled||!FS.db){US.usuarios=[];return;}
+  try{
+    const snap=await FS.db.collection('usuarios').orderBy('email').get();
+    US.usuarios=[];
+    snap.forEach(doc=>{US.usuarios.push({...doc.data(),email:doc.id});});
+  }catch(e){console.error(e);toast('Error cargando usuarios','e');}
+}
+
+async function renderUsuarios(){
+  if(!esAdmin()){
+    document.getElementById('us-content').innerHTML='<div class="empty"><div class="ei">🚫</div>Solo los administradores pueden gestionar usuarios.</div>';
+    return;
+  }
+  await cargarUsuarios();
+  const pendientes=US.usuarios.filter(u=>u.pendiente&&!u.activo);
+  const activos=US.usuarios.filter(u=>u.activo);
+  const desactivados=US.usuarios.filter(u=>!u.activo&&!u.pendiente);
+  document.getElementById('us-sub').textContent=`${US.usuarios.length} usuarios · ${activos.length} activos · ${pendientes.length} pendientes · ${desactivados.length} desactivados`;
+
+  let h='';
+  if(pendientes.length){
+    h+=`<div style="background:rgba(255,193,7,.08);border:1px solid rgba(255,193,7,.3);border-radius:8px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:700;color:#ffc107;margin-bottom:8px">⏳ ${pendientes.length} solicitud${pendientes.length===1?'':'es'} pendiente${pendientes.length===1?'':'s'} de aprobación</div>
+      ${pendientes.map(u=>renderRowUsuario(u,true)).join('')}
+    </div>`;
+  }
+
+  h+='<div class="card-np"><div class="tw"><table><thead><tr><th class="tl">USUARIO</th><th class="tl">EMAIL</th><th>ROL</th><th>ESTADO</th><th>ÚLTIMO ACCESO</th><th style="width:180px"></th></tr></thead><tbody>';
+  US.usuarios.filter(u=>!(u.pendiente&&!u.activo)).forEach(u=>{h+=renderRowUsuario(u,false);});
+  if(!US.usuarios.length)h+='<tr><td colspan="6" class="empty">Aún no hay usuarios registrados.</td></tr>';
+  h+='</tbody></table></div></div>';
+
+  document.getElementById('us-content').innerHTML=h;
+}
+
+function renderRowUsuario(u,esPendiente){
+  const rol=ROLES[u.rol]||ROLES.consulta;
+  const estado=u.activo?'<span class="badge bg">ACTIVO</span>':u.pendiente?'<span class="badge" style="background:rgba(255,193,7,.15);color:#ffc107">PENDIENTE</span>':'<span class="badge br">INACTIVO</span>';
+  const ultimo=u.ultimoLogin&&u.ultimoLogin.toDate?u.ultimoLogin.toDate().toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'}):'—';
+  const acciones=[];
+  if(esPendiente||!u.activo){
+    acciones.push(`<button class="btn btn-s" style="padding:3px 7px;font-size:10px" onclick="aprobarUsuario('${u.email}')">✅ Aprobar</button>`);
+  }else{
+    acciones.push(`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="editarUsuario('${u.email}')">✏️ Editar</button>`);
+    if(u.email!==AUTH.user.email){
+      acciones.push(`<button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="desactivarUsuario('${u.email}')">🚫 Desactivar</button>`);
+    }
+  }
+  const avatar=u.foto?`<img src="${u.foto}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px">`:'👤 ';
+  return `<tr>
+    <td class="tl">${avatar}${u.nombre||'(sin nombre)'}${u.email===AUTH.user.email?' <span style="font-size:9px;color:var(--info);margin-left:4px">(tú)</span>':''}</td>
+    <td class="tl" style="font-family:var(--mono);font-size:11px">${u.email}</td>
+    <td><span style="color:${rol.color};font-weight:600">${rol.icon} ${rol.label}</span></td>
+    <td>${estado}</td>
+    <td style="font-size:10px;color:var(--mt)">${ultimo}</td>
+    <td style="text-align:center">${acciones.join(' ')}</td>
+  </tr>`;
+}
+
+function abrirInvitarUsuario(){
+  US.editEmail=null;US.permCustom=false;
+  document.getElementById('us-form-title').textContent='Invitar nuevo usuario';
+  document.getElementById('us-email').value='';document.getElementById('us-email').disabled=false;
+  document.getElementById('us-nombre').value='';
+  document.getElementById('us-rol').value='contador';
+  renderPermisosForm();
+  document.getElementById('us-form').style.display='block';
+  document.getElementById('us-form').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function editarUsuario(email){
+  const u=US.usuarios.find(x=>x.email===email);if(!u)return;
+  US.editEmail=email;
+  US.permCustom=!!u.permisos;
+  document.getElementById('us-form-title').textContent='Editar usuario — '+email;
+  document.getElementById('us-email').value=email;document.getElementById('us-email').disabled=true;
+  document.getElementById('us-nombre').value=u.nombre||'';
+  document.getElementById('us-rol').value=u.rol||'consulta';
+  renderPermisosForm(u.permisos);
+  document.getElementById('us-form').style.display='block';
+  document.getElementById('us-form').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderPermisosForm(permisosActuales){
+  const rol=document.getElementById('us-rol').value;
+  const permBase=permisosDeRol(rol);
+  const permActuales=permisosActuales||permBase;
+  const html=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <label style="font-size:11px;cursor:pointer">
+        <input type="checkbox" id="us-perm-custom" ${US.permCustom?'checked':''} onchange="US.permCustom=this.checked;renderPermisosForm()">
+        Personalizar permisos (sobrescribe el rol)
+      </label>
+      <span style="font-size:10px;color:var(--mt)">💡 Sin personalizar, se usan los permisos del rol seleccionado.</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 12px;${!US.permCustom?'opacity:.4;pointer-events:none':''}">
+      ${SECCIONES.map(s=>`
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="flex:1;font-size:11px">${s.lbl}</span>
+          <select id="us-p-${s.id}" style="background:var(--sf2);border:1px solid var(--bd);color:var(--tx);padding:3px 6px;border-radius:4px;font-size:10px">
+            <option value="none" ${permActuales[s.id]==='none'?'selected':''}>Sin acceso</option>
+            <option value="read" ${permActuales[s.id]==='read'?'selected':''}>Lectura</option>
+            <option value="write" ${permActuales[s.id]==='write'?'selected':''}>Edición</option>
+          </select>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('us-perms').innerHTML=html;
+}
+
+// Listener para cambios de rol → re-renderiza permisos
+document.addEventListener('change',(e)=>{
+  if(e.target&&e.target.id==='us-rol')renderPermisosForm();
+});
+
+function cerrarUsuarioForm(){
+  document.getElementById('us-form').style.display='none';
+  US.editEmail=null;
+}
+
+async function guardarUsuario(){
+  const email=document.getElementById('us-email').value.trim().toLowerCase();
+  const nombre=document.getElementById('us-nombre').value.trim();
+  const rol=document.getElementById('us-rol').value;
+  if(!email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast('⚠️ Email inválido','e');return;}
+  if(!['admin','contador','consulta'].includes(rol)){toast('⚠️ Rol inválido','e');return;}
+
+  let permisos=null;
+  if(US.permCustom){
+    permisos={};
+    SECCIONES.forEach(s=>{permisos[s.id]=document.getElementById('us-p-'+s.id).value;});
+  }
+
+  try{
+    const existente=US.usuarios.find(u=>u.email===email);
+    if(US.editEmail){
+      // Actualizar
+      const data={nombre,rol,activo:true,pendiente:false};
+      if(permisos)data.permisos=permisos;
+      else data.permisos=firebase.firestore.FieldValue.delete();
+      await FS.db.collection('usuarios').doc(email).update(data);
+      toast('✅ Usuario actualizado');
+    }else{
+      // Crear invitación
+      if(existente){toast('⚠️ Ya existe un usuario con ese email','e');return;}
+      const data={
+        email,nombre,rol,activo:true,pendiente:false,
+        creadoEn:firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if(permisos)data.permisos=permisos;
+      await FS.db.collection('usuarios').doc(email).set(data);
+      toast('✅ Usuario invitado — podrá entrar en su próximo login');
+    }
+    cerrarUsuarioForm();
+    await renderUsuarios();
+  }catch(e){
+    console.error(e);toast('❌ Error: '+e.message,'e');
+  }
+}
+
+async function aprobarUsuario(email){
+  try{
+    await FS.db.collection('usuarios').doc(email).update({activo:true,pendiente:false});
+    toast('✅ Usuario aprobado');
+    await renderUsuarios();
+  }catch(e){toast('❌ '+e.message,'e');}
+}
+
+async function desactivarUsuario(email){
+  if(email===AUTH.user.email){toast('⚠️ No puedes desactivarte a ti mismo','e');return;}
+  const u=US.usuarios.find(x=>x.email===email);
+  if(!confirm(`¿Desactivar el acceso de ${u?.nombre||email}?\n\nEl usuario no podrá entrar hasta que lo reactives.`))return;
+  try{
+    await FS.db.collection('usuarios').doc(email).update({activo:false});
+    toast('🚫 Usuario desactivado');
+    await renderUsuarios();
+  }catch(e){toast('❌ '+e.message,'e');}
 }
 
 // ═══ SHIM DE STORAGE — Firestore + localStorage fallback ═══
@@ -1369,18 +1872,21 @@ async function loadYear(y){
 }
 async function changeYear(y){S.empresa.anio=y;await loadYear(y);rerender();}
 async function init(){
+  // Inicializar Firestore primero (necesario para verificar usuario)
+  await initFirestore();
+  // Inicializar Auth — mostrará el login si no hay sesión
+  await initAuth();
+  // El resto de la inicialización de la app se hace en initApp(), que se llama
+  // desde verificarUsuarioAutorizado() una vez que hay usuario válido.
+}
+
+async function initApp(){
   const ys=document.getElementById('year-sel');
   const cy=new Date().getFullYear();
   for(let y=cy+1;y>=cy-5;y--){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===cy)o.selected=true;ys.appendChild(o);}
 
-  // Inicializar Firestore ANTES de cargar datos, para que window.storage.get pueda usarlo
-  await initFirestore();
-
   try{const r=await window.storage.get('empresa');if(r)S.empresa={...S.empresa,...JSON.parse(r.value)};}catch(e){}
-  // Cargar Plan de Cuentas personalizado si existe.
-  // Versión del PDC base: si cambia, se descartan los guardados previos para que el código tome
-  // el nuevo plan. Incrementar este número cuando se cambie el PDC base en el código.
-  const PDC_VERSION=2; // v2 = Plan empresarial de 293 cuentas (abril 2026)
+  const PDC_VERSION=2;
   try{
     const vr=await window.storage.get('pdc_v');
     const savedV=vr?+vr.value:0;
@@ -1393,7 +1899,6 @@ async function init(){
         }
       }
     }else if(savedV>0){
-      // Había un PDC de versión anterior: lo descartamos y guardamos el nuevo
       console.log('Plan de cuentas actualizado a v'+PDC_VERSION+' (anterior: v'+savedV+')');
       await window.storage.set('pdc',JSON.stringify(PDC));
     }
@@ -1406,8 +1911,9 @@ async function init(){
   initBDImportListener();
   initBalanceImportListener();
   bdStatusSet('offline');
-  // Intentar restaurar conexión previa (requiere permiso que puede pedirse al primer guardado)
   if(BD.supported)await bdRestaurarHandle();
+  // Aplicar permisos por si el usuario no puede ver la sección actual
+  aplicarPermisosUI();
 }
 
 // ═══ NAV ═══
@@ -1420,9 +1926,15 @@ function nav(s){
   curSec=s;renderSec(s);
 }
 function renderSec(s){
+  // Verificar permiso de acceso a la sección
+  if(AUTH.user&&!puedeVer(s)&&s!=='empresa'){
+    document.querySelector('.section.active').innerHTML='<div class="empty"><div class="ei">🚫</div>No tienes permiso para acceder a esta sección.<br><br>Contacta a un administrador para solicitar acceso.</div>';
+    return;
+  }
   if(s==='empresa')fillEmpresaForm();
   else if(s==='pdc')renderPDC();
   else if(s==='apertura')renderApertura();
+  else if(s==='usuarios')renderUsuarios();
   else if(s==='ventas')renderVentas();
   else if(s==='compras')renderCompras();
   else if(s==='honorarios')renderHon();

@@ -114,6 +114,7 @@
   <div class="nav-label">Configuración</div>
   <div class="nav-item" onclick="nav('empresas')" data-s="empresas"><span class="nav-icon">🏢</span>Empresas</div>
   <div class="nav-item active" onclick="nav('empresa')" data-s="empresa"><span class="nav-icon">🏢</span>Empresa</div>
+  <div class="nav-item" onclick="nav('centroscosto')" data-s="centroscosto"><span class="nav-icon">🌱</span>Centros de Costo</div>
   <div class="nav-item" onclick="nav('pdc')" data-s="pdc"><span class="nav-icon">📋</span>Plan de Cuentas</div>
   <div class="nav-item" onclick="nav('indicadores')" data-s="indicadores"><span class="nav-icon">📐</span>Indicadores</div>
   <div class="nav-item" onclick="nav('apertura')" data-s="apertura"><span class="nav-icon">🔰</span>Balance de Apertura</div>
@@ -154,6 +155,14 @@
 </div>
 
 <!-- EMPRESA -->
+<!-- CENTROS DE COSTO -->
+<section class="section" id="s-centroscosto">
+  <div class="sec-hdr"><div><div class="sec-title">🌱 Centros de Costo</div><div class="sec-sub">Predios y cuarteles · acumulación y capitalización de costos</div></div>
+    <button class="btn btn-g" onclick="window.print()">🖨️</button>
+  </div>
+  <div id="cc-content"></div>
+</section>
+
 <!-- GESTIÓN DE EMPRESAS -->
 <section class="section" id="s-empresas">
   <div class="sec-hdr"><div><div class="sec-title">🏢 Empresas</div><div class="sec-sub">Gestiona múltiples empresas con datos separados</div></div></div>
@@ -200,6 +209,11 @@
     <button class="btn btn-g" onclick="restaurarIndicadoresDefault()" title="Restaurar valores oficiales de referencia">↺ Valores 2026</button>
   </div>
   <div id="ind-content"></div>
+  <div style="margin-top:20px;padding-top:16px;border-top:2px solid var(--bd)">
+    <div class="sec-title" style="font-size:16px;margin-bottom:4px">🏥 Previsional</div>
+    <div class="sec-sub" style="margin-bottom:14px">Comisiones AFP, aporte del empleador e instituciones</div>
+    <div id="previsional-content"></div>
+  </div>
 </section>
 
 <!-- PDC -->
@@ -556,8 +570,8 @@
       <div class="grp"><label>Colación (no imponible)</label><input type="number" id="remf-colacion" placeholder="0" value="0" oninput="previewLiq()"></div>
       <div class="grp"><label>Movilización (no imponible)</label><input type="number" id="remf-movilizacion" placeholder="0" value="0" oninput="previewLiq()"></div>
       <div class="grp"><label>AFP</label><select id="remf-afp" onchange="previewLiq()"></select></div>
-      <div class="grp"><label>Salud</label><select id="remf-salud" onchange="onSaludChange()"><option value="fonasa">Fonasa (7%)</option><option value="isapre">Isapre (plan UF)</option></select></div>
-      <div class="grp" id="remf-plan-wrap" style="display:none"><label>Plan Isapre (UF)</label><input type="number" id="remf-plan" step="0.01" placeholder="0" oninput="previewLiq()"></div>
+      <div class="grp"><label>Institución de salud</label><select id="remf-salud" onchange="onSaludChange()"></select></div>
+      <div class="grp" id="remf-plan-wrap" style="display:none"><label>Plan pactado (UF)</label><input type="number" id="remf-plan" step="0.001" placeholder="0" oninput="previewLiq()"><div style="font-size:10px;color:var(--mt);margin-top:2px">Valor en UF según el FUN vigente del trabajador. Se cotiza el mayor entre este plan y el 7% legal.</div></div>
       <div class="grp"><label>Contrato</label><select id="remf-contrato" onchange="previewLiq()"><option value="indefinido">Indefinido (cesantía 0,6%)</option><option value="plazo">Plazo fijo (sin aporte trab.)</option></select></div>
     </div>
     <div id="remf-preview" style="margin:12px 0"></div>

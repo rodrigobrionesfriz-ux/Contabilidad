@@ -28,7 +28,35 @@ export function renderCentrosCosto(){
       <div style="margin-top:14px;font-size:11px;color:var(--mt);max-width:420px;margin-left:auto;margin-right:auto">
         Organiza los costos en dos niveles: <strong>predio</strong> (nivel 1) y <strong>cuartel o plantación</strong> (nivel 2).
         Los gastos que asignes a un cuartel en formación se acumulan y luego puedes <strong>capitalizarlos</strong> como activo fijo.
-      </div></div>`;
+      </div></div>
+  <!-- Formulario -->
+  <div class="card" id="cc-form" style="display:none;margin-top:14px">
+    <div class="card-title" id="ccf-title">Nuevo centro de costo</div>
+    <div class="fg">
+      <div class="grp full"><label>Nombre</label><input type="text" id="ccf-nombre" placeholder="Ej: Cuartel 3 — Arándanos"></div>
+      <div class="grp"><label>Código (opcional)</label><input type="text" id="ccf-codigo" placeholder="Ej: C03"></div>
+      <div class="grp" id="ccf-padre-wrap"><label>Predio</label><select id="ccf-padre"></select></div>
+      <div class="grp" id="ccf-estado-wrap"><label>Estado</label><select id="ccf-estado">
+        ${CC_ESTADOS.filter(e=>e.id!=='capitalizado').map(e=>`<option value="${e.id}">${e.nm}</option>`).join('')}
+      </select></div>
+      <div class="grp" id="ccf-fecha-wrap"><label>Fecha de plantación</label><input type="date" id="ccf-fecha"><div style="font-size:10px;color:var(--mt);margin-top:2px">Define el año 1 de la curva</div></div>
+      <div class="grp" id="ccf-curva-wrap"><label>Curva de capitalización</label><select id="ccf-curva" onchange="onCurvaChange()">
+        ${CURVAS_DEFAULT.map(cv=>`<option value="${cv.id}">${cv.nm} — ${cv.pcts.join('/')}%</option>`).join('')}
+      </select></div>
+      <div class="grp full" id="ccf-cuenta-wrap"><label>Cuenta de costo del huerto</label><select id="ccf-cuenta-costo">
+        ${PDC.filter(x=>x.cd.length===7&&x.nat&&(x.cd.startsWith('31')||x.cd.startsWith('33'))).map(x=>`<option value="${x.cd}">${x.cd} — ${x.nm}</option>`).join('')}
+      </select><div style="font-size:10px;color:var(--mt);margin-top:2px">Donde se registra la parte no capitalizable de cada temporada</div></div>
+      <div class="grp full" id="ccf-pcts-wrap">
+        <label>% que se capitaliza cada año</label>
+        <div id="ccf-pcts" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        <div style="font-size:10px;color:var(--mt);margin-top:4px">El resto de cada año va a <strong>costo del huerto</strong> (resultado). Ej. cerezos: años 1-3 100% activo, año 4 50/50, año 5 en adelante 100% costo.</div>
+      </div>
+    </div>
+    <div class="save-row" style="display:flex;gap:8px">
+      <button class="btn btn-p" onclick="guardarCC()">💾 Guardar</button>
+      <button class="btn btn-g" onclick="cerrarFormCC()">Cancelar</button>
+    </div>
+  </div>`;
     return;
   }
 

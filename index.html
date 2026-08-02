@@ -60,7 +60,9 @@
   <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
   <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span></div>
   <div class="hdr-empresa" id="hdr-empresa">Configure los datos de empresa</div>
+  <button id="btn-tema" onclick="cambiarTema()" title="Cambiar tema" style="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mt);font-size:13px;cursor:pointer;padding:5px 10px;line-height:1">🌙</button>
   <button onclick="abrirBusqueda()" title="Buscar (Ctrl+K)" style="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mt);font-size:13px;cursor:pointer;padding:5px 10px;line-height:1">🔍</button>
+  <select id="empresa-sel" onchange="onCambiarEmpresa()" title="Empresa activa" style="background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;outline:none;max-width:170px"></select>
   <select class="year-sel" id="year-sel" onchange="changeYear(+this.value)"></select>
   <div id="db-status" style="display:flex;align-items:center;gap:12px;margin-right:8px">
     <span id="fs-indicator" style="font-size:11px;color:var(--mt);display:flex;align-items:center;gap:5px" title="Estado de sincronización con Firestore"></span>
@@ -85,13 +87,6 @@
 <div class="layout">
 <div id="nav-overlay" onclick="toggleNav()" style="display:none"></div>
 <nav>
-  <div class="nav-label">Configuración</div>
-  <div class="nav-item active" onclick="nav('empresa')" data-s="empresa"><span class="nav-icon">🏢</span>Empresa</div>
-  <div class="nav-item" onclick="nav('pdc')" data-s="pdc"><span class="nav-icon">📋</span>Plan de Cuentas</div>
-  <div class="nav-item" onclick="nav('indicadores')" data-s="indicadores"><span class="nav-icon">📐</span>Indicadores</div>
-  <div class="nav-item" onclick="nav('apertura')" data-s="apertura"><span class="nav-icon">🔰</span>Balance de Apertura</div>
-  <div class="nav-item" onclick="nav('usuarios')" data-s="usuarios" id="nav-usuarios" style="display:none"><span class="nav-icon">👥</span>Usuarios</div>
-  <div class="nav-item" onclick="nav('auditlog')" data-s="auditlog" id="nav-auditlog" style="display:none"><span class="nav-icon">📜</span>Registro de Actividad</div>
   <div class="nav-label">Registros</div>
   <div class="nav-item" onclick="nav('ventas')" data-s="ventas"><span class="nav-icon">🛒</span>Libro de Ventas</div>
   <div class="nav-item" onclick="nav('compras')" data-s="compras"><span class="nav-icon">🧾</span>Libro de Compras</div>
@@ -116,6 +111,14 @@
   <div class="nav-item" onclick="nav('provisiones')" data-s="provisiones"><span class="nav-icon">📋</span>Provisiones</div>
   <div class="nav-item" onclick="nav('correccion')" data-s="correccion"><span class="nav-icon">📊</span>Corrección Monetaria</div>
   <div class="nav-item" onclick="nav('cierre')" data-s="cierre"><span class="nav-icon">🔒</span>Cierre del Ejercicio</div>
+  <div class="nav-label">Configuración</div>
+  <div class="nav-item" onclick="nav('empresas')" data-s="empresas"><span class="nav-icon">🏢</span>Empresas</div>
+  <div class="nav-item active" onclick="nav('empresa')" data-s="empresa"><span class="nav-icon">🏢</span>Empresa</div>
+  <div class="nav-item" onclick="nav('pdc')" data-s="pdc"><span class="nav-icon">📋</span>Plan de Cuentas</div>
+  <div class="nav-item" onclick="nav('indicadores')" data-s="indicadores"><span class="nav-icon">📐</span>Indicadores</div>
+  <div class="nav-item" onclick="nav('apertura')" data-s="apertura"><span class="nav-icon">🔰</span>Balance de Apertura</div>
+  <div class="nav-item" onclick="nav('usuarios')" data-s="usuarios" id="nav-usuarios" style="display:none"><span class="nav-icon">👥</span>Usuarios</div>
+  <div class="nav-item" onclick="nav('auditlog')" data-s="auditlog" id="nav-auditlog" style="display:none"><span class="nav-icon">📜</span>Registro de Actividad</div>
   <!-- Acciones de utilidad (solo en móvil; en escritorio están en el header) -->
   <div class="nav-mobile-only" style="display:none;margin-top:16px;padding:12px 14px;border-top:1px solid var(--bd)">
     <div class="nav-label" style="padding:0 0 8px 0">Acciones</div>
@@ -128,10 +131,10 @@
     </div>
   </div>
   <!-- Usuario y cerrar sesión: SIEMPRE visible al final del menú -->
-  <div id="nav-user-block-m" style="display:none;margin-top:16px;padding:12px 14px;border-top:1px solid var(--bd)">
+  <div id="nav-user-block-m" style="margin-top:16px;padding:12px 14px;border-top:1px solid var(--bd)">
     <div style="font-size:12px;font-weight:600" id="nav-user-name-m"></div>
     <div style="font-size:9px;color:var(--mt);text-transform:uppercase;margin-bottom:8px" id="nav-user-role-m"></div>
-    <button onclick="logout()" style="width:100%;background:rgba(248,81,73,.12);border:1px solid var(--err,#f85149);color:var(--err,#f85149);cursor:pointer;padding:10px;font-size:13px;border-radius:8px;font-weight:600">🚪 Cerrar sesión</button>
+    <button onclick="logout()" style="width:100%;background:rgba(248,81,73,.12);border:1px solid var(--err);color:var(--err);cursor:pointer;padding:10px;font-size:13px;border-radius:8px;font-weight:600">🚪 Cerrar sesión</button>
   </div>
 </nav>
 <main>
@@ -151,6 +154,12 @@
 </div>
 
 <!-- EMPRESA -->
+<!-- GESTIÓN DE EMPRESAS -->
+<section class="section" id="s-empresas">
+  <div class="sec-hdr"><div><div class="sec-title">🏢 Empresas</div><div class="sec-sub">Gestiona múltiples empresas con datos separados</div></div></div>
+  <div id="empresas-content"></div>
+</section>
+
 <section class="section active" id="s-empresa">
   <div class="sec-hdr"><div><div class="sec-title">Datos de Empresa</div><div class="sec-sub">Información del contribuyente SII</div></div></div>
   <div class="card">

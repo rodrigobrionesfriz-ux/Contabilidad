@@ -160,6 +160,8 @@ function renderIndicadores(){
     <div style="font-size:11px;color:var(--mt);margin-top:4px">Las comisiones de cada AFP se configuran por trabajador en Remuneraciones.</div>
   </div>
   <div class="save-row"><button class="btn btn-p" onclick="guardarIndicadores()">💾 Guardar Indicadores</button></div>`;
+  // La configuración previsional vive en la misma sección: dibujarla también.
+  if(window.renderPrevisional)window.renderPrevisional();
 }
 function guardarIndicadores(){
   const num=id=>+document.getElementById('ind-'+id).value||0;

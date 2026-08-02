@@ -1,11 +1,55 @@
 
-:root{--bg:#0d1117;--sf:#161b22;--sf2:#21262d;--bd:#30363d;--ac:#2ea043;--ach:#3fb950;--tx:#e6edf3;--mt:#8b949e;--err:#f85149;--warn:#d29922;--info:#58a6ff;--mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif}
+/* ═══ TEMAS ═══
+   Se aplican con data-theme en <html>. Todo el CSS usa estas variables. */
+
+/* Tema por defecto: oscuro original (verde) */
+:root,html[data-theme="dark"]{
+  --bg:#0d1117;--sf:#161b22;--sf2:#21262d;--bd:#30363d;
+  --ac:#2ea043;--ach:#3fb950;--tx:#e6edf3;--mt:#8b949e;
+  --err:#f85149;--warn:#d29922;--info:#58a6ff;
+  --logo1:#2ea043;--logo2:#56d364;
+  --mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif;
+}
+
+/* SAP Fiori claro — fondo neutro, azul corporativo SAP */
+html[data-theme="sap-light"]{
+  --bg:#f5f6f7;      /* fondo aplicación */
+  --sf:#ffffff;      /* tarjetas y paneles */
+  --sf2:#eaecee;     /* encabezados de tabla, hover */
+  --bd:#d9d9d9;      /* bordes */
+  --ac:#0a6ed1;      /* azul SAP (acción principal) */
+  --ach:#0854a0;     /* azul SAP hover */
+  --tx:#32363a;      /* texto principal */
+  --mt:#6a6d70;      /* texto secundario */
+  --err:#bb0000;     /* negativo SAP */
+  --warn:#e9730c;    /* crítico SAP */
+  --info:#0a6ed1;
+  --logo1:#0a6ed1;--logo2:#0854a0;
+  --mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif;
+}
+
+/* SAP oscuro — Fiori Horizon dark */
+html[data-theme="sap-dark"]{
+  --bg:#12171c;
+  --sf:#1c2228;
+  --sf2:#272d33;
+  --bd:#3a4149;
+  --ac:#4db1ff;      /* azul SAP claro sobre oscuro */
+  --ach:#7ac6ff;
+  --tx:#eaecee;
+  --mt:#a9b4be;
+  --err:#ff8081;
+  --warn:#f5a86b;
+  --info:#4db1ff;
+  --logo1:#0a6ed1;--logo2:#4db1ff;
+  --mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:14px;display:flex;flex-direction:column}
 header{background:var(--sf);border-bottom:1px solid var(--bd);padding:0 20px;height:54px;display:flex;align-items:center;gap:14px;flex-shrink:0;z-index:10}
 .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;white-space:nowrap}
-.logo-icon{width:30px;height:30px;background:linear-gradient(135deg,#2ea043,#56d364);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--logo1),var(--logo2));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px}
 .hdr-empresa{flex:1;text-align:center;color:var(--mt);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hdr-empresa span{color:var(--tx);font-weight:600}
 .year-sel{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:5px 9px;font-family:var(--mono);font-size:13px;cursor:pointer;outline:none}
@@ -61,9 +105,9 @@ td.err{color:var(--err);font-weight:600}
 .btn-g{background:transparent;color:var(--mt);border:1px solid var(--bd)}.btn-g:hover{color:var(--tx);border-color:var(--tx)}
 .save-row{display:flex;justify-content:flex-end;margin-top:14px;gap:8px}
 .badge{display:inline-block;padding:2px 7px;border-radius:100px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
-.bg{background:rgba(46,160,67,.18);color:#3fb950}
-.br{background:rgba(248,81,73,.18);color:#f85149}
-.bb{background:rgba(88,166,255,.18);color:#58a6ff}
+.bg{background:rgba(46,160,67,.18);color:var(--ach)}
+.br{background:rgba(248,81,73,.18);color:var(--err)}
+.bb{background:rgba(88,166,255,.18);color:var(--info)}
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:18px}
 .kpi{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:14px}
 .kpi-lbl{font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}

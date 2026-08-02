@@ -240,10 +240,7 @@ td.err{color:var(--err);font-weight:600}
 .linea-aux .rut-dv-ln.ok{color:var(--ach)}
 .linea-aux .rut-dv-ln.bad{color:var(--err)}
 /* RESPONSIVE MÓVIL */
-@media (min-width:901px){
-  /* Solo en escritorio amplio el logout está en el header; ocultar el del nav para no duplicar */
-  #nav-user-block-m{display:none!important}
-}
+
 @media (max-width:768px){
   #nav-toggle{display:block!important}
   header{padding:0 12px;gap:8px;height:52px}

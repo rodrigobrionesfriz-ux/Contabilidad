@@ -1,6 +1,7 @@
 // apertura.js — Balance de Apertura (Asiento N°0) + importador Excel
 import {toast, fmtC, fmt, pn, today, pdcNm, PDC, CUENTAS_SEL, rutParse, rutFmt, rutDV} from './core.js';
 import {CUENTAS_AUX, esAux, cuentasOpts} from './asientos.js';
+import {inputCuenta} from './buscadorcuentas.js';
 import {S} from './state.js';
 import {rerender} from './ui.js';
 import './storage.js';
@@ -113,7 +114,7 @@ function apRenderLineas(){
     }
     return `<div class="linea-row">
       <div class="linea-num">${i+1}</div>
-      <div><select class="linea-inp" onchange="apLCd(${i},this.value)">${cuentasOpts(l.cd)}</select></div>
+      <div>${inputCuenta({id:`ap-cd-${i}`,value:l.cd,onPick:`apLCd(${i},'%CD%')`,placeholder:'Código o nombre…'})}</div>
       <div><input type="text" class="linea-inp" placeholder="Observación" value="${l.desc||''}" oninput="APF.lineas[${i}].desc=this.value"></div>
       <div><input type="number" class="linea-num-inp" min="0" placeholder="0" value="${l.debe||''}" oninput="apLVal(${i},'debe',this.value)"></div>
       <div><input type="number" class="linea-num-inp" min="0" placeholder="0" value="${l.haber||''}" oninput="apLVal(${i},'haber',this.value)"></div>

@@ -7,6 +7,7 @@ import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {foliosMensuales, dteVentasOpts} from './helpers.js';
 import {ccOpts} from './centroscosto.js';
+import {inputCuenta} from './buscadorcuentas.js';
 import './storage.js';
 
 // Estado del formulario de asientos (interno del módulo; se reasigna al abrir/editar)
@@ -126,7 +127,7 @@ function renderLineas(){
     }
     return `<div class="linea-row">
       <div class="linea-num">${i+1}</div>
-      <div><select class="linea-inp" onchange="lCd(${i},this.value)">${cuentasOpts(l.cd)}</select></div>
+      <div>${inputCuenta({id:`ln-cd-${i}`,value:l.cd,onPick:`lCd(${i},'%CD%')`,placeholder:'Código o nombre…'})}</div>
       <div><input type="text" class="linea-inp" placeholder="Descripción libre" value="${l.desc||''}" oninput="AF.lineas[${i}].desc=this.value"></div>
       <div><select class="linea-inp" title="Centro de costo" onchange="AF.lineas[${i}].cc=this.value">${ccOpts(l.cc||'')}</select></div>
       <div><input type="number" class="linea-num-inp" min="0" placeholder="0" value="${l.debe||''}" oninput="lVal(${i},'debe',this.value)"></div>
@@ -409,7 +410,7 @@ function dtmRenderDist(){
   if(!DM.dist.length)DM.dist=[{cuenta:'',monto:0}];
   box.innerHTML=DM.dist.map((l,i)=>`<div class="dist-row">
     <div class="dist-num">${i+1}</div>
-    <div><select class="dist-inp" onchange="DM.dist[${i}].cuenta=this.value;dtmUpdDistCheck()">${cuentasGastoOpts(l.cuenta)}</select></div>
+    <div>${inputCuenta({id:`dm-cd-${i}`,value:l.cuenta,onPick:`DM.dist[${i}].cuenta='%CD%';dtmUpdDistCheck()`,placeholder:'Cuenta de gasto…',clase:'dist-inp'})}</div>
     <div><input type="number" class="dist-num-inp" min="0" placeholder="0" value="${l.monto||''}" oninput="DM.dist[${i}].monto=pn(this.value);dtmUpdDistCheck()"></div>
     <div style="text-align:center"><button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="dtmDelDist(${i})">✕</button></div>
   </div>`).join('');

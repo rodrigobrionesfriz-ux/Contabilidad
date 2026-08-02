@@ -29,6 +29,7 @@ import {savePDC, renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm,
 import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
         getIndicadores, IND, actualizarDesdeBancoCentral} from './indicadores.js';
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
+import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas} from './buscadorcuentas.js';
 import {cargarCentros, cargarCierresCC, ccOpts, ccNombre, costoAcumulado} from './centroscosto.js';
 import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
         verDetalleCC, abrirCapitalizar, confirmarCapitalizar, onCurvaChange,
@@ -315,6 +316,7 @@ Object.assign(window,{
   renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
   verDetalleCC, abrirCapitalizar, confirmarCapitalizar, ccOpts, ccNombre,
   onCurvaChange, setPct, addPctAnio, delPctAnio, ejecutarCierreMensual, revertirCierreMensual,
+  acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas,
   // apertura
   renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,
   apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura,

@@ -6,6 +6,7 @@ import {logAccion} from './firebase.js';
 import {mesOpts, foliosMensuales, mesRango} from './helpers.js';
 import {todosDocsCompras, abrirAsientoDesde} from './asientos.js';
 import {ccOpts} from './centroscosto.js';
+import {inputCuenta} from './buscadorcuentas.js';
 import './storage.js';
 
 // Estado del formulario de compras (interno del módulo)
@@ -231,7 +232,7 @@ function renderDist(){
   if(!CF.dist.length)CF.dist=[{cuenta:'',monto:0,cc:''}];
   box.innerHTML=CF.dist.map((l,i)=>`<div class="dist-row">
     <div class="dist-num">${i+1}</div>
-    <div><select class="dist-inp" onchange="CF.dist[${i}].cuenta=this.value;updCfCheck()">${cuentasGastoOpts(l.cuenta)}</select></div>
+    <div>${inputCuenta({id:`dist-cd-${i}`,value:l.cuenta,onPick:`CF.dist[${i}].cuenta='%CD%';updCfCheck()`,placeholder:'Cuenta de gasto…',clase:'dist-inp'})}</div>
     <div><input type="number" class="dist-num-inp" min="0" placeholder="0" value="${l.monto||''}" oninput="CF.dist[${i}].monto=pn(this.value);updCfCheck()"></div>
     <div><select class="dist-inp" title="Centro de costo" onchange="CF.dist[${i}].cc=this.value">${ccOpts(l.cc||'')}</select></div>
     <div style="text-align:center"><button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="delDist(${i})">✕</button></div>

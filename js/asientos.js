@@ -6,6 +6,7 @@ import {cuentasGastoOpts, dteComprasOpts} from './compras.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {foliosMensuales, dteVentasOpts} from './helpers.js';
+import {retencionHonorarios} from './indicadores.js';
 import {ccOpts} from './centroscosto.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import './storage.js';
@@ -15,7 +16,16 @@ let AF={editId:null,lineas:[]};
 
 // ═══ ASIENTOS MANUALES ═══
 // Cuentas que requieren sub-auxiliar (RUT + razón social): clientes, proveedores
-const CUENTAS_AUX={'1104001':'cliente','2102001':'proveedor'};
+// Cuentas que llevan auxiliar: al usarlas se abre el modal para registrar el documento.
+//   cliente    → factura de venta (IVA débito)
+//   proveedor  → factura de compra (IVA crédito) + distribución de gastos
+//   honorario  → boleta de honorarios (retención, sin IVA)
+const CUENTAS_AUX={
+  '1104001':'cliente',
+  '2102001':'proveedor',
+  '2102006':'honorario',   // HONORARIOS POR PAGAR
+  '3202019':'honorario',   // HONORARIOS PROFESIONALES
+};
 const esAux=cd=>!!CUENTAS_AUX[cd];
 
 function renderAsientos(){
@@ -271,15 +281,32 @@ let DM={open:false,lineaIdx:null,dist:[]};
 function abrirDteModal(lineaIdx){
   const l=AF.lineas[lineaIdx];if(!l||!esAux(l.cd))return;
   DM.open=true;DM.lineaIdx=lineaIdx;
-  const tipoAux=CUENTAS_AUX[l.cd]; // 'cliente' o 'proveedor'
+  const tipoAux=CUENTAS_AUX[l.cd]; // 'cliente' | 'proveedor' | 'honorario'
   const esCompra=l.cd==='2102001';
-  // Título
-  document.getElementById('dte-modal-title').textContent=esCompra?'📄 Documento de Compra (DTE)':'📄 Documento de Venta (DTE)';
-  document.getElementById('dte-modal-sub').textContent=`Completa los datos del documento del ${tipoAux}. El folio se asigna automáticamente. No duplica el efecto contable — ya está en el asiento.`;
-  // DTE options
-  document.getElementById('dtm-dte').innerHTML=esCompra?dteComprasOpts(l.dte?.tipoDTE||''):dteVentasOpts(l.dte?.tipoDTE||'');
+  const esHon=tipoAux==='honorario';
+  // Título según el tipo de auxiliar
+  const titulos={cliente:'📄 Documento de Venta (DTE)',proveedor:'📄 Documento de Compra (DTE)',honorario:'📄 Boleta de Honorarios'};
+  document.getElementById('dte-modal-title').textContent=titulos[tipoAux]||'📄 Documento';
+  document.getElementById('dte-modal-sub').textContent=esHon
+    ? 'Completa los datos de la boleta. La retención se calcula con la tasa del año. No duplica el efecto contable — ya está en el asiento.'
+    : `Completa los datos del documento del ${tipoAux}. El folio se asigna automáticamente. No duplica el efecto contable — ya está en el asiento.`;
+  // Tipos de documento
+  document.getElementById('dtm-dte').innerHTML=esHon
+    ? `<option value="70" ${l.dte?.tipoDTE==70?'selected':''}>70 – Boleta de Honorarios</option>
+       <option value="71" ${l.dte?.tipoDTE==71?'selected':''}>71 – Boleta de Honorarios Electrónica</option>`
+    : (esCompra?dteComprasOpts(l.dte?.tipoDTE||''):dteVentasOpts(l.dte?.tipoDTE||''));
   // Distribución solo en compras
   document.getElementById('dtm-dist-wrap').style.display=esCompra?'block':'none';
+  // Campos según el tipo: honorarios usan retención, no IVA
+  const mostrar=(id,v)=>{const e=document.getElementById(id);if(e)e.style.display=v?'':'none';};
+  mostrar('dtm-iva-wrap',!esHon);
+  mostrar('dtm-ret-wrap',esHon);
+  mostrar('dtm-exento-wrap',!esHon);
+  mostrar('dtm-otros-wrap',!esHon);
+  const lblNeto=document.getElementById('dtm-lbl-neto');
+  if(lblNeto)lblNeto.textContent=esHon?'Bruto (honorario)':'Neto';
+  const lblRet=document.getElementById('dtm-lbl-ret');
+  if(lblRet)lblRet.textContent=`Retención ${(retencionHonorarios(S.empresa.anio)*100).toFixed(2)}%`;
   // Cargar datos existentes o defaults
   const d=l.dte||{};
   document.getElementById('dtm-fecha').value=d.fecha||today();
@@ -293,6 +320,8 @@ function abrirDteModal(lineaIdx){
   const montoLinea=esCompra?(l.haber||l.debe||0):(l.debe||l.haber||0);
   document.getElementById('dtm-neto').value=d.neto||'';
   document.getElementById('dtm-exento').value=d.exento||'';
+  const elDesc=document.getElementById('dtm-desc');if(elDesc)elDesc.value=d.descripcion||l.desc||'';
+  const elRet=document.getElementById('dtm-ret');if(elRet)elRet.value=d.retencion||'';
   document.getElementById('dtm-iva').value=d.iva||'';
   document.getElementById('dtm-otros').value=d.otrosImpuestos||'';
   document.getElementById('dtm-total').value=d.total||montoLinea||'';
@@ -333,6 +362,29 @@ function dtmRutInput(val){
 }
 
 function dtmCalcTotals(changed){
+  const lHon=AF.lineas[DM.lineaIdx];
+  // Honorarios: bruto − retención = líquido a pagar
+  if(lHon&&CUENTAS_AUX[lHon.cd]==='honorario'){
+    const bruto=pn(document.getElementById('dtm-neto').value);
+    const retEl=document.getElementById('dtm-ret'), totEl2=document.getElementById('dtm-total');
+    const tasa=retencionHonorarios(S.empresa.anio);
+    if(changed==='neto'){
+      const ret=Math.round(bruto*tasa);
+      retEl.value=ret||'';
+      totEl2.value=bruto-ret;
+    }else if(changed==='ret'){
+      const ret=pn(retEl.value);
+      totEl2.value=bruto-ret;
+    }else if(changed==='total'){
+      // Desde el líquido: reconstruir el bruto
+      const liq=pn(totEl2.value);
+      const b=Math.round(liq/(1-tasa));
+      const ret=b-liq;
+      document.getElementById('dtm-neto').value=b;
+      retEl.value=ret;
+    }
+    return;
+  }
   const neto=pn(document.getElementById('dtm-neto').value);
   const exento=pn(document.getElementById('dtm-exento').value);
   const otros=pn(document.getElementById('dtm-otros').value);
@@ -446,6 +498,9 @@ function dtmGuardar(){
   const iva=pn(document.getElementById('dtm-iva').value);
   const otrosImpuestos=pn(document.getElementById('dtm-otros').value);
   const total=pn(document.getElementById('dtm-total').value);
+  const descripcion=(document.getElementById('dtm-desc')||{}).value?.trim()||'';
+  const retencion=pn((document.getElementById('dtm-ret')||{}).value);
+  const esHon=CUENTAS_AUX[l.cd]==='honorario';
 
   if(!fecha){toast('⚠️ Ingresa la fecha de emisión','e');return;}
   if(fechaVencimiento&&fechaVencimiento<fecha){toast('⚠️ Vencimiento no puede ser anterior a emisión','e');return;}
@@ -456,10 +511,15 @@ function dtmGuardar(){
   if(!r.valido){toast('⚠️ RUT inválido — DV no coincide','e');return;}
   if(!razonSocial){toast('⚠️ Ingresa la razón social','e');return;}
   if(total<=0){toast('⚠️ El total debe ser mayor a cero','e');return;}
-  if(Math.abs((neto+exento+iva+otrosImpuestos)-total)>1){toast('⚠️ Neto + Exento + IVA + Otros no coincide con el Total','e');return;}
+  if(esHon){
+    // Honorarios: bruto − retención = líquido
+    if(Math.abs((neto-retencion)-total)>1){toast('⚠️ Bruto − Retención no coincide con el líquido','e');return;}
+  }else if(Math.abs((neto+exento+iva+otrosImpuestos)-total)>1){
+    toast('⚠️ Neto + Exento + IVA + Otros no coincide con el Total','e');return;
+  }
 
-  // Validar duplicado
-  const docs=esCompra?todosDocsCompras():todosDocsVentas();
+  // Validar duplicado (los honorarios no van a los libros de compra/venta)
+  const docs=esHon?[]:(esCompra?todosDocsCompras():todosDocsVentas());
   const dup=docs.find(d=>d.rutCodigo===r.codigo&&+d.tipoDTE===tipoDTE&&d.numero===numero
     &&!(d.origen==='asiento'&&d.asientoId===AF.editId&&d.lineaIdx===DM.lineaIdx));
   if(dup){
@@ -480,13 +540,37 @@ function dtmGuardar(){
   }
 
   // Guardar en la línea
-  const dteObj={fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,neto,exento,iva,otrosImpuestos,total};
+  const dteObj={fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,
+                neto,exento,iva,otrosImpuestos,total,descripcion};
+  if(esHon){dteObj.retencion=retencion;dteObj.tipoAux='honorario';}
   if(dist)dteObj.dist=dist;
   AF.lineas[DM.lineaIdx].dte=dteObj;
   // Sincronizar RUT/RS en el nivel de la línea para el auxiliar
   AF.lineas[DM.lineaIdx].rutCodigo=r.codigo;
   AF.lineas[DM.lineaIdx].rutDV=r.dv;
   AF.lineas[DM.lineaIdx].razonSocial=razonSocial;
+  if(descripcion&&!AF.lineas[DM.lineaIdx].desc)AF.lineas[DM.lineaIdx].desc=descripcion;
+
+  // ── Asignar el total al DEBE o HABER según el tipo de auxiliar y el documento ──
+  //   cliente   (por cobrar, activo): factura → DEBE · nota de crédito → HABER
+  //   proveedor (por pagar, pasivo) : factura → HABER · nota de crédito → DEBE
+  //   honorario: la cuenta define el lado (gasto al debe, por pagar al haber)
+  const signo=esHon?1:((esCompra?dteC(tipoDTE)?.signo:dteV(tipoDTE)?.signo)||1);
+  const montoLinea=esHon?total:Math.abs(total); // en honorarios el total es el líquido
+  const lin=AF.lineas[DM.lineaIdx];
+  const naturalDebe=esHon
+    ? (l.cd==='3202019'||l.cd==='1107002')   // gasto o anticipo → debe
+    : !esCompra;                              // cliente → debe; proveedor → haber
+  // Una nota de crédito (signo -1) invierte el lado natural
+  const alDebe=signo>=0?naturalDebe:!naturalDebe;
+  if(esHon&&l.cd==='3202019'){
+    // Gasto por honorarios: se registra el BRUTO (la retención va en otra línea)
+    lin.debe=neto;lin.haber=0;
+  }else{
+    lin.debe=alDebe?montoLinea:0;
+    lin.haber=alDebe?0:montoLinea;
+  }
+  updCuadre();
   cerrarDteModal();
   renderLineas();
   toast('✅ Documento asociado a la línea');

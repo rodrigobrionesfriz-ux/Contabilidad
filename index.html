@@ -242,17 +242,27 @@ td.err{color:var(--err);font-weight:600}
 }
 /* PRINT */
 @media print{
-  header,nav,.btn,.save-row,.as-actions,.doc-form,.filter-row,.aux-tabs{display:none!important}
+  header,nav,.btn,.save-row,.as-actions,.doc-form,.filter-row,.aux-tabs,#nav-toggle,#nav-overlay,.nav-mobile-only,#search-overlay{display:none!important}
   body{background:#fff;color:#000;overflow:visible;font-size:11px}
   html,body{height:auto;overflow:visible}
   .layout{display:block}
   main{padding:4px;overflow:visible}
-  .section{display:block!important}
+  /* Solo imprimir la sección activa, no todas */
+  .section{display:none!important}
+  .section.active{display:block!important}
   .card,.card-np,.asiento-item,.as-form,.aux-card{border:1px solid #ccc}
   .asiento-body,.aux-body{display:block!important}
   thead th{background:#eee;color:#333}
   .bal-layout{display:grid}
+  /* Encabezado oficial de impresión */
+  #print-header{display:block!important}
+  .kpi-grid{display:grid!important}
+  .kpi{border:1px solid #ccc}
+  /* Ocultar controles interactivos dentro de secciones */
+  select,input[type=checkbox],input[type=file],input[type=number],input[type=text]{border:none!important}
+  .sec-hdr .btn{display:none!important}
 }
+#print-header{display:none}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
@@ -336,6 +346,7 @@ td.err{color:var(--err);font-weight:600}
   <div class="nav-label">Configuración</div>
   <div class="nav-item active" onclick="nav('empresa')" data-s="empresa"><span class="nav-icon">🏢</span>Empresa</div>
   <div class="nav-item" onclick="nav('pdc')" data-s="pdc"><span class="nav-icon">📋</span>Plan de Cuentas</div>
+  <div class="nav-item" onclick="nav('indicadores')" data-s="indicadores"><span class="nav-icon">📐</span>Indicadores</div>
   <div class="nav-item" onclick="nav('apertura')" data-s="apertura"><span class="nav-icon">🔰</span>Balance de Apertura</div>
   <div class="nav-item" onclick="nav('usuarios')" data-s="usuarios" id="nav-usuarios" style="display:none"><span class="nav-icon">👥</span>Usuarios</div>
   <div class="nav-item" onclick="nav('auditlog')" data-s="auditlog" id="nav-auditlog" style="display:none"><span class="nav-icon">📜</span>Registro de Actividad</div>
@@ -352,9 +363,11 @@ td.err{color:var(--err);font-weight:600}
   <div class="nav-item" onclick="nav('balance')" data-s="balance"><span class="nav-icon">⚖️</span>Balance General</div>
   <div class="nav-item" onclick="nav('resultados')" data-s="resultados"><span class="nav-icon">📈</span>Resultados</div>
   <div class="nav-item" onclick="nav('flujocaja')" data-s="flujocaja"><span class="nav-icon">💵</span>Flujo de Caja</div>
+  <div class="nav-item" onclick="nav('conciliacion')" data-s="conciliacion"><span class="nav-icon">🏦</span>Conciliación Bancaria</div>
   <div class="nav-label">Tributario SII</div>
   <div class="nav-item" onclick="nav('f29')" data-s="f29"><span class="nav-icon">📄</span>Formulario 29</div>
   <div class="nav-item" onclick="nav('ppm')" data-s="ppm"><span class="nav-icon">💰</span>PPM</div>
+  <div class="nav-item" onclick="nav('xmlsii')" data-s="xmlsii"><span class="nav-icon">📤</span>Exportar XML SII</div>
   <div class="nav-label">Activo Fijo</div>
   <div class="nav-item" onclick="nav('activofijo')" data-s="activofijo"><span class="nav-icon">🏗️</span>Activos Fijos<span class="nav-badge" id="nb-af">0</span></div>
   <div class="nav-label">Cierre de Ejercicio</div>
@@ -380,6 +393,20 @@ td.err{color:var(--err);font-weight:600}
   </div>
 </nav>
 <main>
+<div id="print-header" style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #000">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <div>
+      <div id="ph-empresa" style="font-size:16px;font-weight:700">—</div>
+      <div id="ph-rut" style="font-size:12px;color:#333"></div>
+      <div id="ph-giro" style="font-size:11px;color:#555"></div>
+    </div>
+    <div style="text-align:right">
+      <div id="ph-titulo" style="font-size:14px;font-weight:600">—</div>
+      <div id="ph-periodo" style="font-size:11px;color:#333"></div>
+      <div id="ph-fecha" style="font-size:10px;color:#777"></div>
+    </div>
+  </div>
+</div>
 
 <!-- EMPRESA -->
 <section class="section active" id="s-empresa">
@@ -414,6 +441,14 @@ td.err{color:var(--err);font-weight:600}
     <div class="info-tip" style="margin-top:10px;font-size:11px">💡 Régimen 14 D N°3 Pro-Pyme General: tasa de Primera Categoría 25%. La tasa PPM es la que fijas tú (revisa tu F22 del año anterior o usa 0,25% si estás en el tramo Pyme reducido).</div>
   </div>
   <div class="save-row"><button class="btn btn-p" onclick="saveEmpresa()">💾 Guardar Empresa</button></div>
+</section>
+
+<!-- INDICADORES -->
+<section class="section" id="s-indicadores">
+  <div class="sec-hdr"><div><div class="sec-title">📐 Indicadores</div><div class="sec-sub">Valores económicos y previsionales del período</div></div>
+    <button class="btn btn-g" onclick="restaurarIndicadoresDefault()" title="Restaurar valores oficiales de referencia">↺ Valores 2026</button>
+  </div>
+  <div id="ind-content"></div>
 </section>
 
 <!-- PDC -->
@@ -907,6 +942,25 @@ td.err{color:var(--err);font-weight:600}
   <div id="fc-content"></div>
 </section>
 
+<!-- CONCILIACIÓN BANCARIA -->
+<section class="section" id="s-conciliacion">
+  <div class="sec-hdr"><div><div class="sec-title">Conciliación Bancaria</div><div class="sec-sub">Cuadra tus registros contra la cartola del banco</div></div>
+    <button class="btn btn-g" onclick="window.print()">🖨️</button>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="fg">
+      <div class="grp"><label>Cuenta bancaria</label><select id="conc-cuenta" onchange="renderConciliacion()"></select></div>
+      <div class="grp"><label>Saldo según cartola del banco</label><input type="number" id="conc-saldo-banco" placeholder="0" oninput="onSaldoBancoChange()"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">
+      <button class="btn btn-i" onclick="document.getElementById('conc-cartola-file').click()">📤 Cargar cartola (Excel/CSV)</button>
+      <input type="file" id="conc-cartola-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="cargarCartola(event)">
+      <span style="font-size:11px;color:var(--mt)">O marca manualmente cada movimiento como conciliado ✓</span>
+    </div>
+  </div>
+  <div id="conc-content"></div>
+</section>
+
 <!-- FORMULARIO 29 -->
 <section class="section" id="s-f29">
   <div class="sec-hdr"><div><div class="sec-title">Formulario 29</div><div class="sec-sub">Declaración mensual de IVA y PPM</div></div>
@@ -924,6 +978,19 @@ td.err{color:var(--err);font-weight:600}
     <button class="btn btn-g" onclick="window.print()">🖨️ Imprimir</button>
   </div>
   <div id="ppm-content"></div>
+</section>
+
+<!-- EXPORTAR XML SII (IECV) -->
+<section class="section" id="s-xmlsii">
+  <div class="sec-hdr"><div><div class="sec-title">Exportar XML SII</div><div class="sec-sub">Información Electrónica de Compras y Ventas (IECV)</div></div></div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="fg">
+      <div class="grp"><label>Tipo de libro</label><select id="xml-tipo" onchange="renderXmlSii()"><option value="VENTA">Libro de Ventas</option><option value="COMPRA">Libro de Compras</option></select></div>
+      <div class="grp"><label>Período (mes)</label><select id="xml-mes" onchange="renderXmlSii()"></select></div>
+    </div>
+    <div style="font-size:11px;color:var(--mt);margin-top:4px">Genera el archivo XML del período según el formato IECV del SII (esquema LibroCV_v10).</div>
+  </div>
+  <div id="xml-content"></div>
 </section>
 
 <!-- ACTIVO FIJO -->
@@ -1223,6 +1290,7 @@ const ROLES={
 const SECCIONES=[
   {id:'empresa',lbl:'Empresa'},
   {id:'pdc',lbl:'Plan de Cuentas'},
+  {id:'indicadores',lbl:'Indicadores'},
   {id:'apertura',lbl:'Balance de Apertura'},
   {id:'ventas',lbl:'Libro de Ventas'},
   {id:'compras',lbl:'Libro de Compras'},
@@ -1235,9 +1303,11 @@ const SECCIONES=[
   {id:'balance',lbl:'Balance General'},
   {id:'resultados',lbl:'Estado de Resultados'},
   {id:'flujocaja',lbl:'Flujo de Caja'},
+  {id:'conciliacion',lbl:'Conciliación Bancaria'},
   {id:'auditlog',lbl:'Registro de Actividad'},
   {id:'f29',lbl:'Formulario 29'},
   {id:'ppm',lbl:'PPM'},
+  {id:'xmlsii',lbl:'Exportar XML SII'},
   {id:'activofijo',lbl:'Activos Fijos'},
   {id:'provisiones',lbl:'Provisiones'},
   {id:'correccion',lbl:'Corrección Monetaria'},
@@ -2334,6 +2404,7 @@ function renderSec(s){
   }
   if(s==='empresa')fillEmpresaForm();
   else if(s==='pdc')renderPDC();
+  else if(s==='indicadores')renderIndicadores();
   else if(s==='apertura')renderApertura();
   else if(s==='usuarios')renderUsuarios();
   else if(s==='auditlog')renderAuditLog();
@@ -2348,8 +2419,10 @@ function renderSec(s){
   else if(s==='balance')renderBalance();
   else if(s==='resultados')renderResultados();
   else if(s==='flujocaja')renderFlujoCaja();
+  else if(s==='conciliacion')renderConciliacion();
   else if(s==='f29')renderF29();
   else if(s==='ppm')renderPPM();
+  else if(s==='xmlsii')renderXmlSii();
   else if(s==='activofijo')renderActivoFijo();
   else if(s==='provisiones')renderProvisiones();
   else if(s==='correccion')renderCorreccion();
@@ -6056,7 +6129,7 @@ function renderCorreccion(){
   const el=document.getElementById('cm-content');
   const M=buildMayor();
   const capital=Object.keys(M).filter(k=>k.startsWith('23')&&Math.abs(M[k].saldo)>=0.5).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
-  const factorDefault=(S.empresa.factorCM!=null?+S.empresa.factorCM:3.4);
+  const factorDefault=IND('factorCM');
   el.innerHTML=`<div class="card" style="max-width:640px">
     <div class="info-tip" style="margin-bottom:16px;background:rgba(210,153,34,.10);border-color:var(--warn)">⚠️ <strong>Tu empresa está en régimen 14 D N°3 Pro-Pyme General, que NO está sujeto a corrección monetaria</strong> del Art. 41 de la LIR (los contribuyentes de este régimen no reajustan sus registros empresariales). Este módulo es solo <strong>informativo/referencial</strong> por si cambias de régimen o lo necesitas para análisis.</div>
     <div class="card-title">Cálculo referencial de reajuste</div>
@@ -6079,16 +6152,106 @@ function previewCM(){
   if(el)el.innerHTML=`<div class="info-tip" style="font-size:12px">Reajuste referencial del capital propio: <strong>${fmtC(reajuste)}</strong> (${factor}% de ${fmtC(capital)})<br><span style="color:var(--mt);font-size:11px">En regímenes sujetos a CM: cargo a Corrección Monetaria (resultado) / abono a Fondo Revalorización Capital Propio.</span></div>`;
 }
 
-// ═══ FASE 5: REMUNERACIONES ═══
-// Parámetros previsionales 2026 (Superintendencia de Pensiones / SII)
-const REM_PARAMS={
-  topeAFP_UF:90.0,       // tope imponible AFP/salud
-  topeCesantia_UF:135.2, // tope imponible seguro cesantía
-  tasaAFP:0.10,          // cotización obligatoria AFP
-  tasaSalud:0.07,        // salud mínimo (Fonasa 7%)
-  tasaCesantiaTrab:0.006,// cesantía trabajador (contrato indefinido)
-  ingresoMinimo:539000,
+// ═══ INDICADORES CONFIGURABLES ═══
+// Fuente única de valores económicos/previsionales. Se guardan en S.empresa.indicadores.
+// Defaults: valores oficiales de referencia 2026 (Superintendencia de Pensiones / SII).
+const INDICADORES_DEFAULT={
+  uf:69751,             // valor UF
+  utm:71506,            // valor UTM
+  uta:858072,           // valor UTA (12 × UTM aprox)
+  topeAFP_UF:90.0,      // tope imponible AFP/salud
+  topeCesantia_UF:135.2,// tope imponible seguro cesantía
+  ingresoMinimo:539000, // ingreso mínimo mensual
+  tasaAFP:10.0,         // % cotización AFP (sin comisión)
+  tasaSalud:7.0,        // % salud mínimo
+  tasaCesantiaTrab:0.6, // % cesantía trabajador (indefinido)
+  factorCM:3.4,         // % factor corrección monetaria anual (referencial)
 };
+// Devuelve los indicadores vigentes (mezcla defaults con lo guardado)
+function getIndicadores(){
+  const g=(S.empresa&&S.empresa.indicadores)||{};
+  return {...INDICADORES_DEFAULT,...g};
+}
+// Helpers de acceso rápido
+function IND(k){return getIndicadores()[k];}
+function renderIndicadores(){
+  const i=getIndicadores();
+  const el=document.getElementById('ind-content');
+  const campo=(id,lbl,val,step,sufijo,hint)=>`<div class="grp">
+    <label>${lbl}${sufijo?' <span style="color:var(--mt)">('+sufijo+')</span>':''}</label>
+    <input type="number" id="ind-${id}" value="${val}" step="${step||'1'}">
+    ${hint?`<div style="font-size:10px;color:var(--mt);margin-top:2px">${hint}</div>`:''}
+  </div>`;
+  el.innerHTML=`<div class="card" style="margin-bottom:14px">
+    <div class="card-title">💱 Valores monetarios del período</div>
+    <div class="fg">
+      ${campo('uf','Valor UF',i.uf,'0.01','pesos','Unidad de Fomento del día')}
+      ${campo('utm','Valor UTM',i.utm,'1','pesos','Unidad Tributaria Mensual')}
+      ${campo('uta','Valor UTA',i.uta,'1','pesos','Unidad Tributaria Anual (≈12×UTM)')}
+    </div>
+    <div style="font-size:11px;color:var(--mt);margin-top:4px">Actualiza estos valores mensualmente desde sii.cl o previred.com. Los usan Remuneraciones, Honorarios y Corrección Monetaria.</div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">🏦 Topes imponibles y mínimos</div>
+    <div class="fg">
+      ${campo('topeAFP_UF','Tope imponible AFP / Salud',i.topeAFP_UF,'0.1','UF','Tope 2026: 90 UF')}
+      ${campo('topeCesantia_UF','Tope imponible Cesantía',i.topeCesantia_UF,'0.1','UF','Tope 2026: 135,2 UF')}
+      ${campo('ingresoMinimo','Ingreso mínimo mensual',i.ingresoMinimo,'1000','pesos','2026: $539.000')}
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">📊 Tasas previsionales y tributarias</div>
+    <div class="fg">
+      ${campo('tasaAFP','Cotización AFP',i.tasaAFP,'0.1','%','Obligatoria: 10% (sin comisión AFP)')}
+      ${campo('tasaSalud','Cotización Salud',i.tasaSalud,'0.1','%','Mínimo legal: 7%')}
+      ${campo('tasaCesantiaTrab','Cesantía trabajador',i.tasaCesantiaTrab,'0.1','%','Contrato indefinido: 0,6%')}
+      ${campo('factorCM','Factor Corrección Monetaria',i.factorCM,'0.1','% anual','Referencial 2025: 3,4% (14D3 exento)')}
+    </div>
+    <div style="font-size:11px;color:var(--mt);margin-top:4px">Las comisiones de cada AFP se configuran por trabajador en Remuneraciones.</div>
+  </div>
+  <div class="save-row"><button class="btn btn-p" onclick="guardarIndicadores()">💾 Guardar Indicadores</button></div>`;
+}
+function guardarIndicadores(){
+  const num=id=>+document.getElementById('ind-'+id).value||0;
+  const ind={
+    uf:num('uf'),utm:num('utm'),uta:num('uta'),
+    topeAFP_UF:num('topeAFP_UF'),topeCesantia_UF:num('topeCesantia_UF'),
+    ingresoMinimo:num('ingresoMinimo'),
+    tasaAFP:num('tasaAFP'),tasaSalud:num('tasaSalud'),tasaCesantiaTrab:num('tasaCesantiaTrab'),
+    factorCM:num('factorCM'),
+  };
+  // Validaciones básicas
+  if(ind.uf<=0||ind.utm<=0){toast('⚠️ UF y UTM deben ser mayores a 0','e');return;}
+  S.empresa.indicadores=ind;
+  // Limpiar valores legacy que quedaban sueltos
+  delete S.empresa.remUF;delete S.empresa.remUTM;delete S.empresa.factorCM;
+  window.storage.set('empresa',JSON.stringify(S.empresa)).catch(()=>toast('❌ Error al guardar','e'));
+  // Refrescar los inputs de UF/UTM del mes en Remuneraciones si están cargados
+  const ufEl=document.getElementById('rem-uf'),utmEl=document.getElementById('rem-utm');
+  if(ufEl)ufEl.value=ind.uf;if(utmEl)utmEl.value=ind.utm;
+  toast('✅ Indicadores guardados');
+  logAccion('Actualizó indicadores',`UF ${fmtC(ind.uf)} · UTM ${fmtC(ind.utm)}`);
+}
+function restaurarIndicadoresDefault(){
+  if(!confirm('¿Restaurar los valores oficiales de referencia 2026? Se sobrescribirán los actuales.'))return;
+  S.empresa.indicadores={...INDICADORES_DEFAULT};
+  window.storage.set('empresa',JSON.stringify(S.empresa)).catch(()=>{});
+  renderIndicadores();toast('↺ Valores 2026 restaurados');
+}
+
+// ═══ FASE 5: REMUNERACIONES ═══
+// Parámetros previsionales — ahora leídos desde los indicadores configurables
+function remParams(){
+  const i=getIndicadores();
+  return {
+    topeAFP_UF:i.topeAFP_UF,
+    topeCesantia_UF:i.topeCesantia_UF,
+    tasaAFP:i.tasaAFP/100,
+    tasaSalud:i.tasaSalud/100,
+    tasaCesantiaTrab:i.tasaCesantiaTrab/100,
+    ingresoMinimo:i.ingresoMinimo,
+  };
+}
 // AFP con sus comisiones (% adicional sobre imponible) — actualizables
 const AFP_LISTA=[
   {k:'capital',   nm:'Capital',    comision:0.0144},
@@ -6118,11 +6281,12 @@ function calcularIUSC(baseTributable,utm){
   return Math.max(0,Math.round(baseTributable*t.factor-t.rebajaUTM*utm));
 }
 // UF/UTM del mes: guardadas en empresa (editables). Defaults referenciales.
-function getUF(){return +document.getElementById('rem-uf')?.value||S.empresa.remUF||69751;}
-function getUTM(){return +document.getElementById('rem-utm')?.value||S.empresa.remUTM||71506;}
+function getUF(){return +document.getElementById('rem-uf')?.value||IND('uf');}
+function getUTM(){return +document.getElementById('rem-utm')?.value||IND('utm');}
 
 // Calcula la liquidación completa de un trabajador con UF/UTM dados
 function calcularLiquidacion(t,uf,utm){
+  const REM_PARAMS=remParams(); // indicadores configurables
   const base=+t.base||0, grat=+t.grat||0, otros=+t.otros||0;
   const colacion=+t.colacion||0, movilizacion=+t.movilizacion||0;
   // Total imponible (haberes que cotizan)
@@ -6220,8 +6384,9 @@ function guardarTrabajador(){
   const t=leerFormTrabajador();
   if(!t.nombre){toast('⚠️ Ingresa el nombre','e');return;}
   if(t.base<=0){toast('⚠️ Ingresa el sueldo base','e');return;}
-  if(t.base<REM_PARAMS.ingresoMinimo){
-    if(!confirm(`El sueldo base (${fmtC(t.base)}) es menor al ingreso mínimo (${fmtC(REM_PARAMS.ingresoMinimo)}). ¿Continuar de todas formas?`))return;
+  const _rp=remParams();
+  if(t.base<_rp.ingresoMinimo){
+    if(!confirm(`El sueldo base (${fmtC(t.base)}) es menor al ingreso mínimo (${fmtC(_rp.ingresoMinimo)}). ¿Continuar de todas formas?`))return;
   }
   const bien={id:REMF.editId||'tr_'+Date.now(),...t};
   if(REMF.editId){const i=S.trabajadores.findIndex(x=>x.id===REMF.editId);if(i>=0)S.trabajadores[i]=bien;toast('✅ Trabajador actualizado');}
@@ -6271,8 +6436,8 @@ function renderRemuneraciones(){
     const hoyMes=new Date().getMonth()+1;selMes.value=(S.empresa.anio===new Date().getFullYear())?hoyMes:1;
   }
   const ufEl=document.getElementById('rem-uf'),utmEl=document.getElementById('rem-utm');
-  if(ufEl&&!ufEl.value)ufEl.value=S.empresa.remUF||69751;
-  if(utmEl&&!utmEl.value)utmEl.value=S.empresa.remUTM||71506;
+  if(ufEl&&!ufEl.value)ufEl.value=IND('uf');
+  if(utmEl&&!utmEl.value)utmEl.value=IND('utm');
   const uf=getUF(),utm=getUTM();
   const el=document.getElementById('rem-content');
   if(!S.trabajadores.length){
@@ -6693,6 +6858,349 @@ async function renderAuditLog(){
   }catch(e){
     el.innerHTML='<div class="empty"><div class="ei">⚠️</div>Error al cargar el registro: '+e.message+'</div>';
   }
+}
+
+// ═══ FASE 6: CONCILIACIÓN BANCARIA ═══
+// Estado: marcas de conciliado guardadas en S.empresa.conciliacion[cuenta-anio] = {ids:[...], saldoBanco}
+// Cada movimiento del mayor recibe un id determinista (fecha+glosa+monto+índice) para marcarlo.
+let CONC_CARTOLA=null; // cartola cargada temporalmente [{fecha,desc,monto}]
+function concKey(){
+  const cd=document.getElementById('conc-cuenta')?.value||'';
+  return cd+'-'+S.empresa.anio;
+}
+function getConcEstado(){
+  const k=concKey();
+  const all=S.empresa.conciliacion||{};
+  return all[k]||{ids:[],saldoBanco:0};
+}
+function setConcEstado(est){
+  if(!S.empresa.conciliacion)S.empresa.conciliacion={};
+  S.empresa.conciliacion[concKey()]=est;
+  window.storage.set('empresa',JSON.stringify(S.empresa)).catch(()=>{});
+}
+// id determinista de un movimiento del mayor
+function movId(m,i){return `${m.fecha}|${(m.glosa||'').slice(0,20)}|${m.debe||0}|${m.haber||0}|${i}`;}
+function renderConciliacion(){
+  // Poblar selector de cuentas de banco/caja (1101)
+  const sel=document.getElementById('conc-cuenta');
+  if(sel&&sel.options.length===0){
+    const cuentas=PDC.filter(c=>c.cd.startsWith('1101')&&c.cd.length===7&&c.nat);
+    sel.innerHTML=cuentas.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+    // default: Banco Estado si existe
+    if(cuentas.find(c=>c.cd==='1101201'))sel.value='1101201';
+  }
+  const cd=sel.value;
+  const el=document.getElementById('conc-content');
+  if(!cd){el.innerHTML='<div class="empty"><div class="ei">🏦</div>Selecciona una cuenta bancaria.</div>';return;}
+  const M=buildMayor();
+  const cuenta=M[cd];
+  const movs=cuenta?cuenta.movs.map((m,i)=>({...m,_id:movId(m,i)})):[];
+  const est=getConcEstado();
+  const conciliados=new Set(est.ids);
+  // Restaurar saldo banco guardado
+  const sbEl=document.getElementById('conc-saldo-banco');
+  if(sbEl&&!sbEl.value&&est.saldoBanco)sbEl.value=est.saldoBanco;
+  const saldoBanco=+((sbEl&&sbEl.value)||est.saldoBanco||0);
+  // Saldo según libros = saldo contable de la cuenta
+  const saldoLibros=cuenta?cuenta.saldo:0;
+  // Movimientos no conciliados (partidas conciliatorias)
+  const noConc=movs.filter(m=>!conciliados.has(m._id));
+  const sumaNoConc=noConc.reduce((s,m)=>s+(m.debe||0)-(m.haber||0),0);
+  // Saldo conciliado en libros = suma de los conciliados
+  const saldoConciliado=movs.filter(m=>conciliados.has(m._id)).reduce((s,m)=>s+(m.debe||0)-(m.haber||0),0);
+  // Diferencia: saldo banco vs saldo libros
+  const diferencia=saldoLibros-saldoBanco;
+  // Filas
+  let filas=movs.map(m=>{
+    const marcado=conciliados.has(m._id);
+    const monto=(m.debe||0)-(m.haber||0);
+    return `<tr style="${marcado?'opacity:.55':''}">
+      <td style="text-align:center"><input type="checkbox" ${marcado?'checked':''} onchange="toggleConciliado('${m._id.replace(/'/g,"\\'")}')" style="width:16px;height:16px;cursor:pointer"></td>
+      <td class="tl" style="font-family:var(--mono);font-size:11px">${m.fecha}</td>
+      <td class="tl" style="font-size:11px">${m.glosa||''}</td>
+      <td style="font-family:var(--mono);text-align:right;color:${monto>=0?'var(--ach)':'var(--err)'}">${fmtC(monto)}</td>
+      <td style="text-align:center;font-size:11px">${marcado?'<span style="color:var(--ach)">✓ Conciliado</span>':'<span style="color:var(--mt)">Pendiente</span>'}</td>
+    </tr>`;
+  }).join('');
+  const cartolaHtml=CONC_CARTOLA?renderCartolaMatch(movs,conciliados):'';
+  el.innerHTML=`<div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi"><div class="kpi-lbl">Saldo según Libros</div><div class="kpi-val">${fmtC(saldoLibros)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Saldo según Banco</div><div class="kpi-val">${fmtC(saldoBanco)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Diferencia</div><div class="kpi-val ${Math.abs(diferencia)<1?'pos':'neg'}">${fmtC(diferencia)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Sin conciliar</div><div class="kpi-val">${noConc.length}</div></div>
+  </div>
+  ${Math.abs(diferencia)<1&&saldoBanco!==0?'<div class="info-tip" style="margin-bottom:14px;background:rgba(46,160,67,.10);border-color:var(--ach)">✅ <strong>Conciliado.</strong> El saldo de libros coincide con el del banco.</div>':saldoBanco!==0?`<div class="info-tip" style="margin-bottom:14px;background:rgba(210,153,34,.10);border-color:var(--warn)">⚠️ Hay una diferencia de <strong>${fmtC(diferencia)}</strong> entre libros y banco. Revisa las partidas pendientes (cheques girados no cobrados, depósitos en tránsito, cargos del banco no registrados).</div>`:''}
+  ${cartolaHtml}
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="btn btn-i" onclick="marcarTodosConciliados(true)">✓ Marcar todos</button>
+    <button class="btn btn-i" onclick="marcarTodosConciliados(false)">✗ Desmarcar todos</button>
+    <span style="font-size:11px;color:var(--mt);align-self:center">${conciliados.size} de ${movs.length} conciliados</span>
+  </div>
+  <div class="card-np"><div class="tw"><table>
+    <thead><tr><th style="width:40px">✓</th><th class="tl">FECHA</th><th class="tl">GLOSA</th><th style="text-align:right">MONTO</th><th style="text-align:center">ESTADO</th></tr></thead>
+    <tbody>${filas||'<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:20px">Sin movimientos en esta cuenta</td></tr>'}</tbody>
+  </table></div></div>
+  <div style="margin-top:10px;font-size:10px;color:var(--mt)">Marca cada movimiento que aparezca en tu cartola del banco. Al conciliar todos y coincidir el saldo, la cuenta queda cuadrada.</div>`;
+}
+function onSaldoBancoChange(){
+  const est=getConcEstado();
+  est.saldoBanco=+document.getElementById('conc-saldo-banco').value||0;
+  setConcEstado(est);
+  renderConciliacion();
+}
+function toggleConciliado(id){
+  const est=getConcEstado();
+  const s=new Set(est.ids);
+  if(s.has(id))s.delete(id);else s.add(id);
+  est.ids=[...s];
+  setConcEstado(est);
+  renderConciliacion();
+}
+function marcarTodosConciliados(marcar){
+  const cd=document.getElementById('conc-cuenta').value;
+  const M=buildMayor();
+  const movs=M[cd]?M[cd].movs.map((m,i)=>movId(m,i)):[];
+  const est=getConcEstado();
+  est.ids=marcar?movs:[];
+  setConcEstado(est);
+  renderConciliacion();
+  toast(marcar?'✓ Todos marcados como conciliados':'✗ Todos desmarcados');
+}
+// Cargar cartola desde Excel/CSV: intenta detectar fecha, descripción y monto
+function cargarCartola(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{header:1});
+      // Detectar columnas: buscar fila de encabezado con "fecha", "monto/cargo/abono", "detalle/glosa"
+      const cartola=[];
+      rows.forEach(r=>{
+        if(!r||!r.length)return;
+        // Buscar una fecha y un número en la fila
+        let fecha=null,monto=null,desc='';
+        r.forEach(cell=>{
+          if(cell==null)return;
+          const s=String(cell).trim();
+          // fecha dd/mm/yyyy o yyyy-mm-dd
+          if(!fecha&&/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$|^\d{4}-\d{2}-\d{2}$/.test(s))fecha=s;
+          else if(typeof cell==='number'&&Math.abs(cell)>100&&monto===null)monto=cell;
+          else if(s.length>3&&!/^\d+$/.test(s))desc=desc||s;
+        });
+        if(fecha&&monto!==null)cartola.push({fecha,desc,monto});
+      });
+      if(!cartola.length){toast('⚠️ No se detectaron movimientos. Verifica que la cartola tenga columnas de fecha y monto.','e');return;}
+      CONC_CARTOLA=cartola;
+      toast('✅ Cartola cargada: '+cartola.length+' movimientos');
+      renderConciliacion();
+    }catch(err){toast('❌ Error al leer cartola: '+err.message,'e');}
+  };
+  reader.readAsArrayBuffer(file);
+  ev.target.value='';
+}
+// Compara cartola cargada contra movimientos del mayor y sugiere coincidencias
+function renderCartolaMatch(movs,conciliados){
+  if(!CONC_CARTOLA)return '';
+  // Emparejar por monto aproximado
+  const noConcMovs=movs.filter(m=>!conciliados.has(m._id));
+  let emparejados=0,sinMatch=[];
+  CONC_CARTOLA.forEach(c=>{
+    const montoAbs=Math.abs(c.monto);
+    const match=noConcMovs.find(m=>Math.abs(Math.abs((m.debe||0)-(m.haber||0))-montoAbs)<1);
+    if(match)emparejados++;else sinMatch.push(c);
+  });
+  return `<div class="card" style="margin-bottom:14px;background:rgba(88,166,255,.06)">
+    <div class="card-title">📤 Cartola cargada (${CONC_CARTOLA.length} movimientos)</div>
+    <div style="font-size:12px;color:var(--mt);margin-bottom:8px">${emparejados} coinciden con movimientos pendientes por monto. ${sinMatch.length} sin coincidencia (podrían ser cargos del banco no registrados).</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="autoConciliarCartola()">🔗 Auto-conciliar coincidencias</button>
+      <button class="btn btn-g" onclick="CONC_CARTOLA=null;renderConciliacion()">Descartar cartola</button>
+    </div>
+    ${sinMatch.length?`<div style="margin-top:10px;font-size:11px"><strong>Sin coincidencia en libros:</strong><ul style="margin:4px 0 0 16px;color:var(--mt)">${sinMatch.slice(0,8).map(c=>`<li>${c.fecha} · ${c.desc||''} · ${fmtC(c.monto)}</li>`).join('')}</ul>${sinMatch.length>8?`<div style="color:var(--mt);margin-top:4px">…y ${sinMatch.length-8} más</div>`:''}</div>`:''}
+  </div>`;
+}
+function autoConciliarCartola(){
+  if(!CONC_CARTOLA)return;
+  const cd=document.getElementById('conc-cuenta').value;
+  const M=buildMayor();
+  const movs=M[cd]?M[cd].movs.map((m,i)=>({...m,_id:movId(m,i)})):[];
+  const est=getConcEstado();
+  const s=new Set(est.ids);
+  let n=0;
+  CONC_CARTOLA.forEach(c=>{
+    const montoAbs=Math.abs(c.monto);
+    const match=movs.find(m=>!s.has(m._id)&&Math.abs(Math.abs((m.debe||0)-(m.haber||0))-montoAbs)<1);
+    if(match){s.add(match._id);n++;}
+  });
+  est.ids=[...s];
+  setConcEstado(est);
+  toast('🔗 '+n+' movimientos conciliados automáticamente');
+  renderConciliacion();
+}
+
+// ═══ IMPRESIÓN FORMATO OFICIAL ═══
+// Rellena el encabezado oficial antes de imprimir según la sección activa.
+const TITULOS_SEC={
+  diario:'Libro Diario',mayor:'Libro Mayor',balance:'Balance General',
+  resultados:'Estado de Resultados',ventas:'Libro de Ventas',compras:'Libro de Compras',
+  honorarios:'Libro de Honorarios',flujocaja:'Flujo de Caja',conciliacion:'Conciliación Bancaria',
+  f29:'Formulario 29',ppm:'Pago Provisional Mensual',auxiliares:'Libro Auxiliar',
+  remuneraciones:'Libro de Remuneraciones',activofijo:'Registro de Activo Fijo',
+  cierre:'Cierre del Ejercicio',provisiones:'Provisiones',pdc:'Plan de Cuentas',
+  apertura:'Balance de Apertura',indicadores:'Indicadores',correccion:'Corrección Monetaria'
+};
+function prepararImpresion(){
+  const e=S.empresa||{};
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v||'';};
+  set('ph-empresa',e.nombre||'(Empresa sin configurar)');
+  set('ph-rut',e.rut?'RUT: '+e.rut:'');
+  set('ph-giro',e.giro||'');
+  set('ph-titulo',TITULOS_SEC[curSec]||'Reporte');
+  set('ph-periodo','Ejercicio '+(e.anio||new Date().getFullYear()));
+  const hoy=new Date();
+  set('ph-fecha','Emitido: '+hoy.toLocaleDateString('es-CL')+' '+hoy.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}));
+}
+window.addEventListener('beforeprint',prepararImpresion);
+
+// ═══ FASE 6: EXPORTAR XML SII (IECV) ═══
+// Genera el XML de Información Electrónica de Compras y Ventas según esquema LibroCV_v10 del SII.
+function escXml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function rutSii(cod,dv){ // formato SII sin puntos: 12345678-9
+  if(!cod)return '0-0';
+  return String(cod)+'-'+String(dv||'0').toUpperCase();
+}
+function renderXmlSii(){
+  const sel=document.getElementById('xml-mes');
+  if(sel&&sel.options.length===0){
+    sel.innerHTML=MESES.map((nm,i)=>`<option value="${i+1}">${nm} ${S.empresa.anio}</option>`).join('');
+    const hoyMes=new Date().getMonth()+1;sel.value=(S.empresa.anio===new Date().getFullYear())?hoyMes:1;
+  }
+  const tipo=document.getElementById('xml-tipo').value;
+  const mes=+sel.value||1;
+  const el=document.getElementById('xml-content');
+  // Filtrar documentos del período
+  const docs=(tipo==='VENTA'?todosDocsVentas():todosDocsCompras()).filter(d=>{
+    const m=+(d.fecha||'').slice(5,7);return m===mes;
+  });
+  if(!docs.length){
+    el.innerHTML=`<div class="empty"><div class="ei">📭</div>No hay documentos de ${tipo==='VENTA'?'venta':'compra'} en ${MESES[mes-1]} ${S.empresa.anio}.</div>`;return;
+  }
+  // Resumen por tipo de documento
+  const resumen={};
+  let totalGeneral={docs:0,exe:0,neto:0,iva:0,total:0};
+  docs.forEach(d=>{
+    const cod=d.tipoDTE;
+    if(!resumen[cod])resumen[cod]={docs:0,exe:0,neto:0,iva:0,total:0};
+    const signo=(tipo==='VENTA'?(dteV(cod)?.signo):(dteC(cod)?.signo))||1;
+    const neto=(d.neto||0)*signo, exento=(d.exento||d.exe||0)*signo, iva=(d.iva||0)*signo, total=(d.total||0)*signo;
+    resumen[cod].docs++;resumen[cod].neto+=neto;resumen[cod].exe+=exento;resumen[cod].iva+=iva;resumen[cod].total+=total;
+    totalGeneral.docs++;totalGeneral.neto+=neto;totalGeneral.exe+=exento;totalGeneral.iva+=iva;totalGeneral.total+=total;
+  });
+  // Tabla resumen
+  const filasRes=Object.keys(resumen).map(cod=>{
+    const r=resumen[cod];
+    const nm=(tipo==='VENTA'?dteV(cod)?.nm:dteC(cod)?.nm)||('DTE '+cod);
+    return `<tr><td class="tl" style="font-size:12px">${cod} — ${nm}</td><td style="text-align:right">${r.docs}</td><td style="font-family:var(--mono);text-align:right">${fmtC(r.neto)}</td><td style="font-family:var(--mono);text-align:right">${fmtC(r.iva)}</td><td style="font-family:var(--mono);text-align:right">${fmtC(r.total)}</td></tr>`;
+  }).join('');
+  el.innerHTML=`<div class="kpi-grid" style="margin-bottom:16px">
+    <div class="kpi"><div class="kpi-lbl">Documentos</div><div class="kpi-val">${totalGeneral.docs}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Neto</div><div class="kpi-val">${fmtC(totalGeneral.neto)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">IVA</div><div class="kpi-val">${fmtC(totalGeneral.iva)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Total</div><div class="kpi-val">${fmtC(totalGeneral.total)}</div></div>
+  </div>
+  <div class="card-np" style="margin-bottom:14px"><div class="tw"><table>
+    <thead><tr><th class="tl">TIPO DOCUMENTO</th><th style="text-align:right">N°</th><th style="text-align:right">NETO</th><th style="text-align:right">IVA</th><th style="text-align:right">TOTAL</th></tr></thead>
+    <tbody>${filasRes}</tbody>
+  </table></div></div>
+  <div class="info-tip" style="margin-bottom:14px">📤 El archivo XML se generará según el formato IECV del SII para <strong>${tipo==='VENTA'?'Ventas':'Compras'}</strong> de ${MESES[mes-1]} ${S.empresa.anio}. Verifica que los datos de empresa (RUT) estén completos.</div>
+  <button class="btn btn-p" onclick="generarXmlSii()">📥 Descargar XML SII</button>
+  <div style="margin-top:10px;font-size:10px;color:var(--mt)">Importante: este archivo cumple el formato de datos, pero para presentarlo al SII debe firmarse digitalmente con tu certificado. Puedes usarlo para revisión o cargarlo en software que agregue la firma.</div>`;
+}
+function generarXmlSii(){
+  const tipo=document.getElementById('xml-tipo').value;
+  const mes=+document.getElementById('xml-mes').value||1;
+  const anio=S.empresa.anio;
+  const e=S.empresa;
+  if(!e.rut){toast('⚠️ Configura el RUT de la empresa primero','e');return;}
+  const rutParse2=rutParse(e.rut);
+  const rutEmisor=rutSii(rutParse2.codigo,rutParse2.dv);
+  const periodo=`${anio}-${String(mes).padStart(2,'0')}`;
+  const docs=(tipo==='VENTA'?todosDocsVentas():todosDocsCompras()).filter(d=>+(d.fecha||'').slice(5,7)===mes);
+  if(!docs.length){toast('⚠️ No hay documentos en el período','e');return;}
+  // Resumen por tipo
+  const resumen={};
+  docs.forEach(d=>{
+    const cod=d.tipoDTE;
+    if(!resumen[cod])resumen[cod]={docs:0,exe:0,neto:0,iva:0,total:0};
+    const signo=(tipo==='VENTA'?(dteV(cod)?.signo):(dteC(cod)?.signo))||1;
+    resumen[cod].docs++;
+    resumen[cod].neto+=(d.neto||0)*signo;resumen[cod].exe+=(d.exento||d.exe||0)*signo;
+    resumen[cod].iva+=(d.iva||0)*signo;resumen[cod].total+=(d.total||0)*signo;
+  });
+  const R=n=>Math.round(n||0);
+  // Construir XML
+  let xml='<?xml version="1.0" encoding="ISO-8859-1"?>\n';
+  xml+='<LibroCompraVenta xmlns="http://www.sii.cl/SiiDte" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sii.cl/SiiDte LibroCV_v10.xsd" version="1.0">\n';
+  xml+='  <EnvioLibro ID="LIBRO'+periodo.replace('-','')+'">\n';
+  xml+='    <Caratula>\n';
+  xml+='      <RutEmisorLibro>'+escXml(rutEmisor)+'</RutEmisorLibro>\n';
+  xml+='      <RutEnvia>'+escXml(rutEmisor)+'</RutEnvia>\n';
+  xml+='      <PeriodoTributario>'+periodo+'</PeriodoTributario>\n';
+  xml+='      <FchResol>'+anio+'-01-01</FchResol>\n';
+  xml+='      <NroResol>0</NroResol>\n';
+  xml+='      <TipoOperacion>'+tipo+'</TipoOperacion>\n';
+  xml+='      <TipoLibro>MENSUAL</TipoLibro>\n';
+  xml+='      <TipoEnvio>TOTAL</TipoEnvio>\n';
+  xml+='    </Caratula>\n';
+  // ResumenPeriodo
+  xml+='    <ResumenPeriodo>\n';
+  Object.keys(resumen).forEach(cod=>{
+    const r=resumen[cod];
+    xml+='      <TotalesPeriodo>\n';
+    xml+='        <TpoDoc>'+cod+'</TpoDoc>\n';
+    xml+='        <TotDoc>'+r.docs+'</TotDoc>\n';
+    if(R(r.exe))xml+='        <TotMntExe>'+R(r.exe)+'</TotMntExe>\n';
+    else xml+='        <TotMntExe>0</TotMntExe>\n';
+    xml+='        <TotMntNeto>'+R(r.neto)+'</TotMntNeto>\n';
+    xml+='        <TotMntIVA>'+R(r.iva)+'</TotMntIVA>\n';
+    xml+='        <TotMntTotal>'+R(r.total)+'</TotMntTotal>\n';
+    xml+='      </TotalesPeriodo>\n';
+  });
+  xml+='    </ResumenPeriodo>\n';
+  // Detalle por documento
+  docs.forEach(d=>{
+    const cod=d.tipoDTE;
+    const rp=(d.rutCodigo)?rutSii(d.rutCodigo,d.rutDV):'0-0';
+    const signo=(tipo==='VENTA'?(dteV(cod)?.signo):(dteC(cod)?.signo))||1;
+    xml+='    <Detalle>\n';
+    xml+='      <TpoDoc>'+cod+'</TpoDoc>\n';
+    xml+='      <NroDoc>'+(d.numero||0)+'</NroDoc>\n';
+    if(R(d.iva))xml+='      <TasaImp>19</TasaImp>\n';
+    xml+='      <FchDoc>'+(d.fecha||periodo+'-01')+'</FchDoc>\n';
+    xml+='      <RUTDoc>'+escXml(rp)+'</RUTDoc>\n';
+    xml+='      <RznSoc>'+escXml((d.razonSocial||'').slice(0,50))+'</RznSoc>\n';
+    const exe=R((d.exento||d.exe||0)*signo);
+    if(exe)xml+='      <MntExe>'+exe+'</MntExe>\n';
+    xml+='      <MntNeto>'+R((d.neto||0)*signo)+'</MntNeto>\n';
+    if(R(d.iva))xml+='      <MntIVA>'+R((d.iva||0)*signo)+'</MntIVA>\n';
+    xml+='      <MntTotal>'+R((d.total||0)*signo)+'</MntTotal>\n';
+    xml+='    </Detalle>\n';
+  });
+  xml+='  </EnvioLibro>\n';
+  xml+='</LibroCompraVenta>\n';
+  // Descargar
+  const blob=new Blob([xml],{type:'application/xml;charset=ISO-8859-1'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`IECV_${tipo}_${periodo}.xml`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✅ XML generado: '+docs.length+' documentos');
+  logAccion('Exportó XML SII',`${tipo} · ${periodo} · ${docs.length} docs`);
 }
 
 // ═══ TOAST ═══

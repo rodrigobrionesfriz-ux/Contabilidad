@@ -1,5 +1,6 @@
 // apertura.js — Balance de Apertura (Asiento N°0) + importador Excel
-import {toast, fmtC, fmt, pn, today, pdcNm, PDC, CUENTAS_SEL, rutParse, rutFmt} from './core.js';
+import {toast, fmtC, fmt, pn, today, pdcNm, PDC, CUENTAS_SEL, rutParse, rutFmt, rutDV} from './core.js';
+import {CUENTAS_AUX, esAux, cuentasOpts} from './asientos.js';
 import {S} from './state.js';
 import {rerender} from './ui.js';
 import './storage.js';

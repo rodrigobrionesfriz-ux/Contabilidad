@@ -1,9 +1,10 @@
 // compras.js — Libro de compras + importador SII
-import {toast, fmt, pn, today, MESES, IVA, DTE_COMPRAS, dteC, rutParse, rutFmt, rutDV, pdcNm, CCOLS} from './core.js';
+import {toast, fmt, pn, today, MESES, IVA, DTE_COMPRAS, dteC, rutParse, rutFmt, rutDV, pdcNm, CCOLS, CUENTAS_GASTO, fmtC} from './core.js';
+import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {mesOpts, foliosMensuales, mesRango} from './helpers.js';
-import {todosDocsCompras} from './asientos.js';
+import {todosDocsCompras, abrirAsientoDesde} from './asientos.js';
 import './storage.js';
 
 

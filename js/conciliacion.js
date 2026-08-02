@@ -1,5 +1,5 @@
 // conciliacion.js
-import {toast, PDC} from './core.js';
+import {toast, PDC, fmtC} from './core.js';
 import {S} from './state.js';
 import {buildMayor} from './reportes.js';
 import './storage.js';

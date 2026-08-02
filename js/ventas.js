@@ -1,9 +1,10 @@
 // ventas.js — Libro de ventas (documentos individuales)
-import {toast, pn, today, MESES, IVA, DTE_VENTAS, dteV, rutParse, rutFmt, rutDV} from './core.js';
+import {toast, pn, today, MESES, IVA, DTE_VENTAS, dteV, rutParse, rutFmt, rutDV, fmt, fmtC} from './core.js';
+import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {mesRango, mesOpts, dteVentasOpts, foliosMensuales} from './helpers.js';
-import {todosDocsVentas} from './asientos.js';
+import {todosDocsVentas, abrirAsientoDesde} from './asientos.js';
 import './storage.js';
 
 // ═══ VENTAS — Documentos individuales ═══

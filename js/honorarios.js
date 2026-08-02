@@ -1,5 +1,5 @@
 // honorarios.js — Libro de honorarios (retención 10,75%)
-import {toast, pn, RET_H, fmtC, MESES} from './core.js';
+import {toast, pn, RET_H, fmtC, MESES, fmt} from './core.js';
 import {S} from './state.js';
 import './storage.js';
 

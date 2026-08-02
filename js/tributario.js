@@ -1,5 +1,6 @@
 // tributario.js — Formulario 29 (IVA mensual) y PPM
 import {fmtC, MESES, IVA, RET_H, dteV, dteC} from './core.js';
+import {todosDocsCompras, todosDocsVentas} from './asientos.js';
 import {S} from './state.js';
 
 // ═══ FORMULARIO 29 (IVA mensual + PPM + retenciones) ═══

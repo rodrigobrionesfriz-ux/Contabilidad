@@ -1,5 +1,6 @@
 // auth.js — Autenticación, roles y permisos
 import {S, AUTH} from './state.js';
+import {nav} from './ui.js';
 import {FS, logAccion, initFirestore} from './firebase.js';
 
 // Callback que app.js registra para arrancar la app tras login exitoso.

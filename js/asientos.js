@@ -1,5 +1,8 @@
 // asientos.js — Asientos manuales, modal DTE, documentos unificados
-import {toast, fmtC, pn, today, IVA, pdcNm, CUENTAS_SEL, rutParse, rutFmt, dteV, dteC} from './core.js';
+import {toast, fmtC, pn, today, IVA, pdcNm, CUENTAS_SEL, rutParse, rutFmt, dteV, dteC, rutDV} from './core.js';
+import {updateHdr} from './empresa.js';
+import {nav, rerender} from './ui.js';
+import {cuentasGastoOpts, dteComprasOpts} from './compras.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {foliosMensuales, dteVentasOpts} from './helpers.js';

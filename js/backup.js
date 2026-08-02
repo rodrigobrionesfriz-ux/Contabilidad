@@ -1,5 +1,6 @@
 // backup.js — Export/import Excel + sincronización con Firestore
-import {toast, PDC} from './core.js';
+import {toast, PDC, dteC, dteV, rutDV, rutFmt} from './core.js';
+import {CUENTAS_AUX, esAux, todosDocsCompras, todosDocsVentas} from './asientos.js';
 import {S} from './state.js';
 import {FS, fsStatusSet} from './firebase.js';
 import {rerender} from './ui.js';

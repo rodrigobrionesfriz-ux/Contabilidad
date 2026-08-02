@@ -1,5 +1,6 @@
 // cierre.js — Cierre de ejercicio, provisiones, corrección monetaria
 import {toast, fmtC, pdcNm} from './core.js';
+import {updateHdr} from './empresa.js';
 import {S} from './state.js';
 import {buildMayor} from './reportes.js';
 import {proxFolioAsiento} from './asientos.js';

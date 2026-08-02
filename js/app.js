@@ -7,6 +7,7 @@ import {S, AUTH, getCurSec, setCurSec} from './state.js';
 import {FS, initFirestore, logAccion} from './firebase.js';
 import './storage.js';
 import {registrarUI} from './ui.js';
+import {initTema, cambiarTema, aplicarTema} from './tema.js';
 
 // Sistema
 import {initAuth, puedeVer, puedeEditar, esAdmin, ROLES, SECCIONES, permisosDeRol,
@@ -285,6 +286,7 @@ Object.assign(window,{
   renderXmlSii, generarXmlSii,
   // búsqueda / backup
   abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda, irAResultado,
+  cambiarTema, aplicarTema,
   exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud, importarExcelBD,
 });
 
@@ -292,4 +294,5 @@ Object.assign(window,{
 window.addEventListener('beforeprint', prepararImpresion);
 
 // ═══ ARRANQUE ═══
+initTema();   // aplicar tema guardado antes de renderizar
 init();

@@ -1,5 +1,6 @@
 // activofijo.js — Activos fijos y depreciación
 import {toast, fmtC, fmt, today, pdcNm, PDC} from './core.js';
+import {updateHdr} from './empresa.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {proxFolioAsiento} from './asientos.js';

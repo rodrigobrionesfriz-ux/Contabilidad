@@ -1,5 +1,5 @@
 // xmlsii.js
-import {toast, fmtC, MESES, dteV, dteC} from './core.js';
+import {toast, fmtC, MESES, dteV, dteC, IVA, rutParse} from './core.js';
 import {S} from './state.js';
 import {todosDocsVentas, todosDocsCompras} from './asientos.js';
 import {logAccion} from './firebase.js';

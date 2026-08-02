@@ -1,7 +1,7 @@
 // pdc.js — Plan de cuentas: edición, alta/baja, reset
 // Importa de: core (PDC array + helpers), state (S)
 
-import {PDC, recalcDerivadasPDC, toast} from './core.js';
+import {PDC, recalcDerivadasPDC, toast, CUENTAS_SEL, CUENTAS_GASTO, pdcNm, fmtC, IVA} from './core.js';
 import {S} from './state.js';
 import './storage.js'; // instala window.storage
 

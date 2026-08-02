@@ -1,6 +1,7 @@
 // reportes.js — Libro Diario, Mayor, Balance, Resultados (núcleo de reportes)
 // genDiario y buildMayor son la base de casi todos los cálculos.
 import {toast, fmtC, fmt, pn, today, MESES, MC, IVA, RET_H, pdcNm, PDC, CUENTAS_SEL, dteV, dteC} from './core.js';
+import {toggleAgingDetalle} from './auxiliares.js';
 import {S} from './state.js';
 import './storage.js';
 

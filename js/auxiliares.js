@@ -1,7 +1,7 @@
 // auxiliares.js — Auxiliares por cliente/proveedor + aging
-import {toast, fmtC, fmt, MESES, pdcNm, rutFmt, dteV, dteC} from './core.js';
+import {toast, fmtC, fmt, MESES, pdcNm, rutFmt, dteV, dteC, rutDV, today} from './core.js';
 import {S} from './state.js';
-import {todosDocsVentas, todosDocsCompras} from './asientos.js';
+import {todosDocsVentas, todosDocsCompras, CUENTAS_AUX, esAux, abrirAsientoDesde} from './asientos.js';
 
 let AUX_TAB='c';       // 'c'=clientes | 'p'=proveedores
 let AUX_VIEW='detalle';// 'detalle' | 'aging'

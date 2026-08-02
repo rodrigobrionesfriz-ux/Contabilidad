@@ -1,7 +1,7 @@
 // storage.js — Shim de persistencia (Firestore + localStorage)
 // Instala window.storage. Depende de firebase (FS).
 
-import {FS} from './firebase.js';
+import {FS, fsStatusSet} from './firebase.js';
 
 // ═══ SHIM DE STORAGE — Firestore + localStorage fallback ═══
 // Estrategia: siempre escribir a AMBOS (localStorage para velocidad + Firestore para nube).

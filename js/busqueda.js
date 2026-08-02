@@ -2,7 +2,7 @@
 import {toast, PDC, fmtC, MESES, rutFmt} from './core.js';
 import {S, AUTH} from './state.js';
 import {todosDocsVentas, todosDocsCompras, editarAsiento} from './asientos.js';
-import {puedeVer} from './auth.js';
+import {puedeVer, permiso} from './auth.js';
 import {nav} from './ui.js';
 
 let SEARCH_SEL=0;

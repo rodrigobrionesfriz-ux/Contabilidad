@@ -1,5 +1,6 @@
 // remuneraciones.js — Liquidaciones de sueldo (AFP, salud, cesantía, IUSC)
 import {toast, fmtC, MESES, pdcNm} from './core.js';
+import {updateHdr} from './empresa.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {proxFolioAsiento} from './asientos.js';

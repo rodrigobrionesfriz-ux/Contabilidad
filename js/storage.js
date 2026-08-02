@@ -71,6 +71,8 @@ import {FS, fsStatusSet} from './firebase.js';
       const k=K(key);
       setLocal(k,value);
       setRemote(k,value);
+      // Avisar al control de salida que se guardó (si está cargado)
+      try{ if(window.__marcarGuardado)window.__marcarGuardado(); }catch(e){}
       return {key,value};
     },
     async delete(key){

@@ -30,6 +30,7 @@ import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
         getIndicadores, IND, actualizarDesdeBancoCentral} from './indicadores.js';
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
 import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas} from './buscadorcuentas.js';
+import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './salida.js';
 import {cargarCentros, cargarCierresCC, ccOpts, ccNombre, costoAcumulado} from './centroscosto.js';
 import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
         verDetalleCC, abrirCapitalizar, confirmarCapitalizar, onCurvaChange,
@@ -317,6 +318,7 @@ Object.assign(window,{
   verDetalleCC, abrirCapitalizar, confirmarCapitalizar, ccOpts, ccNombre,
   onCurvaChange, setPct, addPctAnio, delPctAnio, ejecutarCierreMensual, revertirCierreMensual,
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas,
+  marcarGuardado, marcarSucio, haySinGuardar,
   // apertura
   renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,
   apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura,
@@ -367,5 +369,6 @@ Object.assign(window,{
 window.addEventListener('beforeprint', prepararImpresion);
 
 // ═══ ARRANQUE ═══
-initTema();   // aplicar tema guardado antes de renderizar
+initTema();
+initAvisoSalida();   // aviso si se cierra con cambios sin guardar   // aplicar tema guardado antes de renderizar
 init();

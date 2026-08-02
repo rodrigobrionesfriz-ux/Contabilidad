@@ -95,6 +95,17 @@ async function initAuth(){
   }
   AUTH.auth=firebase.auth();
 
+  // ── Persistencia de sesión: SESSION ──
+  // El token vive mientras la pestaña siga abierta: sobrevive a recargas (F5)
+  // pero se pierde al cerrar la pestaña o el navegador, así que en un equipo
+  // compartido nadie entra sin la contraseña.
+  //   Alternativas: NONE (pide clave hasta al recargar) · LOCAL (recuerda siempre)
+  try{
+    await AUTH.auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+  }catch(e){
+    console.warn('No se pudo fijar la persistencia de sesión:',e);
+  }
+
   // Listener de cambios de sesión
   AUTH.auth.onAuthStateChanged(async(user)=>{
     if(!user){
@@ -331,7 +342,13 @@ function mostrarLogin(){
 }
 
 async function logout(){
-  if(!confirm('¿Cerrar sesión?'))return;
+  // Avisar si queda trabajo sin guardar antes de cerrar la sesión
+  let msg='¿Cerrar sesión?';
+  try{
+    if(window.haySinGuardar&&window.haySinGuardar())
+      msg='⚠️ Hay cambios SIN GUARDAR.\n\nSi cierras sesión ahora podrías perderlos.\n\n¿Cerrar sesión de todas formas?';
+  }catch(e){}
+  if(!confirm(msg))return;
   try{await AUTH.auth.signOut();}catch(e){}
   location.reload();
 }

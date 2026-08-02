@@ -1,5 +1,6 @@
 // impresion.js
 import {S, getCurSec} from './state.js';
+import {empresaActiva, marcoInfo} from './empresas.js';
 
 // ═══ IMPRESIÓN FORMATO OFICIAL ═══
 // Rellena el encabezado oficial antes de imprimir según la sección activa.
@@ -19,7 +20,9 @@ function prepararImpresion(){
   set('ph-rut',e.rut?'RUT: '+e.rut:'');
   set('ph-giro',e.giro||'');
   set('ph-titulo',TITULOS_SEC[curSec]||'Reporte');
-  set('ph-periodo','Ejercicio '+(e.anio||new Date().getFullYear()));
+  const emp=empresaActiva();
+  const marcoNm=emp?marcoInfo(emp.marco).nm:'';
+  set('ph-periodo','Ejercicio '+(e.anio||new Date().getFullYear())+(marcoNm?' · '+marcoNm:''));
   const hoy=new Date();
   set('ph-fecha','Emitido: '+hoy.toLocaleDateString('es-CL')+' '+hoy.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}));
 }

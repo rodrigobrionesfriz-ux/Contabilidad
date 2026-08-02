@@ -33,6 +33,7 @@ const ROLES={
 // Secciones a las que se aplican permisos
 const SECCIONES=[
   {id:'empresa',lbl:'Empresa'},
+  {id:'empresas',lbl:'Empresas'},
   {id:'pdc',lbl:'Plan de Cuentas'},
   {id:'indicadores',lbl:'Indicadores'},
   {id:'apertura',lbl:'Balance de Apertura'},

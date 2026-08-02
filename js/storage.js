@@ -44,28 +44,57 @@ import {FS, fsStatusSet} from './firebase.js';
     try{await FS.db.collection(COLL).doc(key).delete();}catch(e){console.warn('FS del',key,e);}
   }
 
+  // ── Prefijo multiempresa ──
+  // Todas las claves de datos se guardan como "<empresaId>:<clave>", de modo que
+  // cada empresa queda aislada sin tocar los módulos que llaman a storage.
+  // Las claves del catálogo (_empresas, _empresaActiva) usan getGlobal/setGlobal
+  // y NO llevan prefijo.
+  let empresaId='emp1';
+  const K=key=>empresaId+':'+key;   // clave con prefijo de empresa
+
   window.storage={
+    // Cambia la empresa activa (lo llama empresas.js)
+    setPrefijo(id){empresaId=id||'emp1';},
+    getPrefijo(){return empresaId;},
+
+    // ── API con prefijo (datos de la empresa activa) ──
     async get(key){
-      // Preferir remoto si Firestore está online, si no hay local
-      const local=getLocal(key);
+      const k=K(key);
+      const local=getLocal(k);
       if(FS.enabled){
-        const remote=await getRemote(key);
-        if(remote){setLocal(key,remote.value);return remote;} // sincronizar local
+        const remote=await getRemote(k);
+        if(remote){setLocal(k,remote.value);return {key,value:remote.value};}
       }
-      return local;
+      return local?{key,value:local.value}:null;
     },
     async set(key,value){
-      setLocal(key,value); // siempre escribir local primero (rápido, offline-safe)
-      setRemote(key,value); // fire-and-forget al remoto
+      const k=K(key);
+      setLocal(k,value);
+      setRemote(k,value);
       return {key,value};
     },
     async delete(key){
-      delLocal(key);
-      delRemote(key);
+      const k=K(key);
+      delLocal(k);delRemote(k);
       return {key,deleted:true};
     },
+
+    // ── API sin prefijo (catálogo de empresas, config global) ──
+    async getGlobal(key){
+      const local=getLocal(key);
+      if(FS.enabled){
+        const remote=await getRemote(key);
+        if(remote){setLocal(key,remote.value);return remote;}
+      }
+      return local;
+    },
+    async setGlobal(key,value){
+      setLocal(key,value);setRemote(key,value);
+      return {key,value};
+    },
+
     async list(prefixArg){
-      try{const keys=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(prefix)){const base=k.slice(prefix.length);if(!prefixArg||base.startsWith(prefixArg))keys.push(base);}}return {keys};}
+      try{const keys=[];const pref=empresaId+':';for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(prefix)){let base=k.slice(prefix.length);if(!base.startsWith(pref))continue;base=base.slice(pref.length);if(!prefixArg||base.startsWith(prefixArg))keys.push(base);}}return {keys};}
       catch(e){return {keys:[]};}
     },
     // Sincronizar todo local → remoto (usado tras conectar por primera vez)

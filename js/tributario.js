@@ -1,5 +1,6 @@
 // tributario.js — Formulario 29 (IVA mensual) y PPM
-import {fmtC, MESES, IVA, RET_H, dteV, dteC} from './core.js';
+import {fmtC, MESES, IVA, dteV, dteC} from './core.js';
+import {retencionHonorarios} from './indicadores.js';
 import {todosDocsCompras, todosDocsVentas} from './asientos.js';
 import {S} from './state.js';
 
@@ -30,7 +31,7 @@ function calcularF29Anual(){
     });
     // Honorarios del mes → retención 10,75% (código 151)
     const honM=S.honorarios.filter(h=>h.mes===m);
-    const retencionHon=Math.round(honM.reduce((s,h)=>s+ +(h.bruto||0),0)*RET_H);
+    const retencionHon=Math.round(honM.reduce((s,h)=>s+ +(h.bruto||0),0)*retencionHonorarios(S.empresa.anio));
     // IVA: crédito total = crédito del mes + remanente anterior
     const creditoTotal=credito+remanenteAnt;
     const ivaDeterminado=debito-creditoTotal;

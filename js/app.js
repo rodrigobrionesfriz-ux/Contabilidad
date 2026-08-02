@@ -8,6 +8,10 @@ import {FS, initFirestore, logAccion} from './firebase.js';
 import './storage.js';
 import {registrarUI} from './ui.js';
 import {initTema, cambiarTema, aplicarTema} from './tema.js';
+import {EMPRESAS, MARCOS, marcoInfo, cargarEmpresas, empresaActiva, crearEmpresa,
+        eliminarEmpresa, actualizarEmpresa, activarEmpresa, migrarSiHaceFalta} from './empresas.js';
+import {renderEmpresas, abrirFormEmpresa, cerrarFormEmpresa, editarEmpresaCat,
+        guardarEmpresaCat, seleccionarEmpresa, borrarEmpresa, onMarcoChange} from './empresas-ui.js';
 
 // Sistema
 import {initAuth, puedeVer, puedeEditar, esAdmin, ROLES, SECCIONES, permisosDeRol,
@@ -23,7 +27,7 @@ import {fillEmpresaForm, saveEmpresa, updateHdr} from './empresa.js';
 import {savePDC, renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm,
         guardarCuenta, eliminarCuenta, resetPDC} from './pdc.js';
 import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
-        getIndicadores, IND} from './indicadores.js';
+        getIndicadores, IND, actualizarDesdeBancoCentral} from './indicadores.js';
 import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 
 // Negocio
@@ -131,6 +135,13 @@ async function init(){
 }
 
 async function initApp(){
+  // ── Multiempresa: migrar datos antiguos, cargar catálogo y fijar el prefijo
+  // ANTES de leer cualquier dato (si no, se leería con el prefijo equivocado).
+  await migrarSiHaceFalta();
+  await cargarEmpresas();
+  window.storage.setPrefijo(EMPRESAS.activa);
+  renderSelectorEmpresa();
+
   const ys=document.getElementById('year-sel');
   const cy=new Date().getFullYear();
   for(let y=cy+1;y>=cy-5;y--){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===cy)o.selected=true;ys.appendChild(o);}
@@ -198,6 +209,7 @@ function renderSec(s){
     return;
   }
   if(s==='empresa')fillEmpresaForm();
+  else if(s==='empresas')renderEmpresas();
   else if(s==='pdc')renderPDC();
   else if(s==='indicadores')renderIndicadores();
   else if(s==='apertura')renderApertura();
@@ -226,6 +238,45 @@ function renderSec(s){
 function rerender(){updateHdr();renderSec(getCurSec());}
 
 
+
+// ═══ MULTIEMPRESA ═══
+// Selector en el header + cambio de empresa (recarga todos los datos).
+function renderSelectorEmpresa(){
+  const sel=document.getElementById('empresa-sel');
+  if(!sel)return;
+  sel.innerHTML=EMPRESAS.lista.map(e=>
+    `<option value="${e.id}" ${e.id===EMPRESAS.activa?'selected':''}>${e.nombre}</option>`
+  ).join('')+'<option value="__gestionar">⚙️ Gestionar empresas…</option>';
+}
+
+async function onCambiarEmpresa(){
+  const sel=document.getElementById('empresa-sel');
+  const v=sel.value;
+  if(v==='__gestionar'){ renderSelectorEmpresa(); nav('empresas'); return; }
+  if(v===EMPRESAS.activa)return;
+  await activarEmpresa(v);
+  await recargarEmpresaActiva();
+  const e=empresaActiva();
+  toast('🏢 Empresa activa: '+(e?e.nombre:''));
+}
+
+// Recarga TODO el estado desde la empresa activa (tras cambiarla)
+async function recargarEmpresaActiva(){
+  // Resetear estado en memoria
+  S.ventas=[];S.compras=[];S.honorarios=[];S.asientos=[];
+  S.activos=[];S.trabajadores=[];S.apertura=null;
+  S.empresa={...S.empresa,nombre:'',rut:'',domicilio:'',giro:'',codigo:'',ciudad:'',comuna:'',rep:'',rutrep:''};
+  // Cargar datos de la nueva empresa
+  try{const r=await window.storage.get('empresa');if(r)S.empresa={...S.empresa,...JSON.parse(r.value)};}catch(e){}
+  try{
+    const r=await window.storage.get('pdc');
+    if(r){const l=JSON.parse(r.value);if(Array.isArray(l)&&l.length){PDC.length=0;l.forEach(c=>PDC.push(c));recalcDerivadasPDC();}}
+  }catch(e){}
+  await loadYear(S.empresa.anio);
+  fillEmpresaForm();updateHdr();renderSelectorEmpresa();
+  rerender();
+}
+
 // ═══ REGISTRO DE CALLBACKS (inversión de dependencias) ═══
 // ui.js expone wrappers; aquí inyectamos las implementaciones reales.
 registrarUI({rerender, nav, renderSec});
@@ -245,7 +296,7 @@ Object.assign(window,{
   // empresa / pdc / indicadores
   fillEmpresaForm, saveEmpresa, updateHdr,
   renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm, guardarCuenta, eliminarCuenta, resetPDC,
-  renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
+  renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault, actualizarDesdeBancoCentral,
   // apertura
   renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,
   apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura,
@@ -286,7 +337,9 @@ Object.assign(window,{
   renderXmlSii, generarXmlSii,
   // búsqueda / backup
   abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda, irAResultado,
-  cambiarTema, aplicarTema,
+  cambiarTema, aplicarTema, onCambiarEmpresa, renderSelectorEmpresa, recargarEmpresaActiva,
+  renderEmpresas, abrirFormEmpresa, cerrarFormEmpresa, editarEmpresaCat, guardarEmpresaCat,
+  seleccionarEmpresa, borrarEmpresa, onMarcoChange,
   exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud, importarExcelBD,
 });
 

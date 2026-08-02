@@ -1,6 +1,7 @@
 // reportes.js — Libro Diario, Mayor, Balance, Resultados (núcleo de reportes)
 // genDiario y buildMayor son la base de casi todos los cálculos.
-import {toast, fmtC, fmt, pn, today, MESES, MC, IVA, RET_H, pdcNm, PDC, CUENTAS_SEL, dteV, dteC} from './core.js';
+import {toast, fmtC, fmt, pn, today, MESES, MC, IVA, pdcNm, PDC, CUENTAS_SEL, dteV, dteC} from './core.js';
+import {retencionHonorarios} from './indicadores.js';
 import {toggleAgingDetalle} from './auxiliares.js';
 import {S} from './state.js';
 import './storage.js';
@@ -95,7 +96,7 @@ function genDiario(){
     // HONORARIOS
     const honM=S.honorarios.filter(h=>h.mes===m);
     if(honM.length){
-      const tBruto=honM.reduce((s,h)=>s+ +(h.bruto||0),0),tRet=Math.round(tBruto*RET_H);
+      const tBruto=honM.reduce((s,h)=>s+ +(h.bruto||0),0),tRet=Math.round(tBruto*retencionHonorarios(S.empresa.anio));
       entries.push({n:n++,fecha,glosa:`Honorarios ${mesNm} ${anio}`,movs:[
         {cd:'3202019',nm:'HONORARIOS',debe:tBruto,haber:0},
         {cd:'2102006',nm:pdcNm('2102006'),debe:0,haber:tRet},

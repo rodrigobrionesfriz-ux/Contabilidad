@@ -846,10 +846,12 @@
     </div>
     <div id="dtm-dup-warn" style="display:none"></div>
     <div class="doc-grid-totals">
-      <div class="grp"><label>Neto</label><input type="number" id="dtm-neto" min="0" placeholder="0" oninput="dtmCalcTotals('neto')"></div>
-      <div class="grp"><label>Exento</label><input type="number" id="dtm-exento" min="0" placeholder="0" oninput="dtmCalcTotals('exento')"></div>
-      <div class="grp"><label>IVA 19%</label><input type="number" id="dtm-iva" min="0" placeholder="0" oninput="dtmCalcTotals('iva')"></div>
-      <div class="grp"><label>Otros Imp.</label><input type="number" id="dtm-otros" min="0" placeholder="0" oninput="dtmCalcTotals('otros')"></div>
+      <div class="grp full"><label>Descripción / detalle</label><input type="text" id="dtm-desc" placeholder="Ej: 500 plantas de arándano variedad Duke"></div>
+      <div class="grp"><label id="dtm-lbl-neto">Neto</label><input type="number" id="dtm-neto" min="0" placeholder="0" oninput="dtmCalcTotals('neto')"></div>
+      <div class="grp" id="dtm-exento-wrap"><label>Exento</label><input type="number" id="dtm-exento" min="0" placeholder="0" oninput="dtmCalcTotals('exento')"></div>
+      <div class="grp" id="dtm-iva-wrap"><label id="dtm-lbl-iva">IVA 19%</label><input type="number" id="dtm-iva" min="0" placeholder="0" oninput="dtmCalcTotals('iva')"></div>
+      <div class="grp" id="dtm-ret-wrap" style="display:none"><label id="dtm-lbl-ret">Retención</label><input type="number" id="dtm-ret" min="0" placeholder="0" oninput="dtmCalcTotals('ret')"></div>
+      <div class="grp" id="dtm-otros-wrap"><label>Otros Imp.</label><input type="number" id="dtm-otros" min="0" placeholder="0" oninput="dtmCalcTotals('otros')"></div>
       <div class="grp"><label>Total</label><input type="number" id="dtm-total" min="0" placeholder="0" oninput="dtmCalcTotals('total')"></div>
     </div>
 

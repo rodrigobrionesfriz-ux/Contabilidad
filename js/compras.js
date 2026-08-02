@@ -1,0 +1,706 @@
+// compras.js — Libro de compras + importador SII
+import {toast, fmt, pn, today, MESES, IVA, DTE_COMPRAS, dteC, rutParse, rutFmt, rutDV, pdcNm, CCOLS} from './core.js';
+import {S} from './state.js';
+import {logAccion} from './firebase.js';
+import {mesOpts, foliosMensuales, mesRango} from './helpers.js';
+import {todosDocsCompras} from './asientos.js';
+import './storage.js';
+
+
+function onMesChangeC(){
+  const m=+(document.getElementById('cf-mes')?.value||0);
+  if(m){const r=mesRango(m);document.getElementById('cf-desde').value=r.desde;document.getElementById('cf-hasta').value=r.hasta;}
+  else{document.getElementById('cf-desde').value='';document.getElementById('cf-hasta').value='';}
+  renderCompras();
+}
+
+function limpiarFiltrosC(){
+  ['cf-mes','cf-desde','cf-hasta','cf-dte-flt','cf-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  renderCompras();
+}
+
+// ═══ COMPRAS — Documentos individuales ═══
+function dteComprasOpts(sel=''){
+  return '<option value="">— Seleccionar —</option>'+DTE_COMPRAS.map(d=>`<option value="${d.cod}" ${+sel===d.cod?'selected':''}>${d.cod} — ${d.nm}</option>`).join('');
+}
+function cuentasGastoOpts(sel=''){
+  return '<option value="">— cuenta de gasto —</option>'+CUENTAS_GASTO.map(c=>`<option value="${c.cd}" ${c.cd===sel?'selected':''}>${c.cd} — ${c.nm}</option>`).join('');
+}
+
+function renderCompras(){
+  const selMes=document.getElementById('cf-mes');
+  if(selMes&&selMes.options.length<=1)selMes.innerHTML=mesOpts(selMes.value);
+  const selDteFlt=document.getElementById('cf-dte-flt');
+  if(selDteFlt&&selDteFlt.options.length<=1)selDteFlt.innerHTML='<option value="">Todos los DTE</option>'+DTE_COMPRAS.map(d=>`<option value="${d.cod}">${d.cod} — ${d.nm}</option>`).join('');
+
+  const fDesde=(document.getElementById('cf-desde')?.value||'');
+  const fHasta=(document.getElementById('cf-hasta')?.value||'');
+  const fDte=+(document.getElementById('cf-dte-flt')?.value||0);
+  const fQ=(document.getElementById('cf-search')?.value||'').toLowerCase().trim();
+  const todos=todosDocsCompras();
+  const docs=[...todos].sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.numero||'').localeCompare(b.numero||''));
+  const folios=foliosMensuales(todos);
+  const fDocs=docs.filter(d=>{
+    if(fDesde&&d.fecha<fDesde)return false;
+    if(fHasta&&d.fecha>fHasta)return false;
+    if(fDte&&+d.tipoDTE!==fDte)return false;
+    if(fQ){const t=(d.rutCodigo+' '+(d.razonSocial||'')+' '+(d.numero||'')).toLowerCase();if(!t.includes(fQ))return false;}
+    return true;
+  });
+
+  const cntMan=todos.filter(d=>d.origen==='asiento').length;
+  document.getElementById('cf-count').textContent=`${fDocs.length} de ${todos.length} documentos${cntMan?` (${cntMan} desde asientos)`:''}`;
+
+  const tb=document.getElementById('c-tbody');
+  if(!fDocs.length){
+    tb.innerHTML=`<tr><td colspan="13" class="empty"><div class="ei">🧾</div>${todos.length?'No hay documentos con ese filtro':'No hay documentos de compra. Usa <strong>+ Nuevo Documento</strong> para agregar el primero.'}</td></tr>`;
+    document.getElementById('c-tfoot').innerHTML='';
+  }else{
+    let tN=0,tE=0,tI=0,tO=0,tT=0;
+    tb.innerHTML=fDocs.map(d=>{
+      const signo=(dteC(d.tipoDTE)?.signo)||1;
+      tN+=(d.neto||0)*signo;tE+=(d.exento||0)*signo;tI+=(d.iva||0)*signo;tO+=(d.otrosImpuestos||0)*signo;tT+=(d.total||0)*signo;
+      const dte=dteC(d.tipoDTE);
+      const mesSl=(d.fecha||'').slice(5,7);
+      const folioNum=folios[d.id]||'';
+      const esManual=d.origen==='asiento';
+      const rowStyle=esManual?' style="background:rgba(88,166,255,.04)"':'';
+      const origenBadge=esManual?`<div style="font-size:9px;color:var(--info);margin-top:2px">✏ Asiento N°${d.asientoN}</div>`:'';
+      const distTxt=d.dist&&d.dist.length>1?`📊 ${d.dist.length} categorías`:(d.dist&&d.dist[0]?pdcNm(d.dist[0].cuenta):'');
+      const acciones=esManual
+        ?`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="abrirAsientoDesde('${d.asientoId}')">📝 Abrir</button>`
+        :`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="editarCompra('${d.id}')">✏️</button> <button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="eliminarCompra('${d.id}')">🗑</button>`;
+      return `<tr${rowStyle}>
+        <td class="tl"><span class="doc-folio">${mesSl}-${String(folioNum).padStart(3,'0')}</span></td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}${origenBadge}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px;color:${d.fechaVencimiento?'var(--tx)':'var(--mt)'}">${d.fechaVencimiento||'—'}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.tipoDTE}${dte?`<div style="font-size:9px;color:var(--mt);font-family:var(--sans);line-height:1.1;margin-top:1px">${dte.nm.slice(0,18)}</div>`:''}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.numero||''}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px">${rutFmt(d.rutCodigo,d.rutDV)}</td>
+        <td class="tnm">${d.razonSocial||''}${distTxt?`<div style="font-size:10px;color:var(--mt);margin-top:2px">${distTxt}</div>`:''}</td>
+        <td>${fmt(d.neto)}</td>
+        <td>${fmt(d.exento)}</td>
+        <td>${fmt(d.iva)}</td>
+        <td>${fmt(d.otrosImpuestos)}</td>
+        <td style="font-weight:600">${fmt(d.total)}</td>
+        <td style="text-align:center">${acciones}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('c-tfoot').innerHTML=`<tr><td class="tl" colspan="7">TOTALES</td><td>${fmt(tN)}</td><td>${fmt(tE)}</td><td>${fmt(tI)}</td><td>${fmt(tO)}</td><td>${fmt(tT)}</td><td></td></tr>`;
+  }
+  renderCResumen();
+}
+
+function renderCResumen(){
+  const el=document.getElementById('c-resumen');if(!el)return;
+  if(!S.compras.length){el.innerHTML='';return;}
+  const porMes=Array.from({length:12},()=>({neto:0,exento:0,iva:0,otros:0,total:0,cant:0}));
+  S.compras.forEach(d=>{
+    const m=+d.fecha.slice(5,7)-1;if(m<0||m>11)return;
+    porMes[m].neto+=d.neto||0;porMes[m].exento+=d.exento||0;porMes[m].iva+=d.iva||0;porMes[m].otros+=d.otrosImpuestos||0;porMes[m].total+=d.total||0;porMes[m].cant++;
+  });
+  const porCta={};
+  S.compras.forEach(d=>{(d.dist||[]).forEach(l=>{if(!porCta[l.cuenta])porCta[l.cuenta]={nm:pdcNm(l.cuenta),monto:0};porCta[l.cuenta].monto+=l.monto||0;});});
+
+  let tN=0,tE=0,tI=0,tO=0,tT=0,tC=0;
+  let rowsM=porMes.map((p,i)=>{
+    tN+=p.neto;tE+=p.exento;tI+=p.iva;tO+=p.otros;tT+=p.total;tC+=p.cant;
+    if(!p.cant)return '';
+    return `<tr><td class="tl">${MESES[i]}</td><td>${p.cant}</td><td>${fmt(p.neto)}</td><td>${fmt(p.exento)}</td><td>${fmt(p.iva)}</td><td>${fmt(p.otros)}</td><td style="font-weight:600">${fmt(p.total)}</td></tr>`;
+  }).join('');
+  if(!rowsM)rowsM=`<tr><td colspan="7" class="empty" style="padding:18px">Sin movimientos</td></tr>`;
+
+  const ctaKeys=Object.keys(porCta).sort();
+  const rowsC=ctaKeys.map(k=>`<tr><td class="tl" style="font-family:var(--mono);font-size:11px;color:var(--mt)">${k}</td><td class="tnm">${porCta[k].nm}</td><td style="font-weight:600">${fmt(porCta[k].monto)}</td></tr>`).join('');
+
+  el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="card-np"><div style="padding:12px 16px;background:var(--sf2);font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bd)">📅 Resumen Mensual</div><div class="tw"><table>
+      <thead><tr><th class="tl">MES</th><th>DOCS</th><th>NETO</th><th>EXENTO</th><th>IVA</th><th>OTROS</th><th>TOTAL</th></tr></thead>
+      <tbody>${rowsM}</tbody>
+      <tfoot><tr><td class="tl">TOTAL</td><td>${tC}</td><td>${fmt(tN)}</td><td>${fmt(tE)}</td><td>${fmt(tI)}</td><td>${fmt(tO)}</td><td>${fmt(tT)}</td></tr></tfoot>
+    </table></div></div>
+    <div class="card-np"><div style="padding:12px 16px;background:var(--sf2);font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bd)">📊 Por Cuenta de Gasto</div><div class="tw"><table>
+      <thead><tr><th class="tl">CÓDIGO</th><th class="tl">CUENTA</th><th>MONTO</th></tr></thead>
+      <tbody>${rowsC||'<tr><td colspan="3" class="empty" style="padding:18px">Sin distribución</td></tr>'}</tbody>
+    </table></div></div>
+  </div>`;
+}
+
+// — Form Compras —
+function abrirCF(){
+  CF={editId:null,dist:[{cuenta:'',monto:0}]};
+  const f=document.getElementById('cf-form');f.style.display='block';f.classList.remove('editing');
+  document.getElementById('cf-title').textContent='Nuevo Documento de Compra';
+  document.getElementById('cf-fecha').value=today();
+  document.getElementById('cf-vence').value='';
+  document.getElementById('cf-dte').innerHTML=dteComprasOpts('');
+  ['cf-num','cf-rut','cf-rs','cf-neto','cf-exento','cf-iva','cf-otros','cf-total'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('cf-dv').textContent='';
+  document.getElementById('cf-dup-warn').style.display='none';
+  renderDist();
+  f.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function editarCompra(id){
+  const d=S.compras.find(x=>x.id===id);if(!d)return;
+  CF={editId:id,dist:d.dist?d.dist.map(l=>({...l})):[{cuenta:'',monto:d.neto||0}]};
+  const f=document.getElementById('cf-form');f.style.display='block';f.classList.add('editing');
+  document.getElementById('cf-title').textContent='Editando Documento — '+rutFmt(d.rutCodigo,d.rutDV);
+  document.getElementById('cf-fecha').value=d.fecha;
+  document.getElementById('cf-vence').value=d.fechaVencimiento||'';
+  document.getElementById('cf-dte').innerHTML=dteComprasOpts(d.tipoDTE);
+  document.getElementById('cf-num').value=d.numero||'';
+  document.getElementById('cf-rut').value=(d.rutCodigo||'')+(d.rutDV||'');
+  document.getElementById('cf-rs').value=d.razonSocial||'';
+  document.getElementById('cf-neto').value=d.neto||'';
+  document.getElementById('cf-exento').value=d.exento||'';
+  document.getElementById('cf-iva').value=d.iva||'';
+  document.getElementById('cf-otros').value=d.otrosImpuestos||'';
+  document.getElementById('cf-total').value=d.total||'';
+  document.getElementById('cf-dup-warn').style.display='none';
+  cfRutInput(document.getElementById('cf-rut').value);
+  renderDist();
+  f.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function cerrarCF(){document.getElementById('cf-form').style.display='none';CF={editId:null,dist:[]};}
+
+function cfRutInput(val){
+  const r=rutParse(val);
+  const el=document.getElementById('cf-dv');
+  if(!r.raw){el.textContent='';el.className='rut-dv';return;}
+  if(r.codigo&&r.valido){el.textContent='✓ '+r.dv;el.className='rut-dv ok';
+    const prev=S.compras.find(v=>v.rutCodigo===r.codigo&&v.razonSocial);
+    const rs=document.getElementById('cf-rs');
+    if(prev&&!rs.value)rs.value=prev.razonSocial;
+  }else if(r.codigo){el.textContent='✗ DV ≠ '+rutDV(r.codigo);el.className='rut-dv bad';}
+  else{el.textContent='…';el.className='rut-dv';}
+}
+
+// Detección de duplicado en vivo
+function cfCheckDup(){
+  const warn=document.getElementById('cf-dup-warn');if(!warn)return;
+  const tipoDTE=+document.getElementById('cf-dte').value;
+  const numero=document.getElementById('cf-num').value.trim();
+  const r=rutParse(document.getElementById('cf-rut').value);
+  if(!tipoDTE||!numero||!r.codigo){warn.style.display='none';return;}
+  const dup=S.compras.find(v=>v.rutCodigo===r.codigo&&+v.tipoDTE===tipoDTE&&v.numero===numero&&v.id!==CF.editId);
+  if(dup){
+    const folios=foliosMensuales(S.compras);
+    const f=folios[dup.id]||'?';
+    const mesSl=dup.fecha.slice(5,7);
+    warn.className='doc-dup-warn';warn.style.display='';
+    warn.innerHTML=`⚠️ <span>DOCUMENTO DUPLICADO</span><span style="font-weight:400;margin-left:auto;font-size:11px">Ya existe: Folio ${mesSl}-${String(f).padStart(3,'0')} · ${dup.fecha} · ${rutFmt(dup.rutCodigo,dup.rutDV)} · DTE ${dup.tipoDTE} N°${dup.numero} · ${fmtC(dup.total)}</span>`;
+  }else{warn.style.display='none';}
+}
+
+function cfCalcTotals(changed){
+  const neto=pn(document.getElementById('cf-neto').value);
+  const exento=pn(document.getElementById('cf-exento').value);
+  const otros=pn(document.getElementById('cf-otros').value);
+  const ivaEl=document.getElementById('cf-iva'),totEl=document.getElementById('cf-total');
+  const dte=dteC(document.getElementById('cf-dte').value);
+  const afecto=dte?dte.afecto:true;
+  if(changed==='neto'||changed==='exento'||changed==='otros'){
+    const iva=afecto?Math.round(neto*IVA):0;
+    ivaEl.value=iva||'';
+    totEl.value=neto+exento+iva+otros;
+    if(CF.dist.length===1&&!CF.dist[0].monto&&changed==='neto')CF.dist[0].monto=neto;
+    if(changed==='neto')renderDist();
+  }else if(changed==='total'){
+    const total=pn(totEl.value);
+    if(afecto&&total>0&&!exento&&!otros){
+      const n=Math.round(total/(1+IVA)),iv=total-n;
+      document.getElementById('cf-neto').value=n;ivaEl.value=iv;
+      if(CF.dist.length===1&&!CF.dist[0].monto){CF.dist[0].monto=n;renderDist();}
+    }
+  }else if(changed==='iva'){
+    const iva=pn(ivaEl.value);
+    totEl.value=neto+exento+iva+otros;
+  }
+  updCfCheck();
+}
+
+function renderDist(){
+  const box=document.getElementById('cf-dist');
+  if(!CF.dist.length)CF.dist=[{cuenta:'',monto:0}];
+  box.innerHTML=CF.dist.map((l,i)=>`<div class="dist-row">
+    <div class="dist-num">${i+1}</div>
+    <div><select class="dist-inp" onchange="CF.dist[${i}].cuenta=this.value;updCfCheck()">${cuentasGastoOpts(l.cuenta)}</select></div>
+    <div><input type="number" class="dist-num-inp" min="0" placeholder="0" value="${l.monto||''}" oninput="CF.dist[${i}].monto=pn(this.value);updCfCheck()"></div>
+    <div style="text-align:center"><button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="delDist(${i})">✕</button></div>
+  </div>`).join('');
+  updCfCheck();
+}
+function addDist(){CF.dist.push({cuenta:'',monto:0});renderDist();}
+function delDist(i){if(CF.dist.length>1)CF.dist.splice(i,1);else CF.dist[0]={cuenta:'',monto:0};renderDist();}
+function updCfCheck(){
+  const neto=pn(document.getElementById('cf-neto').value);
+  const sum=CF.dist.reduce((s,l)=>s+(l.monto||0),0);
+  const diff=sum-neto,ok=neto>0&&diff===0;
+  const box=document.getElementById('cf-check');
+  box.className='dist-check '+(ok?'ok':'err');
+  document.getElementById('cf-check-ico').textContent=ok?'✅':'⚠️';
+  document.getElementById('cf-check-msg').textContent=ok?'Distribución cuadrada con el neto':
+    neto===0?'Ingresa el neto y distribúyelo en cuentas':
+    diff>0?`Exceso de ${fmtC(diff)} sobre el neto`:
+    `Faltan ${fmtC(-diff)} por distribuir`;
+  document.getElementById('cf-check-det').innerHTML=`<span>Neto: ${fmtC(neto)}</span> · <span>Distribuido: ${fmtC(sum)}</span>`;
+}
+
+function guardarCompra(){
+  const fecha=document.getElementById('cf-fecha').value;
+  const fechaVencimiento=document.getElementById('cf-vence').value||'';
+  const tipoDTE=+document.getElementById('cf-dte').value;
+  const numero=document.getElementById('cf-num').value.trim();
+  const rutInput=document.getElementById('cf-rut').value;
+  const razonSocial=document.getElementById('cf-rs').value.trim();
+  const neto=pn(document.getElementById('cf-neto').value);
+  const exento=pn(document.getElementById('cf-exento').value);
+  const iva=pn(document.getElementById('cf-iva').value);
+  const otrosImpuestos=pn(document.getElementById('cf-otros').value);
+  const total=pn(document.getElementById('cf-total').value);
+
+  if(!fecha){toast('⚠️ Ingresa la fecha de emisión','e');return;}
+  if(fechaVencimiento&&fechaVencimiento<fecha){toast('⚠️ La fecha de vencimiento no puede ser anterior a la emisión','e');return;}
+  if(!tipoDTE){toast('⚠️ Selecciona el tipo de documento','e');return;}
+  if(!numero){toast('⚠️ Ingresa el N° de documento','e');return;}
+  const r=rutParse(rutInput);
+  if(!r.codigo){toast('⚠️ Ingresa el RUT del proveedor','e');return;}
+  if(!r.valido){toast('⚠️ RUT inválido — dígito verificador no coincide','e');return;}
+  if(!razonSocial){toast('⚠️ Ingresa la razón social','e');return;}
+  if(total<=0){toast('⚠️ El total debe ser mayor a cero','e');return;}
+  if(Math.abs((neto+exento+iva+otrosImpuestos)-total)>1){toast('⚠️ Neto + Exento + IVA + Otros no coincide con el Total','e');return;}
+
+  const dist=CF.dist.filter(l=>l.cuenta&&l.monto>0);
+  if(!dist.length){toast('⚠️ Agrega al menos una cuenta de gasto','e');return;}
+  const sumDist=dist.reduce((s,l)=>s+l.monto,0);
+  if(Math.abs(sumDist-neto)>1){toast('⚠️ La distribución no cuadra con el neto','e');return;}
+
+  const dup=S.compras.find(v=>v.rutCodigo===r.codigo&&+v.tipoDTE===tipoDTE&&v.numero===numero&&v.id!==CF.editId);
+  if(dup){
+    const folios=foliosMensuales(S.compras);
+    const f=folios[dup.id]||'?';
+    const mesSl=dup.fecha.slice(5,7);
+    toast(`⚠️ Documento duplicado — ya existe Folio ${mesSl}-${String(f).padStart(3,'0')} (${dup.fecha}, ${fmtC(dup.total)})`,'e');
+    return;
+  }
+
+  const doc={id:CF.editId||'c_'+Date.now(),fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,neto,exento,iva,otrosImpuestos,total,dist};
+  if(CF.editId){const i=S.compras.findIndex(x=>x.id===CF.editId);if(i>=0)S.compras[i]=doc;toast('✅ Documento actualizado');logAccion('Editó compra',`DTE ${doc.tipoDTE} N°${doc.numero} · ${fmtC(doc.total)}`);}
+  else{S.compras.push(doc);toast('✅ Documento registrado');logAccion('Registró compra',`DTE ${doc.tipoDTE} N°${doc.numero} · ${doc.razonSocial} · ${fmtC(doc.total)}`);}
+  window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>{});
+  cerrarCF();rerender();
+}
+
+function eliminarCompra(id){
+  const d=S.compras.find(x=>x.id===id);if(!d)return;
+  if(!confirm(`¿Eliminar documento ${d.tipoDTE} N°${d.numero} de ${d.razonSocial}?\nTotal: ${fmtC(d.total)}`))return;
+  S.compras=S.compras.filter(x=>x.id!==id);
+  window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>{});
+  rerender();toast('🗑 Documento eliminado');
+}
+
+// ═══ IMPORTACIÓN DESDE SII (Registro de Compras CSV) ═══
+let IM={docs:[]};
+
+// Parser de CSV que respeta comillas dobles (con escape "")
+function splitCSVRow(row,delim){
+  const out=[];let cur='';let inQ=false;
+  for(let i=0;i<row.length;i++){
+    const c=row[i];
+    if(inQ){
+      if(c==='"'){if(row[i+1]==='"'){cur+='"';i++;}else inQ=false;}
+      else cur+=c;
+    }else{
+      if(c===delim){out.push(cur);cur='';}
+      else if(c==='"')inQ=true;
+      else cur+=c;
+    }
+  }
+  out.push(cur);
+  return out.map(s=>s.trim());
+}
+
+// Parsea número en formato chileno (1.234.567 o 1.234,56 o 1234567)
+function parseNumSII(str){
+  if(!str)return 0;
+  str=String(str).trim().replace(/[$\s]/g,'');
+  if(!str||str==='-')return 0;
+  if(str.includes(',')&&str.includes('.')){
+    // "1.234,56" → 1234.56
+    str=str.replace(/\./g,'').replace(',','.');
+  }else if(/\d+[\.,]\d{3}(?:[\.,]\d{3})*$/.test(str)){
+    // Miles: "1.234.567" o "1,234,567" (sin decimales)
+    str=str.replace(/[\.,]/g,'');
+  }else if(str.includes(',')){
+    // "1234,56" → 1234.56
+    str=str.replace(',','.');
+  }
+  const n=parseFloat(str);
+  return isNaN(n)?0:Math.round(n);
+}
+
+// "02/01/2026" o "2/1/2026" → "2026-01-02"
+function parseFechaSII(str){
+  if(!str)return '';
+  str=String(str).trim();
+  let m=str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m=str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m)return `${m[1]}-${m[2]}-${m[3]}`;
+  return '';
+}
+
+function parseSIICompras(text){
+  if(text.charCodeAt(0)===0xFEFF)text=text.slice(1); // BOM
+  const rawLines=text.split(/\r?\n/).filter(l=>l.trim().length>0);
+  if(!rawLines.length)throw new Error('Archivo vacío');
+
+  // Detectar delimitador (; es lo más común en SII)
+  const first=rawLines[0];
+  const nSemi=(first.match(/;/g)||[]).length;
+  const nComma=(first.match(/,/g)||[]).length;
+  const delim=nSemi>=nComma?';':',';
+
+  const rows=rawLines.map(l=>splitCSVRow(l,delim));
+
+  // Buscar fila de headers
+  let headerIdx=-1;
+  for(let i=0;i<Math.min(8,rows.length);i++){
+    const joined=rows[i].join(' ').toLowerCase();
+    if(joined.includes('tipo doc')&&(joined.includes('rut')||joined.includes('proveedor'))){
+      headerIdx=i;break;
+    }
+    if(joined.includes('tipo dte')&&joined.includes('rut')){headerIdx=i;break;}
+  }
+  if(headerIdx<0)throw new Error('No se encontró fila de encabezados. ¿Es el archivo "Detalle de Registro de Compras" del SII?');
+
+  const headers=rows[headerIdx].map(h=>h.toLowerCase().trim().replace(/"/g,''));
+  const getCol=(...patterns)=>{
+    for(const p of patterns){
+      const idx=headers.findIndex(h=>h.includes(p.toLowerCase()));
+      if(idx>=0)return idx;
+    }
+    return -1;
+  };
+
+  const cTipo=getCol('tipo doc','tipo dte');
+  const cRut=getCol('rut proveedor','rut emisor','rut');
+  const cRazon=getCol('razon social','razón social','razonsocial');
+  const cNro=getCol('nro doc','n° doc','folio');
+  const cFecha=getCol('fecha docto','fecha documento','fecha emision','fecha emisión','fecha doc','fecha');
+  const cExento=getCol('monto exento','exento');
+  const cNeto=getCol('monto neto','neto');
+  const cIvaRec=getCol('iva recuperable','monto iva recuperable');
+  const cIvaNoRec=getCol('iva no recuperable','monto iva no recuperable');
+  const cIvaPlano=getCol('monto iva','iva');
+  const cTotal=getCol('monto total','total');
+  const cOtroImp=getCol('valor otro impuesto','otro impuesto');
+
+  if(cTipo<0||cRut<0||cNro<0||cFecha<0||cTotal<0){
+    throw new Error('Faltan columnas esenciales (Tipo Doc, RUT, N° Doc, Fecha, Total). Verifica el formato del archivo.');
+  }
+
+  const docs=[];let descartados=0;
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const r=rows[i];if(r.length<3)continue;
+    const tipoDTE=parseInt(r[cTipo],10)||0;
+    if(!tipoDTE){descartados++;continue;}
+    if(!dteC(tipoDTE)){descartados++;continue;} // DTE no soportado
+    const rutInfo=rutParse(r[cRut]||'');
+    if(!rutInfo.codigo||!rutInfo.valido){descartados++;continue;}
+    const fecha=parseFechaSII(r[cFecha]||'');
+    if(!fecha){descartados++;continue;}
+    const neto=Math.abs(parseNumSII(r[cNeto]||'0'));
+    const exento=Math.abs(parseNumSII(r[cExento]||'0'));
+    let iva=0;
+    if(cIvaRec>=0)iva+=Math.abs(parseNumSII(r[cIvaRec]||'0'));
+    if(cIvaNoRec>=0)iva+=Math.abs(parseNumSII(r[cIvaNoRec]||'0'));
+    if(!iva&&cIvaPlano>=0)iva=Math.abs(parseNumSII(r[cIvaPlano]||'0'));
+    const total=Math.abs(parseNumSII(r[cTotal]||'0'));
+    const otrosImpuestos=cOtroImp>=0?Math.abs(parseNumSII(r[cOtroImp]||'0')):0;
+    const numero=String(r[cNro]||'').trim();
+    if(!numero||total===0){descartados++;continue;}
+
+    docs.push({fecha,tipoDTE,numero,rutCodigo:rutInfo.codigo,rutDV:rutInfo.dv,razonSocial:(r[cRazon]||'').trim(),neto,exento,iva,otrosImpuestos,total});
+  }
+  return {docs,descartados};
+}
+
+function abrirImportSII(){
+  const input=document.getElementById('imp-file');
+  input.value='';
+  input.click();
+}
+
+function handleFileImport(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=(ev)=>{
+    try{
+      // Intentar detectar encoding: si hay caracteres raros en UTF-8, probar Latin-1
+      let text=ev.target.result;
+      // Si el texto tiene muchas secuencias raras típicas de mal decoding UTF-8 de Latin-1, re-leer como Latin-1
+      if(/[\u00C3][\u0080-\u00BF]/.test(text)){
+        // Probablemente es UTF-8 bien decodificado — dejar
+      }else if(/[ÃÂ][\x80-\xBF]/.test(text)){
+        // Doble-decodificado, raro
+      }
+      procesarImportText(text,file.name);
+    }catch(err){
+      toast('❌ Error al leer archivo: '+err.message,'e');
+    }
+  };
+  reader.onerror=()=>toast('❌ Error al leer archivo','e');
+  // Primero intentar leerlo como texto UTF-8. Si falla, reintentar con Latin-1.
+  reader.readAsText(file,'UTF-8');
+  reader._didTry=1;
+  reader._file=file;
+}
+
+function procesarImportText(text,nombreArchivo){
+  let res;
+  try{
+    res=parseSIICompras(text);
+  }catch(err){
+    // Reintentar con Latin-1 por si el encoding era incorrecto
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      try{
+        const r2=parseSIICompras(ev.target.result);
+        mostrarDocsImportados(r2,nombreArchivo);
+      }catch(e2){toast('❌ '+e2.message,'e');}
+    };
+    const input=document.getElementById('imp-file');
+    if(input.files[0])reader.readAsText(input.files[0],'ISO-8859-1');
+    else toast('❌ '+err.message,'e');
+    return;
+  }
+  mostrarDocsImportados(res,nombreArchivo);
+}
+
+function mostrarDocsImportados(res,nombreArchivo){
+  if(!res.docs.length){
+    toast('⚠️ No se detectaron documentos válidos en el archivo','e');
+    return;
+  }
+  // Detectar periodo: el mes-año más frecuente entre los documentos
+  const conteo={};
+  res.docs.forEach(d=>{
+    const mY=d.fecha.slice(0,7); // "YYYY-MM"
+    conteo[mY]=(conteo[mY]||0)+1;
+  });
+  const periodos=Object.entries(conteo).sort((a,b)=>b[1]-a[1]);
+  const [periodoTop,cantTop]=periodos[0];
+  const [anioTop,mesTop]=periodoTop.split('-');
+
+  // Marcar duplicados
+  const todos=todosDocsCompras();
+  res.docs.forEach(d=>{
+    const dup=todos.find(x=>x.rutCodigo===d.rutCodigo&&+x.tipoDTE===+d.tipoDTE&&x.numero===d.numero);
+    d.dup=dup||null;
+    d.incluir=!dup;
+    d.cuenta='';
+    d.fechaOriginal=d.fecha; // preservamos para referencia
+  });
+
+  IM={docs:res.docs,descartados:res.descartados||0,archivo:nombreArchivo,
+      periodoMes:+mesTop,periodoAnio:+anioTop,periodos};
+  abrirImportModal();
+}
+
+function abrirImportModal(){
+  // Poblar select de mes
+  const selMes=document.getElementById('imp-periodo-mes');
+  selMes.innerHTML=MESES.map((m,i)=>`<option value="${i+1}" ${i+1===IM.periodoMes?'selected':''}>${m}</option>`).join('');
+  // Poblar select de año (±3 años del actual, incluyendo el detectado)
+  const selAnio=document.getElementById('imp-periodo-anio');
+  const cy=new Date().getFullYear();
+  const anios=new Set();
+  for(let y=cy-3;y<=cy+1;y++)anios.add(y);
+  anios.add(IM.periodoAnio);
+  const aniosOrd=[...anios].sort();
+  selAnio.innerHTML=aniosOrd.map(y=>`<option value="${y}" ${y===IM.periodoAnio?'selected':''}>${y}</option>`).join('');
+
+  // Poblar select bulk
+  const bulkSel=document.getElementById('imp-bulk');
+  bulkSel.innerHTML='<option value="">— seleccionar cuenta de gasto —</option>'+
+    CUENTAS_GASTO.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+
+  renderImportModal();
+  document.getElementById('imp-modal').classList.add('open');
+}
+
+function cambiarPeriodoImport(){
+  IM.periodoMes=+document.getElementById('imp-periodo-mes').value;
+  IM.periodoAnio=+document.getElementById('imp-periodo-anio').value;
+  renderImportModal();
+}
+
+function cerrarImportModal(){
+  document.getElementById('imp-modal').classList.remove('open');
+  IM={docs:[]};
+}
+
+// Devuelve la fecha efectiva que se guardará: si "forzar" está activo y el doc está fuera del
+// periodo, retornar el último día del mes del periodo; si no, usar la fecha original.
+function fechaEfectivaImport(d){
+  const forzar=document.getElementById('imp-forzar-periodo')?.checked;
+  const [yOrig,mOrig]=d.fechaOriginal.split('-');
+  const fueraPeriodo=(+yOrig!==IM.periodoAnio||+mOrig!==IM.periodoMes);
+  if(!forzar||!fueraPeriodo)return d.fechaOriginal;
+  // Forzar al último día del mes del periodo (para preservar orden cronológico al cierre)
+  const ultDia=new Date(IM.periodoAnio,IM.periodoMes,0).getDate();
+  return `${IM.periodoAnio}-${String(IM.periodoMes).padStart(2,'0')}-${String(ultDia).padStart(2,'0')}`;
+}
+
+function renderImportModal(){
+  const total=IM.docs.length;
+  const dups=IM.docs.filter(d=>d.dup).length;
+  const incl=IM.docs.filter(d=>d.incluir).length;
+  const conCuenta=IM.docs.filter(d=>d.incluir&&d.cuenta).length;
+
+  // Info del periodo
+  const periodoStr=`${MESES[IM.periodoMes-1]} ${IM.periodoAnio}`;
+  const fuera=IM.docs.filter(d=>{
+    const [y,m]=d.fechaOriginal.split('-');
+    return +y!==IM.periodoAnio||+m!==IM.periodoMes;
+  }).length;
+  const forzar=document.getElementById('imp-forzar-periodo')?.checked;
+  let periodoInfo=`Periodo seleccionado: <strong>${periodoStr}</strong>`;
+  if(IM.periodos&&IM.periodos.length>1){
+    const detallado=IM.periodos.map(([p,c])=>{
+      const [y,m]=p.split('-');
+      return `${MESES[+m-1].slice(0,3)} ${y}: ${c}`;
+    }).join(' · ');
+    periodoInfo+=`<br><span style="color:var(--mt);font-size:10px">Detectado en archivo: ${detallado}</span>`;
+  }
+  if(fuera>0){
+    periodoInfo+=`<br><span style="color:${forzar?'var(--info)':'var(--err)'};font-size:11px;margin-top:2px;display:inline-block">${forzar?'✓':'⚠️'} ${fuera} documento${fuera===1?'':'s'} con fecha fuera del periodo ${forzar?`se ajustarán al último día de ${periodoStr}`:'se importarán con su fecha original'}</span>`;
+  }
+  document.getElementById('imp-periodo-info').innerHTML=periodoInfo;
+
+  // Summary
+  document.getElementById('imp-summary').innerHTML=`📊 <strong>${total}</strong> documentos detectados` +
+    (IM.descartados?` · ${IM.descartados} descartados (datos incompletos o DTE no soportado)`:'')+
+    (dups?` · <strong style="color:var(--err)">${dups} duplicados</strong> (ya existen)`:'')+
+    ` · Archivo: <code style="font-family:var(--mono);font-size:11px">${IM.archivo||'-'}</code>`;
+  document.getElementById('imp-count').textContent=`${conCuenta}/${incl} con cuenta asignada`;
+
+  // Botón OK
+  const btnOk=document.getElementById('imp-btn-ok');
+  btnOk.textContent=`💾 Importar ${incl} documento${incl===1?'':'s'} al ${periodoStr}`;
+  btnOk.disabled=incl===0;
+
+  // Checkbox "todos"
+  const chkAll=document.getElementById('imp-all');
+  chkAll.checked=incl>0&&incl===IM.docs.filter(d=>!d.dup).length;
+
+  // Filas
+  const opciones='<option value="">— sin asignar —</option>'+
+    CUENTAS_GASTO.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+  document.getElementById('imp-rows').innerHTML=IM.docs.map((d,i)=>{
+    const cls='imp-row'+(d.dup?' dup':'')+(!d.incluir?' excluded':'');
+    const [y,m]=d.fechaOriginal.split('-');
+    const fueraP=+y!==IM.periodoAnio||+m!==IM.periodoMes;
+    const fechaShow=fueraP
+      ? `<span style="color:var(--err)" title="Fuera del periodo">${d.fechaOriginal}</span>${forzar?`<div style="font-size:9px;color:var(--info)">→ ${fechaEfectivaImport(d)}</div>`:''}`
+      : d.fechaOriginal;
+    const estado=d.dup
+      ?`<span class="dup-badge">DUPLICADO</span>`
+      :(d.cuenta?`<span class="ok-badge">LISTO</span>`:`<span style="color:var(--mt);font-size:10px">pendiente</span>`);
+    const selHtml=`<select onchange="setImportCuenta(${i},this.value)">`+
+      opciones.replace(`value="${d.cuenta}"`,`value="${d.cuenta}" selected`)+'</select>';
+    return `<div class="${cls}">
+      <div style="text-align:center"><input type="checkbox" ${d.incluir?'checked':''} ${d.dup?'disabled':''} onchange="toggleImportDoc(${i},this.checked)"></div>
+      <div style="font-family:var(--mono);font-size:10px">${fechaShow}</div>
+      <div style="font-family:var(--mono);font-size:10px">${d.tipoDTE}</div>
+      <div style="font-family:var(--mono);font-size:10px">${d.numero}</div>
+      <div style="font-family:var(--mono);font-size:10px">${rutFmt(d.rutCodigo,d.rutDV)}</div>
+      <div style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.razonSocial}">${d.razonSocial}</div>
+      <div style="text-align:right;font-family:var(--mono)">${fmt(d.neto)}</div>
+      <div style="text-align:right;font-family:var(--mono)">${fmt(d.iva)}</div>
+      <div style="text-align:right;font-family:var(--mono)">${fmt(d.otrosImpuestos)}</div>
+      <div style="text-align:right;font-family:var(--mono);font-weight:600">${fmt(d.total)}</div>
+      <div>${selHtml}</div>
+      <div>${estado}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleImportDoc(i,checked){
+  IM.docs[i].incluir=checked;
+  renderImportModal();
+}
+function toggleAllImport(checked){
+  IM.docs.forEach(d=>{if(!d.dup)d.incluir=checked;});
+  renderImportModal();
+}
+function setImportCuenta(i,cuenta){
+  IM.docs[i].cuenta=cuenta;
+  renderImportModal();
+}
+function aplicarCuentaATodos(){
+  const cta=document.getElementById('imp-bulk').value;
+  if(!cta){toast('⚠️ Selecciona una cuenta primero','e');return;}
+  let n=0;
+  IM.docs.forEach(d=>{if(d.incluir){d.cuenta=cta;n++;}});
+  renderImportModal();
+  toast(`✅ Aplicada cuenta a ${n} documento${n===1?'':'s'}`);
+}
+
+function confirmarImportacion(){
+  const incluidos=IM.docs.filter(d=>d.incluir);
+  if(!incluidos.length){toast('⚠️ No hay documentos para importar','e');return;}
+  const sinCuenta=incluidos.filter(d=>!d.cuenta);
+  if(sinCuenta.length){
+    toast(`⚠️ ${sinCuenta.length} documento${sinCuenta.length===1?' no tiene':'s no tienen'} cuenta asignada`,'e');
+    return;
+  }
+  // Crear registros de compras
+  let agregados=0,normalizados=0;
+  const ts=Date.now();
+  incluidos.forEach((d,i)=>{
+    const fechaFinal=fechaEfectivaImport(d);
+    if(fechaFinal!==d.fechaOriginal)normalizados++;
+    const doc={
+      id:'c_imp_'+ts+'_'+i,
+      fecha:fechaFinal,
+      fechaVencimiento:'',
+      tipoDTE:d.tipoDTE,
+      numero:d.numero,
+      rutCodigo:d.rutCodigo,
+      rutDV:d.rutDV,
+      razonSocial:d.razonSocial,
+      neto:d.neto,
+      exento:d.exento,
+      iva:d.iva,
+      otrosImpuestos:d.otrosImpuestos,
+      total:d.total,
+      dist:[{cuenta:d.cuenta,monto:d.neto+d.exento}]
+    };
+    const sumDist=doc.dist.reduce((s,l)=>s+l.monto,0);
+    const netoEsperado=d.neto+d.exento;
+    if(Math.abs(sumDist-netoEsperado)>0){doc.dist[0].monto=netoEsperado;}
+    S.compras.push(doc);
+    agregados++;
+  });
+  window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>toast('❌ Error guardando en storage','e'));
+  cerrarImportModal();
+  const periodoStr=`${MESES[IM.periodoMes-1]} ${IM.periodoAnio}`;
+  toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${normalizados?` (${normalizados} con fecha normalizada)`:''}`);
+  rerender();
+}
+
+// Listener del file input (se adjunta al init)
+function initImportListener(){
+  const input=document.getElementById('imp-file');
+  if(input&&!input._listenerAttached){
+    input.addEventListener('change',handleFileImport);
+    input._listenerAttached=true;
+  }
+}
+
+
+export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM, splitCSVRow, parseNumSII, parseFechaSII, parseSIICompras, abrirImportSII, handleFileImport, procesarImportText, mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, confirmarImportacion, initImportListener};

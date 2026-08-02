@@ -1,0 +1,295 @@
+// app.js — Orquestador: routing, arranque y puente con el HTML.
+// Importa todos los módulos, registra los callbacks de ui.js/auth.js
+// y expone al scope global las funciones usadas por los onclick del HTML.
+
+import {toast, fmtC, MESES, PDC, recalcDerivadasPDC, pn} from './core.js';
+import {S, AUTH, getCurSec, setCurSec} from './state.js';
+import {FS, initFirestore, logAccion} from './firebase.js';
+import './storage.js';
+import {registrarUI} from './ui.js';
+
+// Sistema
+import {initAuth, puedeVer, puedeEditar, esAdmin, ROLES, SECCIONES, permisosDeRol,
+        toggleLoginMode, submitLogin, recuperarPassword, mostrarLogin, logout,
+        aplicarPermisosUI, setOnAuthReady} from './auth.js';
+import {cargarUsuarios, renderUsuarios, abrirInvitarUsuario, editarUsuario,
+        renderPermisosForm, cerrarUsuarioForm, guardarUsuario, aprobarUsuario,
+        desactivarUsuario} from './usuarios.js';
+import {renderAuditLog} from './audit.js';
+
+// Configuración y datos
+import {fillEmpresaForm, saveEmpresa, updateHdr} from './empresa.js';
+import {savePDC, renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm,
+        guardarCuenta, eliminarCuenta, resetPDC} from './pdc.js';
+import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
+        getIndicadores, IND} from './indicadores.js';
+import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
+
+// Negocio
+import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
+        apLVal, apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura,
+        eliminarApertura, initBalanceImportListener, abrirImpBalModal, cerrarImpBalModal,
+        toggleAllBal, confirmarImportBalance, renderImpBalModal} from './apertura.js';
+import {onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerrarVF,
+        vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta,
+        eliminarVenta} from './ventas.js';
+import {onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cerrarCF,
+        cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck,
+        guardarCompra, eliminarCompra, abrirImportSII, abrirImportModal,
+        cambiarPeriodoImport, cerrarImportModal, toggleImportDoc, toggleAllImport,
+        setImportCuenta, aplicarCuentaATodos, confirmarImportacion,
+        initImportListener, renderImportModal} from './compras.js';
+import {renderHon, uhon, addHon, delHon, saveHon} from './honorarios.js';
+import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
+        anularAsiento, eliminarAsiento, guardarAsiento, addLinea, delLinea, renderLineas,
+        lCd, lVal, lRut, toggleAs, updCuadre, limpiarFormAsiento, sigAsiento,
+        abrirDteModal, cerrarDteModal, dtmGuardar, dtmRefresh, dtmCalcTotals, dtmRutInput,
+        dtmCheckDup, dtmAddDist, dtmDelDist, dtmRenderDist, dtmUpdDistCheck, dtmRemover,
+        quitarDte, folioPreviewDte, abrirAsientoDesde, cuentasOpts,
+        proxFolioAsiento} from './asientos.js';
+import {renderActivoFijo, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF,
+        editarAF, eliminarAF, generarAsientoDepreciacion} from './activofijo.js';
+import {renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange,
+        previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador,
+        onParamRem, verLiquidacion, generarAsientoRemuneraciones} from './remuneraciones.js';
+import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
+        previewProvFer, generarProvisionIncobrables, generarProvisionFeriado,
+        renderCorreccion, previewCM} from './cierre.js';
+
+// Reportes
+import {genDiario, renderDiario, buildMayor, renderMayor, renderBalance,
+        poblarCmpSelect, onCmpYear, renderResultados} from './reportes.js';
+import {setAuxTab, setAuxView, toggleAux, renderAuxiliares, calcularAging,
+        toggleAgingDetalle} from './auxiliares.js';
+import {renderF29, renderPPM} from './tributario.js';
+import {setFCView, renderFlujoCaja} from './flujocaja.js';
+import {renderConciliacion, onSaldoBancoChange, toggleConciliado,
+        marcarTodosConciliados, cargarCartola, autoConciliarCartola} from './conciliacion.js';
+import {renderXmlSii, generarXmlSii} from './xmlsii.js';
+import {abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda,
+        irAResultado} from './busqueda.js';
+import {prepararImpresion} from './impresion.js';
+import {exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud,
+        importarExcelBD, initBDImportListener, bdRestaurarHandle} from './backup.js';
+
+// ═══ STORAGE ═══
+async function saveAll(){
+  const btn=document.querySelector('.btn-save-all');btn.textContent='⏳...';
+  try{
+    const y=S.empresa.anio;
+    await window.storage.set('empresa',JSON.stringify(S.empresa));
+    await window.storage.set('ventas-'+y,JSON.stringify(S.ventas));
+    await window.storage.set('compras-'+y,JSON.stringify(S.compras));
+    await window.storage.set('honorarios-'+y,JSON.stringify(S.honorarios));
+    await window.storage.set('asientos-'+y,JSON.stringify(S.asientos));
+    if(S.activos&&S.activos.length)await window.storage.set('activos',JSON.stringify(S.activos));
+    if(S.trabajadores&&S.trabajadores.length)await window.storage.set('trabajadores',JSON.stringify(S.trabajadores));
+    toast('✅ Todos los datos guardados');
+  }catch(e){toast('❌ Error: '+e.message,'e');}
+  btn.textContent='💾 Guardar Todo';
+}
+async function loadYear(y){
+  S.ventas=[];S.compras=[];S.honorarios=[];S.asientos=[];S.apertura=null;S.activos=[];S.trabajadores=[];
+  for(const[k,d] of [['ventas-'+y,'ventas'],['compras-'+y,'compras'],['honorarios-'+y,'honorarios'],['asientos-'+y,'asientos']]){
+    try{
+      const r=await window.storage.get(k);
+      if(r){
+        const parsed=JSON.parse(r.value);
+        if(Array.isArray(parsed)&&parsed.length>0&&(d==='ventas'||d==='compras')&&parsed[0]&&'mes' in parsed[0]&&!('tipoDTE' in parsed[0])){
+          S[d]=[];
+        }else if(Array.isArray(parsed)){
+          S[d]=parsed;
+        }
+      }
+    }catch(e){}
+  }
+  // Cargar asiento de apertura del año
+  try{
+    const r=await window.storage.get('apertura-'+y);
+    if(r)S.apertura=JSON.parse(r.value);
+  }catch(e){}
+  // Activos fijos: clave GLOBAL (los bienes persisten entre años; la depreciación se calcula por año activo)
+  try{
+    const r=await window.storage.get('activos');
+    if(r){const p=JSON.parse(r.value);if(Array.isArray(p))S.activos=p;}
+  }catch(e){}
+  // Trabajadores: clave GLOBAL (persisten entre meses/años)
+  try{
+    const r=await window.storage.get('trabajadores');
+    if(r){const p=JSON.parse(r.value);if(Array.isArray(p))S.trabajadores=p;}
+  }catch(e){}
+}
+async function changeYear(y){S.empresa.anio=y;await loadYear(y);rerender();}
+async function init(){
+  // Inicializar Firestore primero (necesario para verificar usuario)
+  await initFirestore();
+  // Inicializar Auth — mostrará el login si no hay sesión
+  await initAuth();
+  // El resto de la inicialización de la app se hace en initApp(), que se llama
+  // desde verificarUsuarioAutorizado() una vez que hay usuario válido.
+}
+
+async function initApp(){
+  const ys=document.getElementById('year-sel');
+  const cy=new Date().getFullYear();
+  for(let y=cy+1;y>=cy-5;y--){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===cy)o.selected=true;ys.appendChild(o);}
+
+  try{const r=await window.storage.get('empresa');if(r)S.empresa={...S.empresa,...JSON.parse(r.value)};}catch(e){}
+  const PDC_VERSION=2;
+  try{
+    const vr=await window.storage.get('pdc_v');
+    const savedV=vr?+vr.value:0;
+    if(savedV===PDC_VERSION){
+      const r=await window.storage.get('pdc');
+      if(r){
+        const loaded=JSON.parse(r.value);
+        if(Array.isArray(loaded)&&loaded.length>0){
+          PDC.length=0;loaded.forEach(c=>PDC.push(c));recalcDerivadasPDC();
+        }
+      }
+    }else if(savedV>0){
+      console.log('Plan de cuentas actualizado a v'+PDC_VERSION+' (anterior: v'+savedV+')');
+      await window.storage.set('pdc',JSON.stringify(PDC));
+    }
+    await window.storage.set('pdc_v',String(PDC_VERSION));
+  }catch(e){console.warn('Error cargando PDC:',e);}
+  ys.value=S.empresa.anio;
+  await loadYear(S.empresa.anio);
+  fillEmpresaForm();updateHdr();
+  initImportListener();
+  initBDImportListener();
+  initBalanceImportListener();
+  bdStatusSet('offline');
+  if(BD.supported)await bdRestaurarHandle();
+  // Aplicar permisos por si el usuario no puede ver la sección actual
+  aplicarPermisosUI();
+}
+
+
+// ═══ NAV ═══
+function toggleNav(){
+  const nav=document.querySelector('nav');
+  const ov=document.getElementById('nav-overlay');
+  const abierto=nav.classList.toggle('open');
+  if(ov)ov.classList.toggle('open',abierto);
+}
+function cerrarNavMovil(){
+  const nav=document.querySelector('nav');
+  const ov=document.getElementById('nav-overlay');
+  if(nav)nav.classList.remove('open');
+  if(ov)ov.classList.remove('open');
+}
+function nav(s){
+  document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('s-'+s).classList.add('active');
+  document.querySelector('[data-s="'+s+'"]').classList.add('active');
+  setCurSec(s);renderSec(s);
+  cerrarNavMovil(); // en móvil, cerrar el drawer tras elegir sección
+}
+function renderSec(s){
+  // Verificar permiso de acceso a la sección.
+  // 'empresa' y 'usuarios' se excluyen del bloqueo genérico: empresa es la landing,
+  // y usuarios tiene su propio control de admin dentro de renderUsuarios().
+  if(AUTH.user&&s!=='empresa'&&s!=='usuarios'&&s!=='auditlog'&&!puedeVer(s)){
+    const sec=document.getElementById('s-'+s);
+    if(sec)sec.innerHTML='<div class="empty"><div class="ei">🚫</div>No tienes permiso para acceder a esta sección.<br><br>Contacta a un administrador para solicitar acceso.</div>';
+    return;
+  }
+  if(s==='empresa')fillEmpresaForm();
+  else if(s==='pdc')renderPDC();
+  else if(s==='indicadores')renderIndicadores();
+  else if(s==='apertura')renderApertura();
+  else if(s==='usuarios')renderUsuarios();
+  else if(s==='auditlog')renderAuditLog();
+  else if(s==='ventas')renderVentas();
+  else if(s==='compras')renderCompras();
+  else if(s==='honorarios')renderHon();
+  else if(s==='remuneraciones')renderRemuneraciones();
+  else if(s==='asientos')renderAsientos();
+  else if(s==='auxiliares')renderAuxiliares();
+  else if(s==='diario')renderDiario();
+  else if(s==='mayor')renderMayor();
+  else if(s==='balance')renderBalance();
+  else if(s==='resultados')renderResultados();
+  else if(s==='flujocaja')renderFlujoCaja();
+  else if(s==='conciliacion')renderConciliacion();
+  else if(s==='f29')renderF29();
+  else if(s==='ppm')renderPPM();
+  else if(s==='xmlsii')renderXmlSii();
+  else if(s==='activofijo')renderActivoFijo();
+  else if(s==='provisiones')renderProvisiones();
+  else if(s==='correccion')renderCorreccion();
+  else if(s==='cierre')renderCierre();
+}
+function rerender(){updateHdr();renderSec(getCurSec());}
+
+
+// ═══ REGISTRO DE CALLBACKS (inversión de dependencias) ═══
+// ui.js expone wrappers; aquí inyectamos las implementaciones reales.
+registrarUI({rerender, nav, renderSec});
+// auth.js llama esto tras un login exitoso, sin importar app.js.
+setOnAuthReady(initApp);
+
+// ═══ EXPOSICIÓN GLOBAL PARA onclick DEL HTML ═══
+// El HTML usa onclick="renderVentas()" etc. Los módulos ES tienen scope propio,
+// así que hay que publicar esas funciones en window.
+Object.assign(window,{
+  // navegación y arranque
+  nav, rerender, renderSec, toggleNav, cerrarNavMovil, changeYear, saveAll, init, initApp,
+  // auth / usuarios
+  toggleLoginMode, submitLogin, recuperarPassword, mostrarLogin, logout,
+  renderUsuarios, abrirInvitarUsuario, editarUsuario, renderPermisosForm,
+  cerrarUsuarioForm, guardarUsuario, aprobarUsuario, desactivarUsuario, renderAuditLog,
+  // empresa / pdc / indicadores
+  fillEmpresaForm, saveEmpresa, updateHdr,
+  renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm, guardarCuenta, eliminarCuenta, resetPDC,
+  renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
+  // apertura
+  renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,
+  apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura,
+  abrirImpBalModal, cerrarImpBalModal, toggleAllBal, confirmarImportBalance, renderImpBalModal,
+  // ventas
+  onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerrarVF,
+  vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta,
+  // compras
+  onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cerrarCF,
+  cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck,
+  guardarCompra, eliminarCompra, abrirImportSII, abrirImportModal, cambiarPeriodoImport,
+  cerrarImportModal, toggleImportDoc, toggleAllImport, setImportCuenta,
+  aplicarCuentaATodos, confirmarImportacion, renderImportModal, pn,
+  // honorarios
+  renderHon, uhon, addHon, delHon, saveHon,
+  // asientos
+  renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento, anularAsiento,
+  eliminarAsiento, guardarAsiento, addLinea, delLinea, renderLineas, lCd, lVal, lRut,
+  toggleAs, updCuadre, limpiarFormAsiento, sigAsiento, abrirDteModal, cerrarDteModal,
+  dtmGuardar, dtmRefresh, dtmCalcTotals, dtmRutInput, dtmCheckDup, dtmAddDist, dtmDelDist,
+  dtmRenderDist, dtmUpdDistCheck, dtmRemover, quitarDte, folioPreviewDte, abrirAsientoDesde,
+  // activo fijo
+  renderActivoFijo, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF, editarAF,
+  eliminarAF, generarAsientoDepreciacion,
+  // remuneraciones
+  renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange,
+  previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem,
+  verLiquidacion, generarAsientoRemuneraciones,
+  // cierre
+  renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc, previewProvFer,
+  generarProvisionIncobrables, generarProvisionFeriado, renderCorreccion, previewCM,
+  // reportes
+  renderDiario, renderMayor, renderBalance, onCmpYear, renderResultados,
+  setAuxTab, setAuxView, toggleAux, renderAuxiliares, toggleAgingDetalle,
+  renderF29, renderPPM, setFCView, renderFlujoCaja,
+  renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,
+  cargarCartola, autoConciliarCartola,
+  renderXmlSii, generarXmlSii,
+  // búsqueda / backup
+  abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda, irAResultado,
+  exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud, importarExcelBD,
+});
+
+// Encabezado de impresión
+window.addEventListener('beforeprint', prepararImpresion);
+
+// ═══ ARRANQUE ═══
+init();

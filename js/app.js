@@ -28,6 +28,12 @@ import {savePDC, renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm,
         guardarCuenta, eliminarCuenta, resetPDC} from './pdc.js';
 import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
         getIndicadores, IND, actualizarDesdeBancoCentral} from './indicadores.js';
+import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
+import {cargarCentros, cargarCierresCC, ccOpts, ccNombre, costoAcumulado} from './centroscosto.js';
+import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
+        verDetalleCC, abrirCapitalizar, confirmarCapitalizar, onCurvaChange,
+        setPct, addPctAnio, delPctAnio, ejecutarCierreMensual,
+        revertirCierreMensual} from './centroscosto-ui.js';
 import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 
 // Negocio
@@ -89,6 +95,8 @@ async function saveAll(){
     await window.storage.set('asientos-'+y,JSON.stringify(S.asientos));
     if(S.activos&&S.activos.length)await window.storage.set('activos',JSON.stringify(S.activos));
     if(S.trabajadores&&S.trabajadores.length)await window.storage.set('trabajadores',JSON.stringify(S.trabajadores));
+    if(S.centros&&S.centros.length)await window.storage.set('centros',JSON.stringify(S.centros));
+    if(S.cierresCC&&S.cierresCC.length)await window.storage.set('cierresCC',JSON.stringify(S.cierresCC));
     toast('✅ Todos los datos guardados');
   }catch(e){toast('❌ Error: '+e.message,'e');}
   btn.textContent='💾 Guardar Todo';
@@ -167,6 +175,7 @@ async function initApp(){
   }catch(e){console.warn('Error cargando PDC:',e);}
   ys.value=S.empresa.anio;
   await loadYear(S.empresa.anio);
+  await cargarCentros();await cargarCierresCC();
   fillEmpresaForm();updateHdr();
   initImportListener();
   initBDImportListener();
@@ -210,6 +219,7 @@ function renderSec(s){
   }
   if(s==='empresa')fillEmpresaForm();
   else if(s==='empresas')renderEmpresas();
+  else if(s==='centroscosto')renderCentrosCosto();
   else if(s==='pdc')renderPDC();
   else if(s==='indicadores')renderIndicadores();
   else if(s==='apertura')renderApertura();
@@ -273,6 +283,7 @@ async function recargarEmpresaActiva(){
     if(r){const l=JSON.parse(r.value);if(Array.isArray(l)&&l.length){PDC.length=0;l.forEach(c=>PDC.push(c));recalcDerivadasPDC();}}
   }catch(e){}
   await loadYear(S.empresa.anio);
+  await cargarCentros();await cargarCierresCC();
   fillEmpresaForm();updateHdr();renderSelectorEmpresa();
   rerender();
 }
@@ -297,6 +308,10 @@ Object.assign(window,{
   fillEmpresaForm, saveEmpresa, updateHdr,
   renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm, guardarCuenta, eliminarCuenta, resetPDC,
   renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault, actualizarDesdeBancoCentral,
+  renderPrevisional, guardarPrevisional, restaurarPrevisional,
+  renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
+  verDetalleCC, abrirCapitalizar, confirmarCapitalizar, ccOpts, ccNombre,
+  onCurvaChange, setPct, addPctAnio, delPctAnio, ejecutarCierreMensual, revertirCierreMensual,
   // apertura
   renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,
   apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura,

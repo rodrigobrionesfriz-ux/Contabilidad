@@ -103,6 +103,11 @@ function construirWorkbookBD(){
   const trRows=(S.trabajadores||[]).map(t=>trHdr.map(k=>t[k]!==undefined?t[k]:''));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([trHdr,...trRows]),'Trabajadores');
 
+  // CENTROS DE COSTO (predios y cuarteles)
+  const ccHdr=['id','nivel','nombre','codigo','padre','estado','fechaInicio','capitalizadoEn'];
+  const ccRows=(S.centros||[]).map(c=>ccHdr.map(k=>c[k]!==undefined&&c[k]!==null?c[k]:''));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([ccHdr,...ccRows]),'CentrosCosto');
+
   // PLAN DE CUENTAS (solo referencia, no se importa)
   const pdcHdr=['Código','Nombre','Naturaleza','Tipo'];
   const pdcRows=PDC.map(c=>[c.cd,c.nm,c.nat||'',c.tp||'']);
@@ -390,6 +395,17 @@ async function importarExcelBD(file){
       }));
     }
 
+    // Restaurar centros de costo
+    if(hojas.includes('CentrosCosto')){
+      const ccRows=XLSX.utils.sheet_to_json(wb.Sheets['CentrosCosto']);
+      S.centros=ccRows.map(r=>({
+        id:r.id||'cc_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        nivel:+r.nivel||1,nombre:r.nombre||'',codigo:String(r.codigo||''),
+        padre:r.padre||null,estado:r.estado||null,
+        fechaInicio:r.fechaInicio||'',capitalizadoEn:r.capitalizadoEn||null,
+      }));
+    }
+
     // Restaurar trabajadores (clave global)
     if(hojas.includes('Trabajadores')){
       const trRows=XLSX.utils.sheet_to_json(wb.Sheets['Trabajadores']);
@@ -421,6 +437,7 @@ async function importarExcelBD(file){
     else try{await window.storage.delete('apertura-'+anio);}catch(e){}
     if(S.activos&&S.activos.length)await window.storage.set('activos',JSON.stringify(S.activos));
     if(S.trabajadores&&S.trabajadores.length)await window.storage.set('trabajadores',JSON.stringify(S.trabajadores));
+    if(S.centros&&S.centros.length)await window.storage.set('centros',JSON.stringify(S.centros));
     await window.storage.set('empresa',JSON.stringify(S.empresa));
 
     const apMsg=S.apertura?' · Apertura':'';

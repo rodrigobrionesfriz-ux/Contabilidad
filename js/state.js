@@ -13,6 +13,8 @@ export const S={
   asientos:[],
   activos:[],
   trabajadores:[],
+  centros:[],       // centros de costo (predios y cuarteles)
+  cierresCC:[],     // cierres mensuales de costos ya ejecutados
   apertura:null
 };
 

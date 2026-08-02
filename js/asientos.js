@@ -6,6 +6,7 @@ import {cuentasGastoOpts, dteComprasOpts} from './compras.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {foliosMensuales, dteVentasOpts} from './helpers.js';
+import {ccOpts} from './centroscosto.js';
 import './storage.js';
 
 // ═══ ASIENTOS MANUALES ═══
@@ -124,6 +125,7 @@ function renderLineas(){
       <div class="linea-num">${i+1}</div>
       <div><select class="linea-inp" onchange="lCd(${i},this.value)">${cuentasOpts(l.cd)}</select></div>
       <div><input type="text" class="linea-inp" placeholder="Descripción libre" value="${l.desc||''}" oninput="AF.lineas[${i}].desc=this.value"></div>
+      <div><select class="linea-inp" title="Centro de costo" onchange="AF.lineas[${i}].cc=this.value">${ccOpts(l.cc||'')}</select></div>
       <div><input type="number" class="linea-num-inp" min="0" placeholder="0" value="${l.debe||''}" oninput="lVal(${i},'debe',this.value)"></div>
       <div><input type="number" class="linea-num-inp" min="0" placeholder="0" value="${l.haber||''}" oninput="lVal(${i},'haber',this.value)"></div>
       <div style="text-align:center"><button class="btn btn-d" onclick="delLinea(${i})">✕</button></div>
@@ -647,6 +649,7 @@ function guardarAsiento(){
 
   const movsClean=lineas.map(l=>{
     const m={cd:l.cd,nm:l.nm||pdcNm(l.cd),desc:l.desc||'',debe:l.debe||0,haber:l.haber||0};
+    if(l.cc)m.cc=l.cc; // centro de costo (predio/cuartel)
     if(esAux(l.cd)){
       m.rutCodigo=l.rutCodigo;m.rutDV=l.rutDV;m.razonSocial=String(l.razonSocial||'').trim();
       if(l.dte)m.dte={...l.dte};

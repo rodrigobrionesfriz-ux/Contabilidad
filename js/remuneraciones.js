@@ -5,6 +5,7 @@ import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {proxFolioAsiento} from './asientos.js';
 import {getIndicadores, IND} from './indicadores.js';
+import {getPrevisional, afpInfo, isapreInfo, calcularAportePatronal} from './previsional.js';
 import './storage.js';
 
 let REMF={editId:null}; // form trabajador (estado interno)
@@ -22,17 +23,7 @@ function remParams(){
     ingresoMinimo:i.ingresoMinimo,
   };
 }
-// AFP con sus comisiones (% adicional sobre imponible) — actualizables
-const AFP_LISTA=[
-  {k:'capital',   nm:'Capital',    comision:0.0144},
-  {k:'cuprum',    nm:'Cuprum',     comision:0.0144},
-  {k:'habitat',   nm:'Habitat',    comision:0.0127},
-  {k:'planvital', nm:'PlanVital',  comision:0.0116},
-  {k:'provida',   nm:'ProVida',    comision:0.0145},
-  {k:'modelo',    nm:'Modelo',     comision:0.0058},
-  {k:'uno',       nm:'AFP Uno',    comision:0.0049},
-];
-const afpInfo=k=>AFP_LISTA.find(a=>a.k===k)||AFP_LISTA[0];
+// Las AFP y sus comisiones viven en previsional.js (editables por el usuario).
 // Tabla IUSC en UTM (Art. 43 LIR) — factores y rebajas estables; solo cambia la UTM
 const IUSC_TABLA=[
   {desde:0,    hasta:13.5, factor:0,     rebajaUTM:0},
@@ -70,17 +61,23 @@ function calcularLiquidacion(t,uf,utm){
   const baseCes=Math.min(totalImponible,topeCes);
   // Descuentos previsionales
   const afp=afpInfo(t.afp);
-  const descAFP=Math.round(baseAFP*(REM_PARAMS.tasaAFP+afp.comision));
+  const descAFP=Math.round(baseAFP*(REM_PARAMS.tasaAFP+(afp.comision/100)));
   const descAFP_pension=Math.round(baseAFP*REM_PARAMS.tasaAFP);
   const descAFP_comision=descAFP-descAFP_pension;
-  // Salud: Fonasa 7%, Isapre = mayor entre 7% y plan en UF
-  let descSalud;
-  if(t.salud==='isapre'&&t.plan){
+  // Salud: se separan los dos componentes como en una liquidación real.
+  //  - saludLegal: el 7% obligatorio sobre la renta imponible (topeada)
+  //  - adicionalIsapre: el excedente cuando el plan pactado (UF del FUN) supera ese 7%
+  // Fonasa siempre cotiza exactamente el 7%, sin adicional.
+  const saludLegal=Math.round(baseAFP*REM_PARAMS.tasaSalud);
+  let adicionalIsapre=0;
+  if(t.salud&&t.salud!=='fonasa'&&t.plan){
     const planPesos=Math.round((+t.plan||0)*uf);
-    descSalud=Math.max(Math.round(baseAFP*REM_PARAMS.tasaSalud),planPesos);
-  }else{
-    descSalud=Math.round(baseAFP*REM_PARAMS.tasaSalud);
+    // Si el plan vale menos que el 7%, igual se entera el 7% (no hay adicional).
+    adicionalIsapre=Math.max(0,planPesos-saludLegal);
   }
+  const descSalud=saludLegal+adicionalIsapre; // total enterado a la institución
+  const planUF=+t.plan||0;
+  const planPesos=planUF?Math.round(planUF*uf):0;
   // Cesantía trabajador (solo contrato indefinido)
   const descCesantia=t.contrato==='indefinido'?Math.round(baseCes*REM_PARAMS.tasaCesantiaTrab):0;
   // Total cotizaciones previsionales
@@ -92,17 +89,23 @@ function calcularLiquidacion(t,uf,utm){
   // Total descuentos y líquido
   const totalDescuentos=totalPrevisional+iusc;
   const liquido=totalHaberes-totalDescuentos;
-  return {totalImponible,totalNoImponible,totalHaberes,baseAFP,baseCes,
-    descAFP,descAFP_pension,descAFP_comision,descSalud,descCesantia,
+  // Aporte patronal (costo empresa, no se descuenta al trabajador)
+  const patronal=calcularAportePatronal(t,baseAFP,baseCes);
+  const costoEmpresa=totalHaberes+patronal.total;
+  return {patronal,costoEmpresa,
+    totalImponible,totalNoImponible,totalHaberes,baseAFP,baseCes,
+    descAFP,descAFP_pension,descAFP_comision,descSalud,saludLegal,adicionalIsapre,planUF,planPesos,descCesantia,
     totalPrevisional,baseTributable,iusc,totalDescuentos,liquido,
-    afpNm:afp.nm};
+    afpNm:afp.nm, saludNm:(t.salud&&t.salud!=='fonasa')?isapreInfo(t.salud).nm:'Fonasa'};
 }
 
 function abrirFormTrabajador(){
   REMF={editId:null};
   const f=document.getElementById('rem-form');f.style.display='block';
   document.getElementById('remf-title').textContent='Nuevo Trabajador';
-  document.getElementById('remf-afp').innerHTML=AFP_LISTA.map(a=>`<option value="${a.k}">${a.nm} (${(a.comision*100).toFixed(2)}%)</option>`).join('');
+  const P=getPrevisional();
+  document.getElementById('remf-afp').innerHTML=P.afps.map(a=>`<option value="${a.k}">${a.nm} (${(+a.comision).toFixed(2)}%)</option>`).join('');
+  document.getElementById('remf-salud').innerHTML=P.isapres.map(i=>`<option value="${i.k}">${i.nm}</option>`).join('');
   ['nombre','rut','cargo','base','plan'].forEach(x=>{const e=document.getElementById('remf-'+x);if(e)e.value='';});
   ['grat','otros','colacion','movilizacion'].forEach(x=>{const e=document.getElementById('remf-'+x);if(e)e.value='0';});
   document.getElementById('remf-salud').value='fonasa';
@@ -113,7 +116,7 @@ function abrirFormTrabajador(){
 }
 function cerrarFormTrabajador(){document.getElementById('rem-form').style.display='none';REMF={editId:null};}
 function onSaludChange(){
-  const isIsapre=document.getElementById('remf-salud').value==='isapre';
+  const isIsapre=document.getElementById('remf-salud').value!=='fonasa';
   document.getElementById('remf-plan-wrap').style.display=isIsapre?'':'none';
   previewLiq();
 }
@@ -143,7 +146,8 @@ function previewLiq(){
     <div style="display:grid;grid-template-columns:1fr auto;gap:2px 16px">
       <span>Total haberes</span><span style="font-family:var(--mono);text-align:right">${fmtC(l.totalHaberes)}</span>
       <span style="color:var(--mt)">AFP ${l.afpNm} (10% + comisión)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.descAFP)}</span>
-      <span style="color:var(--mt)">Salud (7%)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.descSalud)}</span>
+      <span style="color:var(--mt)">Salud 7% legal</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.saludLegal)}</span>
+      ${l.adicionalIsapre?`<span style="color:var(--mt)">Adicional isapre (${l.planUF} UF)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.adicionalIsapre)}</span>`:''}
       <span style="color:var(--mt)">Cesantía (0,6%)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.descCesantia)}</span>
       <span style="color:var(--mt)">Impuesto único</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.iusc)}</span>
       <span style="font-weight:700;border-top:1px solid var(--bd);padding-top:4px">LÍQUIDO A PAGAR</span><span style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach);border-top:1px solid var(--bd);padding-top:4px">${fmtC(l.liquido)}</span>
@@ -169,7 +173,9 @@ function editarTrabajador(id){
   REMF={editId:id};
   const f=document.getElementById('rem-form');f.style.display='block';
   document.getElementById('remf-title').textContent='Editando Trabajador';
-  document.getElementById('remf-afp').innerHTML=AFP_LISTA.map(a=>`<option value="${a.k}" ${a.k===t.afp?'selected':''}>${a.nm} (${(a.comision*100).toFixed(2)}%)</option>`).join('');
+  const P=getPrevisional();
+  document.getElementById('remf-afp').innerHTML=P.afps.map(a=>`<option value="${a.k}" ${a.k===t.afp?'selected':''}>${a.nm} (${(+a.comision).toFixed(2)}%)</option>`).join('');
+  document.getElementById('remf-salud').innerHTML=P.isapres.map(i=>`<option value="${i.k}" ${i.k===(t.salud||'fonasa')?'selected':''}>${i.nm}</option>`).join('');
   document.getElementById('remf-nombre').value=t.nombre;
   document.getElementById('remf-rut').value=t.rut||'';
   document.getElementById('remf-cargo').value=t.cargo||'';
@@ -214,15 +220,15 @@ function renderRemuneraciones(){
     el.innerHTML=`<div class="empty"><div class="ei">👷</div>No hay trabajadores registrados.<br><br><button class="btn btn-p" onclick="abrirFormTrabajador()">+ Registrar primer trabajador</button></div>`;
     return;
   }
-  let totHab=0,totLiq=0,totPrev=0,totIusc=0;
+  let totHab=0,totLiq=0,totPrev=0,totIusc=0,totPatronal=0;
   const filas=S.trabajadores.map(t=>{
     const l=calcularLiquidacion(t,uf,utm);
-    totHab+=l.totalHaberes;totLiq+=l.liquido;totPrev+=l.totalPrevisional;totIusc+=l.iusc;
+    totHab+=l.totalHaberes;totLiq+=l.liquido;totPrev+=l.totalPrevisional;totIusc+=l.iusc;totPatronal+=l.patronal.total;
     return `<tr>
       <td class="tl" style="font-size:12px">${t.nombre}<div style="font-size:10px;color:var(--mt)">${t.cargo||''} ${t.rut?'· '+t.rut:''}</div></td>
       <td style="font-family:var(--mono);text-align:right">${fmtC(l.totalHaberes)}</td>
       <td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(l.descAFP)}</td>
-      <td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(l.descSalud)}</td>
+      <td style="font-family:var(--mono);text-align:right;color:var(--err)" title="7% legal: ${fmtC(l.saludLegal)}${l.adicionalIsapre?' · Adicional: '+fmtC(l.adicionalIsapre):''}">${fmtC(l.descSalud)}${l.adicionalIsapre?'<div style="font-size:9px;color:var(--mt)">7%: '+fmtC(l.saludLegal)+' + adic. '+fmtC(l.adicionalIsapre)+'</div>':''}</td>
       <td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(l.descCesantia)}</td>
       <td style="font-family:var(--mono);text-align:right;color:var(--err)">${fmtC(l.iusc)}</td>
       <td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach)">${fmtC(l.liquido)}</td>
@@ -238,6 +244,8 @@ function renderRemuneraciones(){
     <div class="kpi"><div class="kpi-lbl">Cotizaciones</div><div class="kpi-val neg">${fmtC(totPrev)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Impuesto Único</div><div class="kpi-val neg">${fmtC(totIusc)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Líquido a Pagar</div><div class="kpi-val pos">${fmtC(totLiq)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Aporte Empleador</div><div class="kpi-val">${fmtC(totPatronal)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Costo Total Empresa</div><div class="kpi-val">${fmtC(totHab+totPatronal)}</div></div>
   </div>
   <div class="card-np"><div class="tw"><table>
     <thead><tr><th class="tl">TRABAJADOR</th><th style="text-align:right">HABERES</th><th style="text-align:right">AFP</th><th style="text-align:right">SALUD</th><th style="text-align:right">CESANTÍA</th><th style="text-align:right">IUSC</th><th style="text-align:right">LÍQUIDO</th><th></th></tr></thead>
@@ -261,7 +269,7 @@ function verLiquidacion(id){
       <div style="font-size:14px;font-weight:700">Liquidación de Sueldo</div>
       <div style="font-size:12px;color:var(--mt)">${mes} ${S.empresa.anio} · ${S.empresa.nombre||''}</div>
     </div>
-    <div style="margin-bottom:10px"><strong>${t.nombre}</strong><div style="font-size:11px;color:var(--mt)">${t.cargo||''} ${t.rut?'· '+t.rut:''} · ${l.afpNm} · ${t.salud==='isapre'?'Isapre':'Fonasa'}</div></div>
+    <div style="margin-bottom:10px"><strong>${t.nombre}</strong><div style="font-size:11px;color:var(--mt)">${t.cargo||''} ${t.rut?'· '+t.rut:''} · ${l.afpNm} · ${l.saludNm}</div></div>
     <table><tbody>
       <tr class="rth"><td colspan="2" class="tl" style="padding:6px 10px">HABERES</td></tr>
       ${row('Sueldo base',+t.base)}
@@ -273,11 +281,18 @@ function verLiquidacion(id){
       <tr class="rth"><td colspan="2" class="tl" style="padding:6px 10px">DESCUENTOS</td></tr>
       ${row('AFP '+l.afpNm+' (pensión 10%)',l.descAFP_pension,true)}
       ${row('AFP comisión',l.descAFP_comision,true)}
-      ${row('Salud 7%',l.descSalud,true)}
+      ${row('Salud 7% (cotización legal)',l.saludLegal,true)}
+      ${l.adicionalIsapre?row(`Adicional ${l.saludNm} (plan ${l.planUF} UF)`,l.adicionalIsapre,true):''}
       ${l.descCesantia?row('Seguro cesantía 0,6%',l.descCesantia,true):''}
       ${l.iusc?row('Impuesto único 2ª cat.',l.iusc,true):''}
       ${row('Total descuentos',l.totalDescuentos,true,true)}
       <tr style="background:rgba(46,160,67,.14)"><td class="tl" style="padding:11px 10px;font-weight:700;font-size:14px">LÍQUIDO A PAGAR</td><td style="font-family:var(--mono);text-align:right;font-weight:700;font-size:14px;color:var(--ach)">${fmtC(l.liquido)}</td></tr>
+    </tbody></table>
+    <table style="margin-top:14px"><tbody>
+      <tr class="rth"><td colspan="2" class="tl" style="padding:6px 10px">APORTE DEL EMPLEADOR (no se descuenta al trabajador)</td></tr>
+      ${l.patronal.detalle.map(d=>`<tr><td class="tl" style="padding:5px 10px;font-size:11px">${d.concepto} <span style="color:var(--mt)">${(+d.tasa).toFixed(2)}% → ${d.institucion}</span></td><td style="font-family:var(--mono);text-align:right;font-size:11px">${fmtC(d.monto)}</td></tr>`).join('')}
+      <tr><td class="tl" style="padding:6px 10px;font-weight:700;font-size:12px">Total aporte empleador</td><td style="font-family:var(--mono);text-align:right;font-weight:700;font-size:12px">${fmtC(l.patronal.total)}</td></tr>
+      <tr style="background:rgba(88,166,255,.10)"><td class="tl" style="padding:9px 10px;font-weight:700;font-size:13px">COSTO TOTAL EMPRESA</td><td style="font-family:var(--mono);text-align:right;font-weight:700;font-size:13px">${fmtC(l.costoEmpresa)}</td></tr>
     </tbody></table>
     <div style="font-size:10px;color:var(--mt);margin-top:8px">Base tributable: ${fmtC(l.baseTributable)} · UF ${fmtC(uf)} · UTM ${fmtC(utm)}</div>
     <div style="margin-top:12px;text-align:right"><button class="btn btn-g" onclick="renderRemuneraciones()">← Volver</button> <button class="btn btn-g" onclick="window.print()">🖨️ Imprimir</button></div>
@@ -290,15 +305,16 @@ function generarAsientoRemuneraciones(){
   const uf=getUF(),utm=getUTM();
   if(!S.trabajadores.length){toast('⚠️ No hay trabajadores','e');return;}
   // Acumular
-  let totSueldo=0,totColMov=0,totAFP=0,totSalud=0,totCes=0,totIusc=0,totLiq=0;
+  let totSueldo=0,totColMov=0,totAFP=0,totSalud=0,totCes=0,totIusc=0,totLiq=0,totPatronal=0;
   S.trabajadores.forEach(t=>{
     const l=calcularLiquidacion(t,uf,utm);
     totSueldo+=l.totalImponible;totColMov+=l.totalNoImponible;
     totAFP+=l.descAFP;totSalud+=l.descSalud;totCes+=l.descCesantia;totIusc+=l.iusc;totLiq+=l.liquido;
+    totPatronal+=l.patronal.total;
   });
   if(totSueldo<=0){toast('⚠️ No hay montos','e');return;}
   const fecha=`${anio}-${String(mesNum).padStart(2,'0')}-30`;
-  if(!confirm(`¿Generar asiento de remuneraciones de ${MESES[mesNum-1]} ${anio}?\n\n${S.trabajadores.length} trabajadores · Líquido a pagar: ${fmtC(totLiq)}`))return;
+  if(!confirm(`¿Generar asiento de remuneraciones de ${MESES[mesNum-1]} ${anio}?\n\n${S.trabajadores.length} trabajadores\nLíquido a pagar: ${fmtC(totLiq)}\nAporte patronal: ${fmtC(totPatronal)}`))return;
   const movs=[];
   // DEBE: gasto en sueldos (imponible + no imponible)
   movs.push({cd:'3201001',nm:pdcNm('3201001'),debe:totSueldo,haber:0,desc:'Sueldos '+MESES[mesNum-1]});
@@ -308,6 +324,12 @@ function generarAsientoRemuneraciones(){
   if(totPrev)movs.push({cd:'2104001',nm:pdcNm('2104001'),debe:0,haber:totPrev,desc:'Instituciones previsionales por pagar'});
   if(totIusc)movs.push({cd:'2104002',nm:pdcNm('2104002'),debe:0,haber:totIusc,desc:'Impuesto único por pagar'});
   movs.push({cd:'2104005',nm:pdcNm('2104005'),debe:0,haber:totLiq,desc:'Líquidos por pagar'});
+  // Aporte patronal: es GASTO de la empresa (no se descuenta al trabajador),
+  // con contrapartida en instituciones previsionales por pagar.
+  if(totPatronal>0){
+    movs.push({cd:'3201013',nm:pdcNm('3201013'),debe:totPatronal,haber:0,desc:'Aporte patronal (SIS, mutual, AFC)'});
+    movs.push({cd:'2104001',nm:pdcNm('2104001'),debe:0,haber:totPatronal,desc:'Aporte patronal por pagar'});
+  }
   const folio=proxFolioAsiento();
   S.asientos.push({id:'as_'+Date.now(),n:folio,fecha,glosa:`Remuneraciones ${MESES[mesNum-1]} ${anio}`,movs});
   window.storage.set('asientos-'+anio,JSON.stringify(S.asientos)).catch(()=>{});
@@ -316,4 +338,4 @@ function generarAsientoRemuneraciones(){
 }
 
 
-export {remParams, AFP_LISTA, afpInfo, IUSC_TABLA, calcularIUSC, getUF, getUTM, calcularLiquidacion, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, leerFormTrabajador, previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem, renderRemuneraciones, verLiquidacion, generarAsientoRemuneraciones};
+export {remParams, IUSC_TABLA, calcularIUSC, getUF, getUTM, calcularLiquidacion, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, leerFormTrabajador, previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem, renderRemuneraciones, verLiquidacion, generarAsientoRemuneraciones};

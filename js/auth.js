@@ -34,6 +34,7 @@ const ROLES={
 const SECCIONES=[
   {id:'empresa',lbl:'Empresa'},
   {id:'empresas',lbl:'Empresas'},
+  {id:'centroscosto',lbl:'Centros de Costo'},
   {id:'pdc',lbl:'Plan de Cuentas'},
   {id:'indicadores',lbl:'Indicadores'},
   {id:'apertura',lbl:'Balance de Apertura'},

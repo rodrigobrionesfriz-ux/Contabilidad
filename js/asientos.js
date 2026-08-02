@@ -9,6 +9,9 @@ import {foliosMensuales, dteVentasOpts} from './helpers.js';
 import {ccOpts} from './centroscosto.js';
 import './storage.js';
 
+// Estado del formulario de asientos (interno del módulo; se reasigna al abrir/editar)
+let AF={editId:null,lineas:[]};
+
 // ═══ ASIENTOS MANUALES ═══
 // Cuentas que requieren sub-auxiliar (RUT + razón social): clientes, proveedores
 const CUENTAS_AUX={'1104001':'cliente','2102001':'proveedor'};
@@ -719,4 +722,4 @@ function eliminarAsiento(id){
 }
 
 
-export {CUENTAS_AUX, esAux, renderAsientos, toggleAs, cuentasOpts, renderLineas, lCd, lRut, lVal, quitarDte, delLinea, addLinea, updCuadre, todosDocsVentas, todosDocsCompras, todosDocsComprasConBorrador, todosDocsVentasConBorrador, folioPreviewDte, DM, abrirDteModal, cerrarDteModal, dtmRutInput, dtmCalcTotals, dtmRefresh, dtmCheckDup, dtmRenderDist, dtmAddDist, dtmDelDist, dtmUpdDistCheck, dtmGuardar, dtmRemover, proxFolioAsiento, abrirForm, editarAsiento, cerrarForm, duplicarAsiento, anularAsiento, abrirAsientoDesde, sigAsiento, limpiarFormAsiento, guardarAsiento, eliminarAsiento};
+export {CUENTAS_AUX, esAux, renderAsientos, toggleAs, cuentasOpts, renderLineas, lCd, lRut, lVal, quitarDte, delLinea, addLinea, updCuadre, todosDocsVentas, todosDocsCompras, todosDocsComprasConBorrador, todosDocsVentasConBorrador, folioPreviewDte, DM, abrirDteModal, cerrarDteModal, dtmRutInput, dtmCalcTotals, dtmRefresh, dtmCheckDup, dtmRenderDist, dtmAddDist, dtmDelDist, dtmUpdDistCheck, dtmGuardar, dtmRemover, proxFolioAsiento, abrirForm, editarAsiento, cerrarForm, duplicarAsiento, anularAsiento, abrirAsientoDesde, sigAsiento, limpiarFormAsiento, guardarAsiento, eliminarAsiento, AF};

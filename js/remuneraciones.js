@@ -338,4 +338,4 @@ function generarAsientoRemuneraciones(){
 }
 
 
-export {remParams, IUSC_TABLA, calcularIUSC, getUF, getUTM, calcularLiquidacion, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, leerFormTrabajador, previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem, renderRemuneraciones, verLiquidacion, generarAsientoRemuneraciones};
+export {remParams, IUSC_TABLA, calcularIUSC, getUF, getUTM, calcularLiquidacion, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, leerFormTrabajador, previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem, renderRemuneraciones, verLiquidacion, generarAsientoRemuneraciones, REMF};

@@ -7,6 +7,9 @@ import {mesRango, mesOpts, dteVentasOpts, foliosMensuales} from './helpers.js';
 import {todosDocsVentas, abrirAsientoDesde} from './asientos.js';
 import './storage.js';
 
+// Estado del formulario de ventas (interno del módulo)
+let VF={editId:null};
+
 // ═══ VENTAS — Documentos individuales ═══
 // Computa folio correlativo por mes: retorna {[docId]: folioNumero}
 // Al elegir un mes en el select, auto-poblar desde/hasta con primer y último día
@@ -247,4 +250,4 @@ function eliminarVenta(id){
 }
 
 
-export {onMesChangeV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta};
+export {onMesChangeV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta, VF};

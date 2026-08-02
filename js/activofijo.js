@@ -214,4 +214,4 @@ function renderActivoFijo(){
 }
 
 
-export {AF_CATEGORIAS, afCat, vidaAcelerada, calcularDepreciacion, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF, editarAF, eliminarAF, generarAsientoDepreciacion, renderActivoFijo};
+export {AF_CATEGORIAS, afCat, vidaAcelerada, calcularDepreciacion, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF, editarAF, eliminarAF, generarAsientoDepreciacion, renderActivoFijo, AFB};

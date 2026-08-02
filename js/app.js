@@ -19,13 +19,13 @@ import {initAuth, puedeVer, puedeEditar, esAdmin, ROLES, SECCIONES, permisosDeRo
         aplicarPermisosUI, setOnAuthReady} from './auth.js';
 import {cargarUsuarios, renderUsuarios, abrirInvitarUsuario, editarUsuario,
         renderPermisosForm, cerrarUsuarioForm, guardarUsuario, aprobarUsuario,
-        desactivarUsuario} from './usuarios.js';
+        desactivarUsuario, US} from './usuarios.js';
 import {renderAuditLog} from './audit.js';
 
 // Configuración y datos
 import {fillEmpresaForm, saveEmpresa, updateHdr} from './empresa.js';
 import {savePDC, renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm,
-        guardarCuenta, eliminarCuenta, resetPDC} from './pdc.js';
+        guardarCuenta, eliminarCuenta, resetPDC, PF} from './pdc.js';
 import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
         getIndicadores, IND, actualizarDesdeBancoCentral} from './indicadores.js';
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
@@ -40,16 +40,16 @@ import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
         apLVal, apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura,
         eliminarApertura, initBalanceImportListener, abrirImpBalModal, cerrarImpBalModal,
-        toggleAllBal, confirmarImportBalance, renderImpBalModal} from './apertura.js';
+        toggleAllBal, confirmarImportBalance, renderImpBalModal, APF, IMB} from './apertura.js';
 import {onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerrarVF,
         vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta,
-        eliminarVenta} from './ventas.js';
+        eliminarVenta, VF} from './ventas.js';
 import {onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cerrarCF,
         cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck,
         guardarCompra, eliminarCompra, abrirImportSII, abrirImportModal,
         cambiarPeriodoImport, cerrarImportModal, toggleImportDoc, toggleAllImport,
         setImportCuenta, aplicarCuentaATodos, confirmarImportacion,
-        initImportListener, renderImportModal} from './compras.js';
+        initImportListener, renderImportModal, CF, IM} from './compras.js';
 import {renderHon, uhon, addHon, delHon, saveHon} from './honorarios.js';
 import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
         anularAsiento, eliminarAsiento, guardarAsiento, addLinea, delLinea, renderLineas,
@@ -57,12 +57,12 @@ import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
         abrirDteModal, cerrarDteModal, dtmGuardar, dtmRefresh, dtmCalcTotals, dtmRutInput,
         dtmCheckDup, dtmAddDist, dtmDelDist, dtmRenderDist, dtmUpdDistCheck, dtmRemover,
         quitarDte, folioPreviewDte, abrirAsientoDesde, cuentasOpts,
-        proxFolioAsiento} from './asientos.js';
+        proxFolioAsiento, AF} from './asientos.js';
 import {renderActivoFijo, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF,
-        editarAF, eliminarAF, generarAsientoDepreciacion} from './activofijo.js';
+        editarAF, eliminarAF, generarAsientoDepreciacion, AFB} from './activofijo.js';
 import {renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange,
         previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador,
-        onParamRem, verLiquidacion, generarAsientoRemuneraciones} from './remuneraciones.js';
+        onParamRem, verLiquidacion, generarAsientoRemuneraciones, REMF} from './remuneraciones.js';
 import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
         previewProvFer, generarProvisionIncobrables, generarProvisionFeriado,
         renderCorreccion, previewCM} from './cierre.js';
@@ -81,7 +81,7 @@ import {abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda,
         irAResultado} from './busqueda.js';
 import {prepararImpresion} from './impresion.js';
 import {exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud,
-        importarExcelBD, initBDImportListener, bdRestaurarHandle} from './backup.js';
+        importarExcelBD, initBDImportListener, bdRestaurarHandle, BD} from './backup.js';
 
 // ═══ STORAGE ═══
 async function saveAll(){
@@ -297,6 +297,9 @@ setOnAuthReady(initApp);
 // ═══ EXPOSICIÓN GLOBAL PARA onclick DEL HTML ═══
 // El HTML usa onclick="renderVentas()" etc. Los módulos ES tienen scope propio,
 // así que hay que publicar esas funciones en window.
+// Objetos de estado usados directamente en onclick del HTML
+Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, US, BD, S});
+
 Object.assign(window,{
   // navegación y arranque
   nav, rerender, renderSec, toggleNav, cerrarNavMovil, changeYear, saveAll, init, initApp,

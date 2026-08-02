@@ -5,7 +5,11 @@ import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {mesOpts, foliosMensuales, mesRango} from './helpers.js';
 import {todosDocsCompras, abrirAsientoDesde} from './asientos.js';
+import {ccOpts} from './centroscosto.js';
 import './storage.js';
+
+// Estado del formulario de compras (interno del módulo)
+let CF={editId:null,dist:[]};
 
 
 function onMesChangeC(){
@@ -705,4 +709,4 @@ function initImportListener(){
 }
 
 
-export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM, splitCSVRow, parseNumSII, parseFechaSII, parseSIICompras, abrirImportSII, handleFileImport, procesarImportText, mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, confirmarImportacion, initImportListener};
+export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM, splitCSVRow, parseNumSII, parseFechaSII, parseSIICompras, abrirImportSII, handleFileImport, procesarImportText, mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, confirmarImportacion, initImportListener, CF};

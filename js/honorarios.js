@@ -1,4 +1,4 @@
-// honorarios.js — Libro de honorarios (retención 10,75%)
+// honorarios.js — Libro de honorarios (retención de 2ª categoría, variable por año)
 import {toast, pn, fmtC, MESES, fmt} from './core.js';
 import {retencionHonorarios} from './indicadores.js';
 import {S} from './state.js';
@@ -6,15 +6,19 @@ import './storage.js';
 
 // ═══ HONORARIOS ═══
 function renderHon(){
+  // Mostrar la tasa vigente del año en el subtítulo (cambia por Ley 21.133)
+  const tasa=retencionHonorarios(S.empresa.anio);
+  const sub=document.getElementById('hon-sub');
+  if(sub)sub.textContent=`Retención ${(tasa*100).toFixed(2).replace('.',',')}% · año ${S.empresa.anio}`;
   const tbody=document.getElementById('h-tbody');
   if(!S.honorarios.length){tbody.innerHTML=`<tr><td colspan="7" class="empty"><div class="ei">📝</div>No hay honorarios.</td></tr>`;document.getElementById('h-tfoot').innerHTML='';return;}
   let tB=0,h='';
   S.honorarios.forEach((hn,i)=>{
-    const ret=Math.round((hn.bruto||0)*retencionHonorarios(S.empresa.anio)),net=(hn.bruto||0)-ret;tB+=hn.bruto||0;
+    const ret=Math.round((hn.bruto||0)*tasa),net=(hn.bruto||0)-ret;tB+=hn.bruto||0;
     h+=`<tr><td><select onchange="S.honorarios[${i}].mes=+this.value">${MESES.map((m,mi)=>`<option value="${mi+1}"${hn.mes===mi+1?' selected':''}>${m}</option>`).join('')}</select></td><td><input type="text" value="${hn.nombre||''}" oninput="S.honorarios[${i}].nombre=this.value" style="min-width:140px"></td><td><input type="text" value="${hn.rut||''}" oninput="S.honorarios[${i}].rut=this.value" style="min-width:100px"></td><td><input type="number" min="0" value="${hn.bruto||''}" placeholder="0" oninput="uhon(${i},this.value)"></td><td class="ac" id="hr${i}">${fmt(ret)}</td><td class="ac" id="hn${i}">${fmt(net)}</td><td><button class="btn btn-d" onclick="delHon(${i})">✕</button></td></tr>`;
   });
   tbody.innerHTML=h;
-  const tR=Math.round(tB*retencionHonorarios(S.empresa.anio));
+  const tR=Math.round(tB*tasa);
   document.getElementById('h-tfoot').innerHTML=`<tr><td class="tl" colspan="3">TOTAL</td><td>${fmt(tB)}</td><td>${fmt(tR)}</td><td>${fmt(tB-tR)}</td><td></td></tr>`;
 }
 function uhon(i,val){S.honorarios[i].bruto=pn(val);renderHon();}

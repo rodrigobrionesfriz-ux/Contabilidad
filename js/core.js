@@ -3,7 +3,7 @@
 // ═══ CONSTANTES ═══
 const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const MC=['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
-const IVA=0.19, RET_H=0.1075;
+const IVA=0.19; // La retención de honorarios vive en indicadores.js (varía por año, Ley 21.133)
 
 const CCOLS=[
   {k:'semillas',   lb:'SEMILLAS',    ct:'3202035',fn:'MATERIALES PARA PRODUCCION'},
@@ -391,4 +391,4 @@ function toast(msg,tipo='ok'){
 }
 
 
-export {MESES, MC, IVA, RET_H, CCOLS, PDC, CUENTAS_SEL, CUENTAS_GASTO, recalcDerivadasPDC, pdcNm, DTE_VENTAS, DTE_COMPRAS, dteV, dteC, rutDV, rutParse, rutFmt, fmt, fmtC, pn, today, toast};
+export {MESES, MC, IVA, CCOLS, PDC, CUENTAS_SEL, CUENTAS_GASTO, recalcDerivadasPDC, pdcNm, DTE_VENTAS, DTE_COMPRAS, dteV, dteC, rutDV, rutParse, rutFmt, fmt, fmtC, pn, today, toast};

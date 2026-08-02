@@ -29,7 +29,7 @@ function calcularF29Anual(){
       comprasNetas+=(d.neto||0)*signo;
       credito+=(d.iva||0)*signo;
     });
-    // Honorarios del mes → retención 10,75% (código 151)
+    // Honorarios del mes → retención del año (código 151)
     const honM=S.honorarios.filter(h=>h.mes===m);
     const retencionHon=Math.round(honM.reduce((s,h)=>s+ +(h.bruto||0),0)*retencionHonorarios(S.empresa.anio));
     // IVA: crédito total = crédito del mes + remanente anterior
@@ -86,7 +86,7 @@ function renderF29(){
       <tr class="rth"><td colspan="3" class="tl" style="padding:7px 10px">PPM Y RETENCIONES</td></tr>
       ${linea('563','Base imponible PPM',d.basePPM)}
       ${linea('62','PPM ('+((S.empresa.tasaPPM!=null?+S.empresa.tasaPPM:0))+'%)',d.ppm,{color:'var(--err)'})}
-      ${linea('151','Retención honorarios (10,75%)',d.retencionHon,{color:'var(--err)'})}
+      ${linea('151',`Retención honorarios (${(retencionHonorarios(S.empresa.anio)*100).toFixed(2)}%)`,d.retencionHon,{color:'var(--err)'})}
       <tr style="background:${d.totalPagar>0?'rgba(248,81,73,.12)':'rgba(46,160,67,.12)'}">
         <td style="font-family:var(--mono);font-size:11px;color:var(--mt)">91</td>
         <td class="tl" style="padding:11px;font-weight:700;font-size:14px">TOTAL A PAGAR</td>

@@ -46,6 +46,51 @@ export function initAvisoSalida(){
   // Publicar el marcador para que storage.js lo llame al persistir
   window.__marcarGuardado=marcarGuardado;
 
+  // ── Botón "atrás" (Android / navegación del historial) ──
+  // beforeunload NO se dispara al retroceder: el navegador solo navega en el
+  // historial. Se inserta una entrada extra para interceptarlo con popstate.
+  //
+  // Comportamiento: si el usuario no está en la pantalla inicial (Empresa),
+  // el botón atrás lo lleva ahí en vez de salir — que es lo que espera en una
+  // app. Solo pregunta si salir cuando ya está en la pantalla inicial.
+  let _saliendo=false;
+  try{
+    history.pushState({app:true},'');
+    window.addEventListener('popstate',()=>{
+      if(_saliendo)return;              // ya confirmó: dejar que salga
+      if(!AUTH.user)return;             // sin sesión, no interceptar
+
+      const sec=(window.getCurSec&&window.getCurSec())||'empresa';
+      // Si hay un modal abierto, el atrás solo lo cierra
+      const modalAbierto=['dte-modal','search-overlay'].find(id=>{
+        const el=document.getElementById(id);
+        return el&&el.style.display&&el.style.display!=='none';
+      });
+      if(modalAbierto){
+        const el=document.getElementById(modalAbierto);
+        if(el)el.style.display='none';
+        history.pushState({app:true},'');
+        return;
+      }
+      // Si no está en la pantalla inicial, volver a ella en vez de salir
+      if(sec!=='empresa'&&window.nav){
+        window.nav('empresa');
+        history.pushState({app:true},'');
+        return;
+      }
+      // Ya en la pantalla inicial: preguntar si quiere salir
+      const msg=_sucio
+        ? '⚠️ Hay cambios SIN GUARDAR.\n\nSi sales ahora podrías perderlos.\n\n¿Salir de la aplicación?'
+        : '¿Salir de la aplicación?';
+      if(confirm(msg)){
+        _saliendo=true;
+        history.back();
+      }else{
+        history.pushState({app:true},''); // reponer para el próximo atrás
+      }
+    });
+  }catch(e){ console.warn('No se pudo interceptar el botón atrás:',e); }
+
   // Detectar edición: cualquier campo modificado dentro de la app marca pendiente.
   // Se excluyen los campos de búsqueda/filtro y el login, que no son datos.
   const IGNORAR=new Set(['search-input','login-email','login-password','conc-cartola-file']);

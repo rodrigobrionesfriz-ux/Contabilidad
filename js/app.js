@@ -300,7 +300,7 @@ setOnAuthReady(initApp);
 // El HTML usa onclick="renderVentas()" etc. Los módulos ES tienen scope propio,
 // así que hay que publicar esas funciones en window.
 // Objetos de estado usados directamente en onclick del HTML
-Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, US, BD, S});
+Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, US, BD, S, getCurSec});
 
 Object.assign(window,{
   // navegación y arranque

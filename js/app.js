@@ -31,6 +31,10 @@ import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
 import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas} from './buscadorcuentas.js';
 import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './salida.js';
+import {cargarComprobantes} from './comprobantestipo.js';
+import {buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal,
+        renderCTModal, setCTCuenta, setCTCampo, addCTLinea, delCTLinea, nuevoCT,
+        editarCT, guardarCT, borrarCT, copiarCTaEmpresa} from './comprobantestipo-ui.js';
 import {cargarCentros, cargarCierresCC, ccOpts, ccNombre, costoAcumulado} from './centroscosto.js';
 import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
         verDetalleCC, abrirCapitalizar, confirmarCapitalizar, onCurvaChange,
@@ -99,6 +103,7 @@ async function saveAll(){
     if(S.trabajadores&&S.trabajadores.length)await window.storage.set('trabajadores',JSON.stringify(S.trabajadores));
     if(S.centros&&S.centros.length)await window.storage.set('centros',JSON.stringify(S.centros));
     if(S.cierresCC&&S.cierresCC.length)await window.storage.set('cierresCC',JSON.stringify(S.cierresCC));
+    if(S.comprobantesTipo&&S.comprobantesTipo.length)await window.storage.set('comprobantesTipo',JSON.stringify(S.comprobantesTipo));
     toast('✅ Todos los datos guardados');
   }catch(e){toast('❌ Error: '+e.message,'e');}
   btn.textContent='💾 Guardar Todo';
@@ -177,7 +182,7 @@ async function initApp(){
   }catch(e){console.warn('Error cargando PDC:',e);}
   ys.value=S.empresa.anio;
   await loadYear(S.empresa.anio);
-  await cargarCentros();await cargarCierresCC();
+  await cargarCentros();await cargarCierresCC();await cargarComprobantes();
   fillEmpresaForm();updateHdr();
   initImportListener();
   initBDImportListener();
@@ -285,7 +290,7 @@ async function recargarEmpresaActiva(){
     if(r){const l=JSON.parse(r.value);if(Array.isArray(l)&&l.length){PDC.length=0;l.forEach(c=>PDC.push(c));recalcDerivadasPDC();}}
   }catch(e){}
   await loadYear(S.empresa.anio);
-  await cargarCentros();await cargarCierresCC();
+  await cargarCentros();await cargarCierresCC();await cargarComprobantes();
   fillEmpresaForm();updateHdr();renderSelectorEmpresa();
   rerender();
 }
@@ -319,6 +324,9 @@ Object.assign(window,{
   onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual, revertirCierreMensual,
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas,
   marcarGuardado, marcarSucio, haySinGuardar,
+  buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal, renderCTModal,
+  setCTCuenta, setCTCampo, addCTLinea, delCTLinea, nuevoCT, editarCT, guardarCT,
+  borrarCT, copiarCTaEmpresa,
   // apertura
   renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,
   apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura,

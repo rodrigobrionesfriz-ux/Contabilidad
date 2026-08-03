@@ -14,6 +14,7 @@ export const S={
   activos:[],
   trabajadores:[],
   centros:[],       // centros de costo (predios y cuarteles)
+  comprobantesTipo:[], // plantillas de asientos recurrentes
   cierresCC:[],     // cierres mensuales de costos ya ejecutados
   apertura:null
 };

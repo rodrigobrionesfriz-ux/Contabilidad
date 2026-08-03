@@ -34,7 +34,7 @@ import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './sal
 import {cargarCentros, cargarCierresCC, ccOpts, ccNombre, costoAcumulado} from './centroscosto.js';
 import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
         verDetalleCC, abrirCapitalizar, confirmarCapitalizar, onCurvaChange,
-        setPct, addPctAnio, delPctAnio, ejecutarCierreMensual,
+        setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual,
         revertirCierreMensual} from './centroscosto-ui.js';
 import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 
@@ -316,7 +316,7 @@ Object.assign(window,{
   renderPrevisional, guardarPrevisional, restaurarPrevisional,
   renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
   verDetalleCC, abrirCapitalizar, confirmarCapitalizar, ccOpts, ccNombre,
-  onCurvaChange, setPct, addPctAnio, delPctAnio, ejecutarCierreMensual, revertirCierreMensual,
+  onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual, revertirCierreMensual,
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas,
   marcarGuardado, marcarSucio, haySinGuardar,
   // apertura

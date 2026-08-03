@@ -1,10 +1,13 @@
 // centroscosto.js — Centros de costo en dos niveles.
-//   Nivel 1: PREDIO (ej: "Fundo El Sauce")
-//   Nivel 2: CUARTEL / PLANTACIÓN (ej: "Cuartel 3 - Arándanos 2024")
+//   Nivel 1: CENTRO PRINCIPAL  (ej: "Administración", "Área Maderas",
+//                               "Transporte", "Fundo El Sauce")
+//   Nivel 2: SUBCENTRO         (ej: "Contabilidad", "Aserradero",
+//                               "Camión 1", "Cuartel 3 — Cerezos")
 //
-// Permite acumular gastos por cuartel y luego CAPITALIZARLOS: convertir el
-// costo acumulado en un activo fijo (plantación en formación → activo biológico
-// o mejora de terreno), generando el asiento de traspaso.
+// Cada subcentro acumula sus gastos. Los que representan una INVERSIÓN EN CURSO
+// (una plantación en formación, una obra, un proyecto) pueden marcarse como
+// capitalizables: se les asigna una curva de % por año y sus costos se traspasan
+// a un activo fijo. Los centros operativos normales simplemente acumulan gasto.
 
 import {S} from './state.js';
 
@@ -12,18 +15,21 @@ import {S} from './state.js';
 // [{id, nivel:1, nombre, codigo}, {id, nivel:2, padre:<idPredio>, nombre, codigo,
 //   estado:'formacion'|'productivo'|'capitalizado', fechaInicio, capitalizadoEn}]
 
+// Tipo de centro: define si sus costos se capitalizan o van directo a resultado.
 export const CC_ESTADOS=[
-  {id:'formacion',    nm:'En formación', desc:'Acumula costos; aún no capitalizado'},
-  {id:'productivo',   nm:'Productivo',   desc:'En producción; los costos van a resultado'},
-  {id:'capitalizado', nm:'Capitalizado', desc:'Sus costos ya pasaron a activo fijo'},
+  {id:'operativo',    nm:'Operativo',      desc:'Sus costos van directo a resultado (administración, transporte, etc.)'},
+  {id:'formacion',    nm:'Inversión en curso', desc:'Acumula costos capitalizables según una curva por año'},
+  {id:'capitalizado', nm:'Capitalizado',   desc:'Sus costos ya se traspasaron a activo fijo'},
 ];
 
-// ── Curvas de capitalización por especie ──
-// Durante la formación de una plantación frutal, el gasto del año se reparte
-// entre ACTIVO (inversión que se capitaliza) y COSTO del huerto (va a resultado).
-// El % cambia según el año desde la plantación: al principio todo es inversión,
-// y a medida que entra en producción pasa a ser costo.
+// ── Curvas de capitalización ──
+// En una inversión en curso, el gasto de cada año se reparte entre ACTIVO
+// (lo que se capitaliza) y COSTO del período (lo que va a resultado).
+// El % cambia según el año desde el inicio: al principio suele ser todo
+// inversión y luego pasa gradualmente a costo.
 //   año 1 = primer año desde fechaInicio.
+// Las plantillas agrícolas son solo un punto de partida: se pueden editar
+// libremente o usar "Personalizada" para cualquier tipo de proyecto.
 export const CURVAS_DEFAULT=[
   {id:'cerezo',    nm:'Cerezos',      pcts:[100,100,100,50,0]},
   {id:'manzano',   nm:'Manzanos',     pcts:[100,100,100,50,0]},
@@ -32,12 +38,14 @@ export const CURVAS_DEFAULT=[
   {id:'nogal',     nm:'Nogales',      pcts:[100,100,100,100,50,0]},
   {id:'palto',     nm:'Paltos',       pcts:[100,100,100,50,0]},
   {id:'vid',       nm:'Vides',        pcts:[100,100,50,0]},
+  {id:'obra',      nm:'Obra / proyecto (100% hasta terminar)',pcts:[100,100,100]},
   {id:'custom',    nm:'Personalizada',pcts:[100,100,50,0]},
 ];
 export const curvaInfo=id=>CURVAS_DEFAULT.find(c=>c.id===id)||CURVAS_DEFAULT[0];
 
-// ── Año agrícola / temporada ──
-// La temporada agrícola va de MAYO a ABRIL del año siguiente.
+// ── Temporada / ejercicio de costos ──
+// Por defecto la temporada va de MAYO a ABRIL (año agrícola chileno), que es
+// como se agrupan los costos de las inversiones en curso.
 // Se identifica por el año en que COMIENZA: la temporada 2025 va del
 // 1-may-2025 al 30-abr-2026.
 export const MES_INICIO_TEMPORADA=5; // mayo
@@ -86,8 +94,10 @@ export function repartirCosto(centro,anio,monto){
 }
 
 export const centros=()=>S.centros||[];
-export const predios=()=>centros().filter(c=>c.nivel===1);
-export const cuarteles=(idPredio)=>centros().filter(c=>c.nivel===2&&(!idPredio||c.padre===idPredio));
+export const predios=()=>centros().filter(c=>c.nivel===1);      // nivel 1 (alias histórico)
+export const principales=()=>centros().filter(c=>c.nivel===1);
+export const cuarteles=(idPadre)=>centros().filter(c=>c.nivel===2&&(!idPadre||c.padre===idPadre)); // nivel 2 (alias histórico)
+export const subcentros=(idPadre)=>cuarteles(idPadre);
 export const ccInfo=id=>centros().find(c=>c.id===id)||null;
 
 // Nombre completo "Predio › Cuartel"
@@ -137,12 +147,12 @@ export function actualizarCentro(id,campos){
 export function eliminarCentro(id){
   const c=ccInfo(id);
   if(!c)return {ok:false,motivo:'No existe'};
-  // No permitir borrar un predio con cuarteles
+  // No permitir borrar un centro con subcentros
   if(c.nivel===1&&cuarteles(id).length)
-    return {ok:false,motivo:'Tiene cuarteles asociados. Elimínalos primero.'};
+    return {ok:false,motivo:'Tiene subcentros asociados. Elimínalos primero.'};
   // No permitir borrar si tiene movimientos
   if(contarMovimientos(id)>0)
-    return {ok:false,motivo:'Tiene movimientos registrados. Puedes marcarlo como capitalizado en vez de borrarlo.'};
+    return {ok:false,motivo:'Tiene movimientos registrados. Puedes marcarlo como capitalizado o cambiar su tipo en vez de borrarlo.'};
   S.centros=centros().filter(x=>x.id!==id);
   return {ok:true};
 }
@@ -285,11 +295,11 @@ export async function cargarCierresCC(){
   return S.cierresCC;
 }
 
-// Resumen de todos los cuarteles con su costo acumulado
+// Resumen jerárquico: cada centro principal con sus subcentros y costos
 export function resumenCentros(){
-  return predios().map(p=>({
-    predio:p,
-    cuarteles:cuarteles(p.id).map(c=>({
+  return principales().map(p=>({
+    predio:p,        // centro principal (nombre histórico de la propiedad)
+    cuarteles:subcentros(p.id).map(c=>({
       centro:c,
       costo:costoAcumulado(c.id).total,
       movimientos:contarMovimientos(c.id),
@@ -300,8 +310,8 @@ export function resumenCentros(){
 // Opciones <option> para los selectores de los formularios
 export function ccOpts(sel='',incluirVacio=true){
   let h=incluirVacio?'<option value="">— sin centro de costo —</option>':'';
-  predios().forEach(p=>{
-    const hijos=cuarteles(p.id);
+  principales().forEach(p=>{
+    const hijos=subcentros(p.id);
     if(!hijos.length){
       h+=`<option value="${p.id}" ${sel===p.id?'selected':''}>${p.nombre}</option>`;
       return;

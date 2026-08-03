@@ -22,34 +22,35 @@ export function renderCentrosCosto(){
   const totalGeneral=resumen.reduce((s,r)=>s+r.cuarteles.reduce((t,c)=>t+c.costo,0),0);
 
   if(!centros().length){
-    el.innerHTML=`<div class="empty"><div class="ei">🌱</div>
+    el.innerHTML=`<div class="empty"><div class="ei">📊</div>
       No hay centros de costo.<br><br>
-      <button class="btn btn-p" onclick="abrirFormCC(1)">+ Crear primer predio</button>
+      <button class="btn btn-p" onclick="abrirFormCC(1)">+ Crear primer centro</button>
       <div style="margin-top:14px;font-size:11px;color:var(--mt);max-width:420px;margin-left:auto;margin-right:auto">
-        Organiza los costos en dos niveles: <strong>predio</strong> (nivel 1) y <strong>cuartel o plantación</strong> (nivel 2).
-        Los gastos que asignes a un cuartel en formación se acumulan y luego puedes <strong>capitalizarlos</strong> como activo fijo.
+        Organiza los costos en dos niveles: <strong>centro principal</strong> (ej. Administración, Área Maderas, Transporte, un predio)
+        y <strong>subcentro</strong> (ej. Contabilidad, Aserradero, Camión 1, un cuartel).
+        Los centros marcados como <strong>inversión en curso</strong> acumulan costos capitalizables a activo fijo.
       </div></div>
   <!-- Formulario -->
   <div class="card" id="cc-form" style="display:none;margin-top:14px">
     <div class="card-title" id="ccf-title">Nuevo centro de costo</div>
     <div class="fg">
-      <div class="grp full"><label>Nombre</label><input type="text" id="ccf-nombre" placeholder="Ej: Cuartel 3 — Arándanos"></div>
-      <div class="grp"><label>Código (opcional)</label><input type="text" id="ccf-codigo" placeholder="Ej: C03"></div>
-      <div class="grp" id="ccf-padre-wrap"><label>Predio</label><select id="ccf-padre"></select></div>
-      <div class="grp" id="ccf-estado-wrap"><label>Estado</label><select id="ccf-estado">
-        ${CC_ESTADOS.filter(e=>e.id!=='capitalizado').map(e=>`<option value="${e.id}">${e.nm}</option>`).join('')}
+      <div class="grp full"><label>Nombre</label><input type="text" id="ccf-nombre" placeholder="Ej: Administración · Transporte · Cuartel 3"></div>
+      <div class="grp"><label>Código (opcional)</label><input type="text" id="ccf-codigo" placeholder="Ej: ADM · TRA · C03"></div>
+      <div class="grp" id="ccf-padre-wrap"><label>Centro principal</label><select id="ccf-padre"></select></div>
+      <div class="grp" id="ccf-estado-wrap"><label>Tipo de centro</label><select id="ccf-estado" onchange="onTipoCentroChange()">
+        ${CC_ESTADOS.filter(e=>e.id!=='capitalizado').map(e=>`<option value="${e.id}" title="${e.desc}">${e.nm}</option>`).join('')}
       </select></div>
-      <div class="grp" id="ccf-fecha-wrap"><label>Fecha de plantación</label><input type="date" id="ccf-fecha"><div style="font-size:10px;color:var(--mt);margin-top:2px">Define el año 1 de la curva</div></div>
+      <div class="grp" id="ccf-fecha-wrap"><label>Fecha de inicio</label><input type="date" id="ccf-fecha"><div style="font-size:10px;color:var(--mt);margin-top:2px">Define el año 1 de la curva de capitalización</div></div>
       <div class="grp" id="ccf-curva-wrap"><label>Curva de capitalización</label><select id="ccf-curva" onchange="onCurvaChange()">
         ${CURVAS_DEFAULT.map(cv=>`<option value="${cv.id}">${cv.nm} — ${cv.pcts.join('/')}%</option>`).join('')}
       </select></div>
-      <div class="grp full" id="ccf-cuenta-wrap"><label>Cuenta de costo del huerto</label><select id="ccf-cuenta-costo">
+      <div class="grp full" id="ccf-cuenta-wrap"><label>Cuenta de costo del período</label><select id="ccf-cuenta-costo">
         ${PDC.filter(x=>x.cd.length===7&&x.nat&&(x.cd.startsWith('31')||x.cd.startsWith('33'))).map(x=>`<option value="${x.cd}">${x.cd} — ${x.nm}</option>`).join('')}
-      </select><div style="font-size:10px;color:var(--mt);margin-top:2px">Donde se registra la parte no capitalizable de cada temporada</div></div>
+      </select><div style="font-size:10px;color:var(--mt);margin-top:2px">Recibe la parte NO capitalizable de cada período</div></div>
       <div class="grp full" id="ccf-pcts-wrap">
         <label>% que se capitaliza cada año</label>
         <div id="ccf-pcts" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-        <div style="font-size:10px;color:var(--mt);margin-top:4px">El resto de cada año va a <strong>costo del huerto</strong> (resultado). Ej. cerezos: años 1-3 100% activo, año 4 50/50, año 5 en adelante 100% costo.</div>
+        <div style="font-size:10px;color:var(--mt);margin-top:4px">El resto de cada año va a <strong>costo del período</strong> (resultado). Ej. cerezos: años 1-3 100% activo, año 4 50/50, año 5 en adelante 100% costo.</div>
       </div>
     </div>
     <div class="save-row" style="display:flex;gap:8px">
@@ -71,7 +72,7 @@ export function renderCentrosCosto(){
       return `<tr>
         <td class="tl" style="font-size:12px;padding-left:22px">
           ${c.nombre}${c.codigo?` <span style="color:var(--mt);font-family:var(--mono);font-size:10px">${c.codigo}</span>`:''}
-          <div style="font-size:10px;color:${color}">${est.nm}${c.fechaInicio?' · plantado '+c.fechaInicio:''}${añoForm>0?` · año ${añoForm}`:''}</div>
+          <div style="font-size:10px;color:${color}">${est.nm}${c.fechaInicio?' · inicio '+c.fechaInicio:''}${añoForm>0?` · año ${añoForm}`:''}</div>
           ${c.estado==='formacion'&&añoForm>0?`<div style="font-size:10px;color:var(--mt)">${S.empresa.anio}: <strong style="color:var(--ach)">${pctActual}% activo</strong> / ${100-pctActual}% costo</div>`:''}
         </td>
         <td style="text-align:right;font-size:11px;color:var(--mt)">${movimientos}</td>
@@ -90,18 +91,18 @@ export function renderCentrosCosto(){
 
     return `<div class="card-np" style="margin-bottom:12px"><div class="tw"><table>
       <thead><tr>
-        <th class="tl">🏞️ ${r.predio.nombre}${r.predio.codigo?` <span style="font-family:var(--mono);font-size:10px;color:var(--mt)">${r.predio.codigo}</span>`:''}</th>
+        <th class="tl">📁 ${r.predio.nombre}${r.predio.codigo?` <span style="font-family:var(--mono);font-size:10px;color:var(--mt)">${r.predio.codigo}</span>`:''}</th>
         <th style="text-align:right;width:60px">MOVS</th>
         <th style="text-align:right;width:120px">COSTO ACUM.</th>
         <th style="text-align:right;width:180px"></th>
       </tr></thead>
       <tbody>
-        ${filas||'<tr><td colspan="4" style="text-align:center;color:var(--mt);padding:14px;font-size:12px">Sin cuarteles. Agrega uno para acumular costos.</td></tr>'}
+        ${filas||'<tr><td colspan="4" style="text-align:center;color:var(--mt);padding:14px;font-size:12px">Sin subcentros. Agrega uno para acumular costos.</td></tr>'}
         <tr style="background:rgba(88,166,255,.06)">
           <td class="tl" style="font-weight:700;font-size:12px">Total ${r.predio.nombre}</td><td></td>
           <td style="font-family:var(--mono);text-align:right;font-weight:700">${fmtC(totPredio)}</td>
           <td style="text-align:right">
-            <button class="btn btn-i" onclick="abrirFormCC(2,'${r.predio.id}')">+ Cuartel</button>
+            <button class="btn btn-i" onclick="abrirFormCC(2,'${r.predio.id}')">+ Subcentro</button>
             <button class="btn btn-i" onclick="editarCC('${r.predio.id}')">✏️</button>
             <button class="btn btn-d" onclick="borrarCC('${r.predio.id}')">🗑</button>
           </td>
@@ -113,38 +114,38 @@ export function renderCentrosCosto(){
   el.innerHTML=`
   ${renderPanelCierre()}
   <div class="kpi-grid" style="margin-bottom:16px">
-    <div class="kpi"><div class="kpi-lbl">Predios</div><div class="kpi-val">${predios().length}</div></div>
-    <div class="kpi"><div class="kpi-lbl">Cuarteles</div><div class="kpi-val">${cuarteles().length}</div></div>
-    <div class="kpi"><div class="kpi-lbl">En formación</div><div class="kpi-val">${cuarteles().filter(c=>c.estado==='formacion').length}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Centros principales</div><div class="kpi-val">${predios().length}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Subcentros</div><div class="kpi-val">${cuarteles().length}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Inversión en curso</div><div class="kpi-val">${cuarteles().filter(c=>c.estado==='formacion').length}</div></div>
     <div class="kpi"><div class="kpi-lbl">Costo acumulado</div><div class="kpi-val">${fmtC(totalGeneral)}</div></div>
   </div>
-  <div class="info-tip" style="margin-bottom:14px">🌱 Los gastos asignados a un cuartel <strong>en formación</strong> se acumulan aquí. Cuando la plantación entra en producción, pulsa <strong>Capitalizar</strong> para traspasar el costo acumulado a un activo fijo y empezar a depreciarlo.</div>
+  <div class="info-tip" style="margin-bottom:14px">📊 Asigna gastos a cualquier centro para analizarlos por área. Los centros marcados como <strong>inversión en curso</strong> acumulan costos capitalizables: cuando el proyecto termina, pulsa <strong>Capitalizar</strong> para traspasarlos a un activo fijo.</div>
   ${bloques}
   <div style="display:flex;gap:8px;margin-top:12px">
-    <button class="btn btn-p" onclick="abrirFormCC(1)">+ Nuevo predio</button>
+    <button class="btn btn-p" onclick="abrirFormCC(1)">+ Nuevo centro principal</button>
   </div>
 
   <!-- Formulario -->
   <div class="card" id="cc-form" style="display:none;margin-top:14px">
     <div class="card-title" id="ccf-title">Nuevo centro de costo</div>
     <div class="fg">
-      <div class="grp full"><label>Nombre</label><input type="text" id="ccf-nombre" placeholder="Ej: Cuartel 3 — Arándanos"></div>
-      <div class="grp"><label>Código (opcional)</label><input type="text" id="ccf-codigo" placeholder="Ej: C03"></div>
-      <div class="grp" id="ccf-padre-wrap"><label>Predio</label><select id="ccf-padre"></select></div>
-      <div class="grp" id="ccf-estado-wrap"><label>Estado</label><select id="ccf-estado">
-        ${CC_ESTADOS.filter(e=>e.id!=='capitalizado').map(e=>`<option value="${e.id}">${e.nm}</option>`).join('')}
+      <div class="grp full"><label>Nombre</label><input type="text" id="ccf-nombre" placeholder="Ej: Administración · Transporte · Cuartel 3"></div>
+      <div class="grp"><label>Código (opcional)</label><input type="text" id="ccf-codigo" placeholder="Ej: ADM · TRA · C03"></div>
+      <div class="grp" id="ccf-padre-wrap"><label>Centro principal</label><select id="ccf-padre"></select></div>
+      <div class="grp" id="ccf-estado-wrap"><label>Tipo de centro</label><select id="ccf-estado" onchange="onTipoCentroChange()">
+        ${CC_ESTADOS.filter(e=>e.id!=='capitalizado').map(e=>`<option value="${e.id}" title="${e.desc}">${e.nm}</option>`).join('')}
       </select></div>
-      <div class="grp" id="ccf-fecha-wrap"><label>Fecha de plantación</label><input type="date" id="ccf-fecha"><div style="font-size:10px;color:var(--mt);margin-top:2px">Define el año 1 de la curva</div></div>
+      <div class="grp" id="ccf-fecha-wrap"><label>Fecha de inicio</label><input type="date" id="ccf-fecha"><div style="font-size:10px;color:var(--mt);margin-top:2px">Define el año 1 de la curva de capitalización</div></div>
       <div class="grp" id="ccf-curva-wrap"><label>Curva de capitalización</label><select id="ccf-curva" onchange="onCurvaChange()">
         ${CURVAS_DEFAULT.map(cv=>`<option value="${cv.id}">${cv.nm} — ${cv.pcts.join('/')}%</option>`).join('')}
       </select></div>
-      <div class="grp full" id="ccf-cuenta-wrap"><label>Cuenta de costo del huerto</label><select id="ccf-cuenta-costo">
+      <div class="grp full" id="ccf-cuenta-wrap"><label>Cuenta de costo del período</label><select id="ccf-cuenta-costo">
         ${PDC.filter(x=>x.cd.length===7&&x.nat&&(x.cd.startsWith('31')||x.cd.startsWith('33'))).map(x=>`<option value="${x.cd}">${x.cd} — ${x.nm}</option>`).join('')}
-      </select><div style="font-size:10px;color:var(--mt);margin-top:2px">Donde se registra la parte no capitalizable de cada temporada</div></div>
+      </select><div style="font-size:10px;color:var(--mt);margin-top:2px">Recibe la parte NO capitalizable de cada período</div></div>
       <div class="grp full" id="ccf-pcts-wrap">
         <label>% que se capitaliza cada año</label>
         <div id="ccf-pcts" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-        <div style="font-size:10px;color:var(--mt);margin-top:4px">El resto de cada año va a <strong>costo del huerto</strong> (resultado). Ej. cerezos: años 1-3 100% activo, año 4 50/50, año 5 en adelante 100% costo.</div>
+        <div style="font-size:10px;color:var(--mt);margin-top:4px">El resto de cada año va a <strong>costo del período</strong> (resultado). Ej. cerezos: años 1-3 100% activo, año 4 50/50, año 5 en adelante 100% costo.</div>
       </div>
     </div>
     <div class="save-row" style="display:flex;gap:8px">
@@ -168,7 +169,7 @@ function renderDetalleCC(id){
   const cuerpo=filas.map(f=>`<tr style="background:rgba(0,0,0,.12)">
     <td class="tl" style="font-size:11px;padding-left:34px">
       ${f.anio} <span style="color:var(--mt)">· año ${f.anioFormacion} de formación · ${f.movs} mov.</span>
-      <div style="font-size:10px;color:var(--mt)">${f.pct}% activo / ${100-f.pct}% costo huerto</div>
+      <div style="font-size:10px;color:var(--mt)">${f.pct}% activo / ${100-f.pct}% costo período</div>
     </td>
     <td style="font-family:var(--mono);text-align:right;font-size:11px">${fmtC(f.total)}</td>
     <td style="font-family:var(--mono);text-align:right;font-size:11px;color:var(--ach)">${fmtC(f.activo)}</td>
@@ -200,14 +201,14 @@ function renderPanelCierre(){
   const anio=S.empresa.anio;
   const mesActual=+String(today()).slice(5,7);
   const enFormacion=cuarteles().filter(c=>c.estado==='formacion');
-  if(!enFormacion.length)return '';
+  if(!enFormacion.length)return ''; // sin inversiones en curso no hay nada que traspasar
 
   const opciones=MESES.map((m,i)=>`<option value="${i+1}" ${i+1===mesActual?'selected':''}>${m} ${anio}</option>`).join('');
   return `<div class="card" style="margin-bottom:16px;border-color:var(--ac)">
     <div class="card-title">🔐 Cierre mensual de costos</div>
     <div class="info-tip" style="margin-bottom:12px;font-size:11px">
-      Traspasa los gastos del mes de cada cuartel en formación: una parte se <strong>activa</strong> (inversión)
-      y el resto va a <strong>costo del huerto</strong>, según la curva de la temporada.
+      Traspasa los gastos del mes de cada centro en <strong>inversión en curso</strong>: una parte se <strong>activa</strong>
+      y el resto va a <strong>costo del período</strong>, según la curva configurada.
       Ejecútalo <strong>solo cuando el mes esté cerrado</strong>: es manual a propósito.
     </div>
     <div class="fg">
@@ -231,7 +232,7 @@ function renderPreviewCierre(){
   });
   const conMovs=filas.filter(f=>f.m.total>0||f.cerrado);
   if(!conMovs.length){
-    cont.innerHTML=`<div style="padding:12px;text-align:center;color:var(--mt);font-size:12px">Sin gastos registrados en ${MESES[mes-1]} ${anio} para cuarteles en formación.</div>`;
+    cont.innerHTML=`<div style="padding:12px;text-align:center;color:var(--mt);font-size:12px">Sin gastos registrados en ${MESES[mes-1]} ${anio} para centros en inversión.</div>`;
     return;
   }
   const totActivo=conMovs.filter(f=>!f.cerrado).reduce((s,f)=>s+f.m.activo,0);
@@ -239,7 +240,7 @@ function renderPreviewCierre(){
   const pendientes=conMovs.filter(f=>!f.cerrado&&f.m.total>0);
 
   cont.innerHTML=`<div class="card-np" style="margin-bottom:10px"><div class="tw"><table>
-    <thead><tr><th class="tl">CUARTEL</th><th class="tl">TEMPORADA</th><th style="text-align:right">GASTO MES</th><th style="text-align:right">% ACT</th><th style="text-align:right">→ ACTIVO</th><th style="text-align:right">→ COSTO</th><th></th></tr></thead>
+    <thead><tr><th class="tl">CENTRO</th><th class="tl">TEMPORADA</th><th style="text-align:right">GASTO MES</th><th style="text-align:right">% ACT</th><th style="text-align:right">→ ACTIVO</th><th style="text-align:right">→ COSTO</th><th></th></tr></thead>
     <tbody>${conMovs.map(({centro,m,cerrado})=>`<tr${cerrado?' style="opacity:.5"':''}>
       <td class="tl" style="font-size:12px">${centro.nombre}</td>
       <td class="tl" style="font-size:11px;color:var(--mt)">${m.lblTemporada} · año ${m.anioFormacion}</td>
@@ -252,10 +253,10 @@ function renderPreviewCierre(){
   </table></div></div>
   ${pendientes.length?`
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-p" onclick="ejecutarCierreMensual()">🔐 Cerrar ${MESES[mes-1]} ${anio} (${pendientes.length} cuarteles)</button>
-      <span style="font-size:11px;color:var(--mt)">Activo ${fmtC(totActivo)} · Costo huerto ${fmtC(totCosto)}</span>
+      <button class="btn btn-p" onclick="ejecutarCierreMensual()">🔐 Cerrar ${MESES[mes-1]} ${anio} (${pendientes.length} centros)</button>
+      <span style="font-size:11px;color:var(--mt)">Activo ${fmtC(totActivo)} · Costo período ${fmtC(totCosto)}</span>
     </div>`
-   :`<div style="font-size:11px;color:var(--ach)">✓ ${MESES[mes-1]} ${anio} ya está cerrado para todos los cuarteles con movimientos.</div>
+   :`<div style="font-size:11px;color:var(--ach)">✓ ${MESES[mes-1]} ${anio} ya está cerrado para todos los centros con movimientos.</div>
      <div style="margin-top:8px"><button class="btn btn-g" onclick="revertirCierreMensual()">↩️ Revertir cierre del mes</button></div>`}`;
 }
 
@@ -273,7 +274,7 @@ export async function ejecutarCierreMensual(){
   const totActivo=pendientes.reduce((s,x)=>s+x.m.activo,0);
   const totCosto=pendientes.reduce((s,x)=>s+x.m.costo,0);
   const totGasto=pendientes.reduce((s,x)=>s+x.m.total,0);
-  if(!confirm(`¿Cerrar ${MESES[mes-1]} ${anio}?\n\n${pendientes.length} cuarteles\nGasto del mes: ${fmtC(totGasto)}\n→ Activo (inversión): ${fmtC(totActivo)}\n→ Costo del huerto: ${fmtC(totCosto)}\n\nSe generará un asiento de traspaso. Podrás revertirlo si te equivocas.`))return;
+  if(!confirm(`¿Cerrar ${MESES[mes-1]} ${anio}?\n\n${pendientes.length} cuarteles\nGasto del mes: ${fmtC(totGasto)}\n→ Activo (inversión): ${fmtC(totActivo)}\n→ Costo del período: ${fmtC(totCosto)}\n\nSe generará un asiento de traspaso. Podrás revertirlo si te equivocas.`))return;
 
   const movs=[];
   // Por cada cuartel: cargar su activo en curso y su costo de huerto
@@ -284,7 +285,7 @@ export async function ejecutarCierreMensual(){
     }
     if(m.costo>0){
       const cdCosto=centro.cuentaCosto||'3101003';
-      movs.push({cd:cdCosto,nm:pdcNm(cdCosto),debe:m.costo,haber:0,desc:`Costo huerto ${centro.nombre} ${MESES[mes-1]}`,cc:centro.id});
+      movs.push({cd:cdCosto,nm:pdcNm(cdCosto),debe:m.costo,haber:0,desc:`Costo período ${centro.nombre} ${MESES[mes-1]}`,cc:centro.id});
     }
   });
   // Abonar las cuentas de gasto de origen
@@ -339,6 +340,18 @@ export async function revertirCierreMensual(){
   renderCentrosCosto();rerender();
 }
 
+
+// Los campos de capitalización (curva, cuenta de costo, fecha) solo tienen
+// sentido en centros de "inversión en curso". En los operativos se ocultan.
+export function onTipoCentroChange(){
+  const tipo=(document.getElementById('ccf-estado')||{}).value;
+  const esInversion=tipo==='formacion'||tipo==='capitalizado';
+  ['ccf-curva-wrap','ccf-pcts-wrap','ccf-cuenta-wrap','ccf-fecha-wrap'].forEach(id=>{
+    const e=document.getElementById(id);
+    if(e)e.style.display=esInversion?'':'none';
+  });
+}
+
 // ── Curva de capitalización ──
 let CCF_PCTS=[]; // porcentajes en edición
 
@@ -379,7 +392,7 @@ export function onCurvaChange(){
 export function abrirFormCC(nivel,padre){
   CCF={editId:null,nivel:+nivel};
   const f=document.getElementById('cc-form');f.style.display='block';
-  document.getElementById('ccf-title').textContent=nivel===1?'Nuevo predio':'Nuevo cuartel / plantación';
+  document.getElementById('ccf-title').textContent=nivel===1?'Nuevo centro principal':'Nuevo subcentro';
   document.getElementById('ccf-nombre').value='';
   document.getElementById('ccf-codigo').value='';
   document.getElementById('ccf-fecha').value=today();
@@ -389,11 +402,12 @@ export function abrirFormCC(nivel,padre){
   document.getElementById('ccf-fecha-wrap').style.display=esN2?'':'none';
   if(esN2){
     document.getElementById('ccf-padre').innerHTML=predios().map(p=>`<option value="${p.id}" ${p.id===padre?'selected':''}>${p.nombre}</option>`).join('');
-    document.getElementById('ccf-estado').value='formacion';
+    document.getElementById('ccf-estado').value='operativo';
     document.getElementById('ccf-curva').value='cerezo';
     document.getElementById('ccf-cuenta-costo').value='3101003';
     CCF_PCTS=[...curvaInfo('cerezo').pcts];
     renderPcts();
+    onTipoCentroChange();
   }
   ['ccf-curva-wrap','ccf-pcts-wrap','ccf-cuenta-wrap'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=esN2?'':'none';});
   f.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -403,7 +417,7 @@ export function editarCC(id){
   const c=ccInfo(id);if(!c)return;
   CCF={editId:id,nivel:c.nivel};
   const f=document.getElementById('cc-form');f.style.display='block';
-  document.getElementById('ccf-title').textContent=c.nivel===1?'Editar predio':'Editar cuartel';
+  document.getElementById('ccf-title').textContent=c.nivel===1?'Editar centro principal':'Editar subcentro';
   document.getElementById('ccf-nombre').value=c.nombre;
   document.getElementById('ccf-codigo').value=c.codigo||'';
   document.getElementById('ccf-fecha').value=c.fechaInicio||'';
@@ -421,6 +435,7 @@ export function editarCC(id){
     document.getElementById('ccf-cuenta-costo').value=c.cuentaCosto||'3101003';
     CCF_PCTS=(c.pctsCapitalizacion&&c.pctsCapitalizacion.length)?[...c.pctsCapitalizacion]:[...curvaInfo(c.curva).pcts];
     renderPcts();
+    onTipoCentroChange();
   }
   ['ccf-curva-wrap','ccf-pcts-wrap','ccf-cuenta-wrap'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display=esN2?'':'none';});
   f.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -499,13 +514,13 @@ export function abrirCapitalizar(id){
       <div class="grp full"><label>Cuenta de activo destino</label><select id="cap-cuenta">
         ${cuentasActivo.map(x=>`<option value="${x.cd}">${x.cd} — ${x.nm}</option>`).join('')}
       </select></div>
-      <div class="grp full"><label>Cuenta de costo del huerto</label><select id="cap-cuenta-costo">
+      <div class="grp full"><label>Cuenta de costo del período</label><select id="cap-cuenta-costo">
         ${PDC.filter(x=>x.cd.length===7&&x.nat&&(x.cd.startsWith('31')||x.cd.startsWith('33'))).map(x=>`<option value="${x.cd}" ${x.cd===(c.cuentaCosto||'3101003')?'selected':''}>${x.cd} — ${x.nm}</option>`).join('')}
       </select><div style="font-size:10px;color:var(--mt);margin-top:2px">Recibe la parte NO capitalizable (${fmtC(rep.totalCosto)}), que va a resultado de la temporada.</div></div>
-      <div class="grp full"><label>Descripción del activo</label><input type="text" id="cap-desc" value="${c.nombre}" placeholder="Ej: Plantación arándanos cuartel 3"></div>
+      <div class="grp full"><label>Descripción del activo</label><input type="text" id="cap-desc" value="${c.nombre}" placeholder="Ej: Plantación cuartel 3 · Galpón · Camión"></div>
     </div>
     <div class="info-tip" style="font-size:11px;margin:10px 0;background:rgba(210,153,34,.10);border-color:var(--warn)">
-      ⚠️ Revisa con tu contador qué costos son capitalizables. En general se activan los <strong>costos de formación</strong> (preparación de suelo, plantas, mano de obra de plantación, riego inicial) y no los gastos de administración.
+      ⚠️ Revisa con tu contador qué costos son capitalizables. En general se activan los <strong>costos directos del proyecto</strong> (materiales, mano de obra, preparación) y no los gastos generales de administración.
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-p" onclick="confirmarCapitalizar('${id}')">📦 Capitalizar y generar asiento</button>
@@ -525,8 +540,8 @@ export async function confirmarCapitalizar(id){
   const desc=document.getElementById('cap-desc').value.trim()||c.nombre;
   const cuentaCosto=(document.getElementById('cap-cuenta-costo')||{}).value||c.cuentaCosto||'3101003';
   if(!cuentaActivo){toast('⚠️ Selecciona la cuenta de activo','e');return;}
-  if(rep.totalCosto>0&&!cuentaCosto){toast('⚠️ Selecciona la cuenta de costo del huerto','e');return;}
-  if(!confirm(`¿Capitalizar ${fmtC(total)} de "${c.nombre}" a la cuenta ${cuentaActivo}?\n\nGasto total acumulado: ${fmtC(rep.totalGasto)}\nSe capitaliza (activo): ${fmtC(rep.totalActivo)}\nQueda como costo del huerto: ${fmtC(rep.totalCosto)}\n\nSe generará el asiento de traspaso y el cuartel quedará como capitalizado.`))return;
+  if(rep.totalCosto>0&&!cuentaCosto){toast('⚠️ Selecciona la cuenta de costo del período','e');return;}
+  if(!confirm(`¿Capitalizar ${fmtC(total)} de "${c.nombre}" a la cuenta ${cuentaActivo}?\n\nGasto total acumulado: ${fmtC(rep.totalGasto)}\nSe capitaliza (activo): ${fmtC(rep.totalActivo)}\nQueda como costo del período: ${fmtC(rep.totalCosto)}\n\nSe generará el asiento de traspaso y el cuartel quedará como capitalizado.`))return;
 
   // ── Construcción del asiento ──
   // Se abona el TOTAL de los gastos acumulados (por su cuenta de origen) y se
@@ -553,7 +568,7 @@ export async function confirmarCapitalizar(id){
 
   // DEBE 2: costo del huerto (porción no capitalizable, va a resultado)
   if(totalCosto>0)
-    movs.push({cd:cuentaCosto,nm:pdcNm(cuentaCosto),debe:totalCosto,haber:0,desc:'Costo del huerto — '+desc,cc:id});
+    movs.push({cd:cuentaCosto,nm:pdcNm(cuentaCosto),debe:totalCosto,haber:0,desc:'Costo del período — '+desc,cc:id});
 
   // HABER: se saldan las cuentas de gasto acumuladas
   let abonado=0;

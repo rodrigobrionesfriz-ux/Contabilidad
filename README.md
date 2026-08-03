@@ -1,47 +1,110 @@
-# Contabilidad — Versión Modular
+# Contabilidad — Sistema contable chileno
 
-Migración del `index.html` monolítico (7.667 líneas) a **31 módulos ES**, sin build ni npm.
+Aplicación web de contabilidad para empresas chilenas, con soporte multiempresa, orientación agrícola/forestal y cumplimiento tributario SII.
 
-## Estructura
-```
-index.html      950 líneas (solo HTML)
-css/styles.css  estilos + 3 temas
-js/             31 módulos ES
-```
+**Stack:** HTML + 39 módulos ES nativos + CSS. Sin build, sin npm, sin frameworks. Firebase (Auth + Firestore) para autenticación y sincronización.
 
-## Probar localmente
-Los módulos ES **no funcionan con `file://`**. Necesitas servidor:
+---
+
+## Instalación
+
+### Probar localmente
+Los módulos ES **no funcionan abriendo el archivo con doble clic** (`file://`). Necesitas un servidor:
+
 ```bash
+cd app-modular
 python3 -m http.server 8000
 ```
 Abre `http://localhost:8000`.
 
-## Subir a GitHub Pages
-Sube `index.html`, `js/` y `css/` a la **raíz** del repo, manteniendo la estructura.
-Ya no basta con un solo archivo: son 32 archivos y las rutas relativas importan.
+### Publicar en GitHub Pages
+Sube `index.html`, la carpeta `js/` y la carpeta `css/` a la **raíz** del repositorio, manteniendo la estructura. Son ~40 archivos y las rutas relativas importan: no basta con subir uno solo.
 
-## Temas
-Botón en el header (🌙 / ☀️ / 🔷) alterna entre tres paletas, y recuerda la elección:
-- **Oscuro** — el original (verde)
-- **SAP Claro** — Fiori: fondo `#f5f6f7`, azul `#0a6ed1`, texto `#32363a`
-- **SAP Oscuro** — Fiori Horizon dark
+---
 
-Definidas en `css/styles.css` como `html[data-theme="..."]`. Todo el CSS usa variables, así que agregar otra paleta es solo añadir un bloque.
+## Funcionalidades
 
-## Arquitectura por capas
+### Registros
+- **Libro de Ventas** — documentos individuales con DTE, RUT, formas de pago, filtros por rango de fechas
+- **Libro de Compras** — con distribución de gastos por cuenta e importador desde el registro del SII
+- **Honorarios** — retención de 2ª categoría con tasa automática por año (Ley 21.133)
+- **Asientos Manuales** — partidas libres con buscador de cuentas, modal de documentos auxiliares, duplicar y anular
+- **Auxiliares** — por cliente/proveedor, con análisis de antigüedad de saldos (aging)
+
+### Reportes
+Libro Diario · Libro Mayor · Balance General (con comparativo entre años) · Estado de Resultados estructurado · Flujo de Caja (realizado y proyectado) · Conciliación Bancaria (manual o cargando cartola)
+
+### Tributario SII
+- **Formulario 29** — IVA mensual con arrastre de remanente, PPM y retenciones
+- **PPM** — pago provisional mensual
+- **Exportar XML SII** — libros de compra/venta en formato IECV (esquema LibroCV_v10)
+
+### Activo fijo y cierre
+Activos fijos con depreciación lineal y acelerada · Provisiones (incobrables, feriado legal) · Corrección monetaria (informativa) · Cierre de ejercicio
+
+### Remuneraciones
+Liquidaciones completas con AFP, salud (Fonasa o isapre con plan en UF del FUN), seguro de cesantía e impuesto único de 2ª categoría. La liquidación separa el 7% legal del adicional isapre. Incluye aporte patronal desglosado (SIS, mutual, AFC, caja) con la institución de destino de cada componente.
+
+### Centros de costo
+Dos niveles (centro principal → subcentro) para clasificar gastos por área: Administración, Transporte, Área Maderas, predios agrícolas, etc.
+
+Tres tipos de centro:
+- **Operativo** — sus costos van directo a resultado
+- **Inversión en curso** — acumula costos capitalizables según una curva de % por año
+- **Capitalizado** — ya se traspasaron a activo fijo
+
+Las inversiones en curso permiten **cierre mensual manual** (solo administradores) que traspasa los gastos del mes repartiéndolos entre activo y costo del período, y **capitalización final** a activo fijo.
+
+### Multiempresa
+Cada empresa tiene sus datos completamente aislados: plan de cuentas, libros, asientos, indicadores y centros propios. Se cambia con el selector del encabezado. Cada empresa elige su marco contable (tributaria chilena PCGA, NIIF para PYMEs o NIIF plenas).
+
+### Sistema
+Autenticación con roles (admin, contador, consulta) y permisos por sección · Gestión de usuarios · Registro de actividad (audit log) · Búsqueda global (Ctrl+K) · Export/import Excel · Sincronización con Firestore · Impresión con encabezado oficial · Tres temas visuales · Diseño responsive
+
+---
+
+## Configuración importante
+
+### Indicadores (Configuración → Indicadores)
+Valores que **debes mantener actualizados**:
+- **UF** (cambia a diario), **UTM** y **UTA** (mensuales), dólar y euro
+- Botón **"Traer valores del Banco Central"** que los consulta automáticamente desde mindicador.cl
+- Topes imponibles (AFP/salud 90 UF, cesantía 135,2 UF), ingreso mínimo
+- Tasas: AFP 10%, salud 7%, cesantía 0,6%, factor corrección monetaria
+- **Retención de honorarios**: tabla por año según Ley 21.133 (2026: 15,25%, sube hasta 17% en 2028). Se aplica la tasa del año en que se emite la boleta
+
+### Previsional (dentro de Indicadores)
+- Comisiones de las 7 AFP (editables)
+- Aporte del empleador: SIS 1,62%, mutual (base 0,90% + adicional por riesgo), AFC 2,4% indefinido / 3% plazo fijo, caja de compensación
+- Instituciones: mutual (ACHS, Mutual CChC, IST, ISL) y caja
+
+⚠️ **La tasa adicional de mutualidad viene en 0%**: depende del riesgo de tu actividad y te la notifica tu mutual. Cárgala para que el costo empresa quede exacto.
+
+### Año agrícola
+Los costos de las inversiones en curso se agrupan por **temporada de mayo a abril**. La temporada 2025/26 va del 1-may-2025 al 30-abr-2026.
+
+---
+
+## Arquitectura
+
 Dependencias en una sola dirección, sin ciclos.
+
 ```
-Capa 0  core state ui tema
-Capa 1  firebase storage
-Capa 2  helpers pdc empresa indicadores
-Capa 3  auth usuarios audit
-Capa 4  asientos ventas compras honorarios apertura activofijo remuneraciones
-Capa 5  reportes auxiliares tributario cierre flujocaja conciliacion
-        xmlsii busqueda backup impresion
+Capa 0  core · state · ui · tema · salida · buscadorcuentas
+Capa 1  firebase · storage
+Capa 2  helpers · pdc · empresa · indicadores · previsional · centroscosto
+Capa 3  auth · usuarios · audit · empresas
+Capa 4  asientos · ventas · compras · honorarios · apertura
+        activofijo · remuneraciones
+Capa 5  reportes · auxiliares · tributario · cierre · flujocaja
+        conciliacion · xmlsii · busqueda · backup · impresion
+        (+ las UI: previsional-ui · centroscosto-ui · empresas-ui)
 Capa 6  app  (orquestador)
 ```
 
-## Cómo se rompieron los ciclos
+`app.js` importa todo, define el routing y publica en `window` las ~160 funciones que el HTML usa en sus `onclick`.
+
+### Cómo se rompieron los ciclos
 | Ciclo | Solución |
 |---|---|
 | auth ↔ audit | `logAccion` (escritura) → firebase.js; `renderAuditLog` (vista) → audit.js |
@@ -49,51 +112,57 @@ Capa 6  app  (orquestador)
 | ventas ↔ asientos | helpers de bajo nivel → helpers.js |
 | varios ↔ app | `ui.js` con wrappers de `rerender`/`nav`; app.js inyecta con `registrarUI()` |
 
-## Cambios que exigió la modularización
-- **`PDC` se muta in-place**: `PDC.splice(0,PDC.length,...nueva)` en vez de reasignar.
-- **`AUTH` vive en state.js**; **`curSec`** se accede con `getCurSec()`/`setCurSec()`.
-- **Estado de formularios interno**: `VF`, `CF`, `AF`, `REMF`, `AFB`, `AUX_*` en su módulo.
-- **`onclick`**: app.js publica las 155 funciones necesarias en `window`.
-
-## Bug corregido: plan de cuentas vacío
-`renderPDC` usaba `CUENTAS_SEL`/`CUENTAS_GASTO` sin importarlos → `ReferenceError`.
-Se auditaron todos los módulos: **18 tenían imports faltantes** del mismo tipo (ventas, compras, asientos, backup…). Todos corregidos.
-
-## Validación hecha
-- ✅ Los 31 módulos cargan sin ciclos
-- ✅ **Las 24 funciones `render*` se ejecutan sin error** (esta prueba detecta los ReferenceError que la sintaxis no ve)
-- ✅ Cobertura de `onclick`: 155/155 expuestas
-- ✅ Servido por HTTP con MIME correcto
-- ✅ Cálculos verificados: `genDiario`/`buildMayor` correctos; liquidación de sueldo idéntica al monolito (AFP 74.060, líquido 572.740)
-- ✅ Ciclo de temas + persistencia
-
-## Falta validar en navegador
-Node no cubre DOM real ni eventos. Prueba: login/logout, guardar en cada sección, reportes, export/import Excel, Firestore, búsqueda (Ctrl+K), impresión, móvil.
-Mantén el monolito como respaldo hasta confirmarlo.
+### Detalles técnicos
+- **`PDC` se muta in-place** (`splice`), nunca se reasigna: los módulos ES no permiten reasignar un import
+- **Estado de formularios interno**: `AF`, `VF`, `CF`, `REMF`, `AFB` se declaran en su módulo y se publican en `window` porque el HTML los usa en `onclick`
+- **Multiempresa**: `storage.js` prefija todas las claves con el id de empresa (`emp1:ventas-2026`). Transparente para el resto de módulos
+- **Migración automática**: los datos de la versión monoempresa pasan a "Mi Empresa" la primera vez
 
 ---
 
-## Multiempresa
+## Sesión y seguridad
 
-Cada empresa tiene **datos completamente aislados**: plan de cuentas, libros, asientos, indicadores y activos propios.
+- **Persistencia SESSION**: la sesión sobrevive a recargas (F5) pero se pierde al cerrar la pestaña o el navegador
+- **Aviso al salir**: si hay cambios sin guardar, avisa antes de cerrar, recargar o cerrar sesión
+- **Botón atrás (Android)**: cierra modales → vuelve a la pantalla inicial → pregunta si salir
+- **Indicador en el encabezado**: "● Sin guardar" o "✓ Guardado HH:MM"
 
-- **Selector en el header** para cambiar de empresa (recarga todos los datos).
-- **Sección Configuración → Empresas** para crear, editar y eliminar.
-- Técnicamente: `storage.js` prefija todas las claves con el id de empresa (`emp1:ventas-2026`). Los módulos no cambiaron: el prefijo es transparente.
-- **Migración automática**: los datos que ya tenías pasan a ser la empresa "Mi Empresa" (emp1) la primera vez que abras esta versión. Las claves antiguas se conservan por seguridad.
+Para cambiar el comportamiento de sesión, en `js/auth.js`:
+```js
+firebase.auth.Auth.Persistence.SESSION  // actual
+firebase.auth.Auth.Persistence.NONE     // pide clave hasta al recargar
+firebase.auth.Auth.Persistence.LOCAL    // recuerda siempre
+```
 
-## Marco contable (IFRS)
+### Reglas de Firestore necesarias
+Para que el registro de actividad funcione, agrega en `firestore.rules`:
+```
+match /audit_log/{doc} {
+  allow create: if esUsuarioActivo();
+  allow read: if esAdminActivo();
+  allow update, delete: if false;   // el historial es inmutable
+}
+```
 
-Cada empresa elige su marco al crearla o editarla:
+---
 
-| Marco | Uso |
-|---|---|
-| **Tributaria chilena (PCGA)** | Orientada al SII: F29, PPM, depreciación tabla SII, corrección monetaria Art. 41 |
-| **NIIF para PYMEs** | Estados financieros de propósito general (bancos, inversionistas) |
-| **NIIF plenas** | Entidades con obligación pública de rendir cuentas |
+## Validación
 
-Efectos actuales del marco:
-- **Corrección monetaria**: bajo NIIF se advierte que el Art. 41 LIR no forma parte de las normas internacionales (es un ajuste tributario chileno; NIC 29 solo aplica en economías hiperinflacionarias).
-- **Impresión**: el encabezado de los reportes indica el marco bajo el cual se emiten.
+Cada entrega se valida en Node con stubs del DOM:
+- Los 39 módulos cargan en cadena sin ciclos
+- **27 secciones** se renderizan y dibujan contenido real
+- **12 formularios** abren sin error
+- Cobertura de `onclick`: todas las funciones que el HTML invoca están publicadas
+- Cálculos verificados contra fuentes oficiales: liquidaciones de sueldo, retención de honorarios, IUSC, F29, depreciación, capitalización por curva
 
-⚠️ **Alcance honesto**: el marco hoy adapta advertencias y el encabezado de reportes. Una implementación IFRS completa requeriría además: plan de cuentas por naturaleza NIIF, estado de situación financiera y estado de resultados integral en formato NIIF, notas explicativas, deterioro de activos (NIC 36), arrendamientos (NIIF 16) e impuestos diferidos (NIC 12). Eso es un proyecto aparte.
+### Lo que Node NO cubre
+El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba en el navegador: login/logout, guardar en cada sección, reportes, export/import Excel, sincronización, búsqueda (Ctrl+K), impresión y uso en móvil.
+
+---
+
+## Limitaciones conocidas
+
+- **XML SII**: el archivo cumple el formato de datos, pero para presentarlo al SII debe **firmarse digitalmente** con certificado electrónico. Eso no se puede hacer desde un sitio web estático
+- **IFRS**: el marco contable por empresa hoy adapta advertencias y el encabezado de reportes. Una implementación NIIF completa requeriría plan de cuentas por naturaleza, estados en formato NIIF, notas, deterioro (NIC 36), arrendamientos (NIIF 16) e impuestos diferidos (NIC 12)
+- **Corrección monetaria**: el régimen 14 D N°3 Pro-Pyme General **no está sujeto** a la CM del Art. 41 LIR. El módulo es informativo
+- **Indicadores automáticos**: dependen de mindicador.cl, un servicio externo gratuito. Si está caído, los valores se ingresan a mano

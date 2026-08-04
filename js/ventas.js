@@ -362,7 +362,7 @@ function renderImportModalVentas(){
       <div>${fechaMostrar}</div>
       <div>${d.tipoDTE}</div>
       <div>${d.numero}</div>
-      <div>${rutFmt(d.rutCodigo+'-'+d.rutDV)}</div>
+      <div>${rutFmt(d.rutCodigo,d.rutDV)}</div>
       <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.razonSocial}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmtC(d.neto)}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmtC(d.iva)}</div>

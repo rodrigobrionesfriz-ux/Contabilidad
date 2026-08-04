@@ -81,13 +81,13 @@ export function aplicarCT(id){
 export function abrirCTModal(){
   CTF={editId:null,lineas:[{cd:'',desc:'',debe:0,haber:0,cc:''},{cd:'',desc:'',debe:0,haber:0,cc:''}]};
   const m=document.getElementById('ct-modal');
-  if(m)m.classList.add('show');
+  if(m)m.classList.add('open');
   renderCTModal();
 }
 
 export function cerrarCTModal(){
   const m=document.getElementById('ct-modal');
-  if(m)m.classList.remove('show');
+  if(m)m.classList.remove('open');
   CTF={editId:null,lineas:[]};
 }
 

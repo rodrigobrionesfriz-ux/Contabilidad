@@ -1,5 +1,6 @@
 // ventas.js — Libro de ventas (documentos individuales)
-import {toast, pn, today, MESES, IVA, DTE_VENTAS, dteV, rutParse, rutFmt, rutDV, fmt, fmtC} from './core.js';
+import {toast, pn, today, MESES, IVA, DTE_VENTAS, dteV, rutParse, rutFmt, rutDV, fmt, fmtC, CUENTAS_INGRESO} from './core.js';
+import {leerArchivo} from './importadorsii.js';
 import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
@@ -9,6 +10,7 @@ import './storage.js';
 
 // Estado del formulario de ventas (interno del módulo)
 let VF={editId:null};
+let IMV={docs:[]}; // estado del importador SII de ventas
 
 // ═══ VENTAS — Documentos individuales ═══
 // Computa folio correlativo por mes: retorna {[docId]: folioNumero}
@@ -250,4 +252,196 @@ function eliminarVenta(id){
 }
 
 
-export {onMesChangeV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta, VF};
+
+
+function initImportListenerV(){
+  const input=document.getElementById('imp-ventas-file');
+  if(input&&!input._bound){input._bound=true;input.addEventListener('change',handleFileImportVentas);}
+}
+
+// ═══ IMPORTACIÓN DESDE SII (Registro de Ventas) ═══
+
+function abrirImportSIIVentas(){
+  const input=document.getElementById('imp-ventas-file');
+  input.value='';
+  input.click();
+}
+
+async function handleFileImportVentas(e){
+  const file=e.target.files[0];if(!file)return;
+  try{
+    const res=await leerArchivo(file,'venta');
+    mostrarVentasImportadas(res,file.name);
+  }catch(err){
+    toast('❌ '+err.message,'e');
+  }
+}
+
+function mostrarVentasImportadas(res,nombreArchivo){
+  if(!res.docs.length){
+    toast('⚠️ No se detectaron documentos válidos en el archivo','e');
+    return;
+  }
+  // Periodo más frecuente
+  const conteo={};
+  res.docs.forEach(d=>{const mY=d.fecha.slice(0,7);conteo[mY]=(conteo[mY]||0)+1;});
+  const [periodoTop]=Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
+  const [anioTop,mesTop]=periodoTop.split('-');
+
+  // Duplicados
+  const todos=todosDocsVentas();
+  res.docs.forEach(d=>{
+    const dup=todos.find(x=>x.rutCodigo===d.rutCodigo&&+x.tipoDTE===+d.tipoDTE&&x.numero===d.numero);
+    d.dup=dup||null;
+    d.incluir=!dup;
+    d.cuenta='';
+    d.fp='banco';
+  });
+
+  IMV={docs:res.docs,descartados:res.descartados||0,archivo:nombreArchivo,
+       periodoMes:+mesTop,periodoAnio:+anioTop};
+  abrirImportModalVentas();
+}
+
+function abrirImportModalVentas(){
+  const selMes=document.getElementById('impv-periodo-mes');
+  selMes.innerHTML=MESES.map((m,i)=>`<option value="${i+1}" ${i+1===IMV.periodoMes?'selected':''}>${m}</option>`).join('');
+  const selAnio=document.getElementById('impv-periodo-anio');
+  const cy=new Date().getFullYear();
+  const anios=new Set();
+  for(let y=cy-3;y<=cy+1;y++)anios.add(y);
+  anios.add(IMV.periodoAnio);
+  selAnio.innerHTML=[...anios].sort().map(y=>`<option value="${y}" ${y===IMV.periodoAnio?'selected':''}>${y}</option>`).join('');
+
+  // Bulk: cuentas de ingreso
+  const bulkSel=document.getElementById('impv-bulk');
+  bulkSel.innerHTML='<option value="">— seleccionar cuenta de ingreso —</option>'+
+    CUENTAS_INGRESO.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+
+  renderImportModalVentas();
+  document.getElementById('impv-modal').classList.add('open');
+}
+
+function cerrarImportModalVentas(){
+  document.getElementById('impv-modal').classList.remove('open');
+}
+
+function cambiarPeriodoImportV(){
+  IMV.periodoMes=+document.getElementById('impv-periodo-mes').value;
+  IMV.periodoAnio=+document.getElementById('impv-periodo-anio').value;
+  renderImportModalVentas();
+}
+
+function toggleAllImportV(v){
+  IMV.docs.forEach(d=>{if(!d.dup)d.incluir=v;});
+  renderImportModalVentas();
+}
+
+function aplicarCuentaATodosV(){
+  const cd=document.getElementById('impv-bulk').value;
+  if(!cd){toast('⚠️ Elige una cuenta primero','e');return;}
+  IMV.docs.forEach(d=>{if(d.incluir)d.cuenta=cd;});
+  renderImportModalVentas();
+}
+
+function renderImportModalVentas(){
+  const forzar=document.getElementById('impv-forzar-periodo').checked;
+  const box=document.getElementById('impv-rows');
+  const cuentasOpts='<option value="">— cuenta ingreso —</option>'+
+    CUENTAS_INGRESO.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+
+  const filas=IMV.docs.map((d,i)=>{
+    const fechaMostrar=forzar
+      ? `${IMV.periodoAnio}-${String(IMV.periodoMes).padStart(2,'0')}-${d.fechaOriginal?d.fechaOriginal.slice(8,10):String(d.fecha).slice(8,10)}`
+      : d.fecha;
+    const estado=d.dup
+      ? '<span style="color:var(--warn);font-size:10px">⚠️ duplicado</span>'
+      : (d.incluir?'<span style="color:var(--ach);font-size:10px">✓ nuevo</span>':'<span style="color:var(--mt);font-size:10px">omitido</span>');
+    return `<div class="imp-row" style="display:grid;grid-template-columns:26px 90px 60px 80px 120px 1fr 90px 80px 80px 100px 200px 90px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--bd);font-size:11px;align-items:center">
+      <div style="text-align:center">${d.dup?'':`<input type="checkbox" ${d.incluir?'checked':''} onchange="IMV.docs[${i}].incluir=this.checked;renderImportModalVentas()">`}</div>
+      <div>${fechaMostrar}</div>
+      <div>${d.tipoDTE}</div>
+      <div>${d.numero}</div>
+      <div>${rutFmt(d.rutCodigo+'-'+d.rutDV)}</div>
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.razonSocial}</div>
+      <div style="text-align:right;font-family:var(--mono)">${fmtC(d.neto)}</div>
+      <div style="text-align:right;font-family:var(--mono)">${fmtC(d.iva)}</div>
+      <div style="text-align:right;font-family:var(--mono)">${fmtC(d.otrosImpuestos||0)}</div>
+      <div style="text-align:right;font-family:var(--mono);font-weight:600">${fmtC(d.total)}</div>
+      <div><select onchange="IMV.docs[${i}].cuenta=this.value" style="width:100%;font-size:11px;padding:3px">${cuentasOpts.replace(`value="${d.cuenta}"`,`value="${d.cuenta}" selected`)}</select></div>
+      <div>${estado}</div>
+    </div>`;
+  }).join('');
+
+  box.innerHTML=filas;
+
+  const nuevos=IMV.docs.filter(d=>!d.dup).length;
+  const incluidos=IMV.docs.filter(d=>d.incluir).length;
+  const conCuenta=IMV.docs.filter(d=>d.incluir&&d.cuenta).length;
+
+  const summary=document.getElementById('impv-summary');
+  if(summary){
+    summary.innerHTML=`📄 <strong>${IMV.docs.length}</strong> documentos detectados en <em>${IMV.archivo||''}</em> · <strong>${nuevos}</strong> nuevos · <strong>${IMV.docs.length-nuevos}</strong> duplicados${IMV.descartados?' · '+IMV.descartados+' descartados':''}`;
+  }
+  const info=document.getElementById('impv-periodo-info');
+  if(info)info.textContent=`${incluidos} para importar · ${conCuenta} con cuenta asignada`;
+  const cnt=document.getElementById('impv-count');
+  if(cnt)cnt.textContent=`${incluidos} seleccionados`;
+}
+
+function confirmarImportacionV(){
+  const incluidos=IMV.docs.filter(d=>d.incluir);
+  if(!incluidos.length){toast('⚠️ No hay documentos seleccionados','e');return;}
+  const sinCuenta=incluidos.filter(d=>!d.cuenta);
+  if(sinCuenta.length){
+    if(!confirm(`⚠️ Hay ${sinCuenta.length} documentos sin cuenta de ingreso asignada.\n\nSe importarán igual pero deberás asignarles cuenta después. ¿Continuar?`))return;
+  }
+
+  const forzar=document.getElementById('impv-forzar-periodo').checked;
+  const anio=IMV.periodoAnio, mes=String(IMV.periodoMes).padStart(2,'0');
+
+  // Detectar clientes nuevos
+  const rutsExistentes=new Set(todosDocsVentas().map(v=>v.rutCodigo));
+  const clientesNuevos=new Map();
+  incluidos.forEach(d=>{
+    if(!rutsExistentes.has(d.rutCodigo)&&!clientesNuevos.has(d.rutCodigo)){
+      clientesNuevos.set(d.rutCodigo,{rutCodigo:d.rutCodigo,rutDV:d.rutDV,razonSocial:d.razonSocial});
+    }
+  });
+
+  // Cargar libro del año destino
+  if(!S.ventas)S.ventas={};
+  if(!S.ventas[anio])S.ventas[anio]=[];
+
+  let importados=0;
+  incluidos.forEach(d=>{
+    let fecha=d.fecha;
+    if(forzar){
+      const dia=String(d.fecha).slice(8,10)||'01';
+      fecha=`${anio}-${mes}-${dia}`;
+    }
+    S.ventas[anio].push({
+      id:'v_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+      fecha, tipoDTE:d.tipoDTE, numero:d.numero,
+      rutCodigo:d.rutCodigo, rutDV:d.rutDV, razonSocial:d.razonSocial,
+      neto:d.neto, exento:d.exento, iva:d.iva,
+      otrosImpuestos:d.otrosImpuestos||0, total:d.total,
+      formaPago:d.fp||'banco',
+      cuentaIngreso:d.cuenta||'',
+    });
+    importados++;
+  });
+
+  window.storage.set('ventas-'+anio,JSON.stringify(S.ventas[anio])).catch(()=>{});
+  cerrarImportModalVentas();
+  const msgClientes=clientesNuevos.size?` · ${clientesNuevos.size} clientes nuevos detectados en auxiliares`:'';
+  toast(`✅ ${importados} ventas importadas${msgClientes}`);
+  logAccion('Importó ventas SII',`${importados} documentos${msgClientes}`);
+  rerender();
+}
+
+
+export {onMesChangeV, abrirImportSIIVentas, handleFileImportVentas,
+        cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV,
+        renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas, initImportListenerV,
+        IMV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta, VF};

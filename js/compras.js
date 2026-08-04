@@ -7,6 +7,7 @@ import {mesOpts, foliosMensuales, mesRango} from './helpers.js';
 import {todosDocsCompras, abrirAsientoDesde} from './asientos.js';
 import {ccOpts} from './centroscosto.js';
 import {inputCuenta} from './buscadorcuentas.js';
+import {leerArchivo} from './importadorsii.js';
 import './storage.js';
 
 // Estado del formulario de compras (interno del módulo)
@@ -312,52 +313,10 @@ function eliminarCompra(id){
 let IM={docs:[]};
 
 // Parser de CSV que respeta comillas dobles (con escape "")
-function splitCSVRow(row,delim){
-  const out=[];let cur='';let inQ=false;
-  for(let i=0;i<row.length;i++){
-    const c=row[i];
-    if(inQ){
-      if(c==='"'){if(row[i+1]==='"'){cur+='"';i++;}else inQ=false;}
-      else cur+=c;
-    }else{
-      if(c===delim){out.push(cur);cur='';}
-      else if(c==='"')inQ=true;
-      else cur+=c;
-    }
-  }
-  out.push(cur);
-  return out.map(s=>s.trim());
-}
 
 // Parsea número en formato chileno (1.234.567 o 1.234,56 o 1234567)
-function parseNumSII(str){
-  if(!str)return 0;
-  str=String(str).trim().replace(/[$\s]/g,'');
-  if(!str||str==='-')return 0;
-  if(str.includes(',')&&str.includes('.')){
-    // "1.234,56" → 1234.56
-    str=str.replace(/\./g,'').replace(',','.');
-  }else if(/\d+[\.,]\d{3}(?:[\.,]\d{3})*$/.test(str)){
-    // Miles: "1.234.567" o "1,234,567" (sin decimales)
-    str=str.replace(/[\.,]/g,'');
-  }else if(str.includes(',')){
-    // "1234,56" → 1234.56
-    str=str.replace(',','.');
-  }
-  const n=parseFloat(str);
-  return isNaN(n)?0:Math.round(n);
-}
 
 // "02/01/2026" o "2/1/2026" → "2026-01-02"
-function parseFechaSII(str){
-  if(!str)return '';
-  str=String(str).trim();
-  let m=str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-  if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  m=str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if(m)return `${m[1]}-${m[2]}-${m[3]}`;
-  return '';
-}
 
 function parseSIICompras(text){
   if(text.charCodeAt(0)===0xFEFF)text=text.slice(1); // BOM
@@ -441,51 +400,16 @@ function abrirImportSII(){
   input.click();
 }
 
-function handleFileImport(e){
+async function handleFileImport(e){
   const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=(ev)=>{
-    try{
-      // Intentar detectar encoding: si hay caracteres raros en UTF-8, probar Latin-1
-      let text=ev.target.result;
-      // Si el texto tiene muchas secuencias raras típicas de mal decoding UTF-8 de Latin-1, re-leer como Latin-1
-      if(/[\u00C3][\u0080-\u00BF]/.test(text)){
-        // Probablemente es UTF-8 bien decodificado — dejar
-      }else if(/[ÃÂ][\x80-\xBF]/.test(text)){
-        // Doble-decodificado, raro
-      }
-      procesarImportText(text,file.name);
-    }catch(err){
-      toast('❌ Error al leer archivo: '+err.message,'e');
-    }
-  };
-  reader.onerror=()=>toast('❌ Error al leer archivo','e');
-  // Primero intentar leerlo como texto UTF-8. Si falla, reintentar con Latin-1.
-  reader.readAsText(file,'UTF-8');
-  reader._didTry=1;
-  reader._file=file;
+  try{
+    const res=await leerArchivo(file,'compra');
+    mostrarDocsImportados(res,file.name);
+  }catch(err){
+    toast('❌ '+err.message,'e');
+  }
 }
 
-function procesarImportText(text,nombreArchivo){
-  let res;
-  try{
-    res=parseSIICompras(text);
-  }catch(err){
-    // Reintentar con Latin-1 por si el encoding era incorrecto
-    const reader=new FileReader();
-    reader.onload=(ev)=>{
-      try{
-        const r2=parseSIICompras(ev.target.result);
-        mostrarDocsImportados(r2,nombreArchivo);
-      }catch(e2){toast('❌ '+e2.message,'e');}
-    };
-    const input=document.getElementById('imp-file');
-    if(input.files[0])reader.readAsText(input.files[0],'ISO-8859-1');
-    else toast('❌ '+err.message,'e');
-    return;
-  }
-  mostrarDocsImportados(res,nombreArchivo);
-}
 
 function mostrarDocsImportados(res,nombreArchivo){
   if(!res.docs.length){
@@ -665,6 +589,14 @@ function confirmarImportacion(){
     toast(`⚠️ ${sinCuenta.length} documento${sinCuenta.length===1?' no tiene':'s no tienen'} cuenta asignada`,'e');
     return;
   }
+  // Detectar proveedores nuevos (RUTs que no aparecen en el libro actual)
+  const rutsExistentes=new Set(todosDocsCompras().map(x=>x.rutCodigo));
+  const proveedoresNuevos=new Map();
+  incluidos.forEach(d=>{
+    if(!rutsExistentes.has(d.rutCodigo)&&!proveedoresNuevos.has(d.rutCodigo)){
+      proveedoresNuevos.set(d.rutCodigo,{rutCodigo:d.rutCodigo,rutDV:d.rutDV,razonSocial:d.razonSocial});
+    }
+  });
   // Crear registros de compras
   let agregados=0,normalizados=0;
   const ts=Date.now();
@@ -696,7 +628,8 @@ function confirmarImportacion(){
   window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>toast('❌ Error guardando en storage','e'));
   cerrarImportModal();
   const periodoStr=`${MESES[IM.periodoMes-1]} ${IM.periodoAnio}`;
-  toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${normalizados?` (${normalizados} con fecha normalizada)`:''}`);
+  const msgProv=proveedoresNuevos.size?` · ${proveedoresNuevos.size} proveedor${proveedoresNuevos.size===1?'':'es'} nuevo${proveedoresNuevos.size===1?'':'s'} detectado${proveedoresNuevos.size===1?'':'s'} en auxiliares`:'';
+  toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${normalizados?` (${normalizados} con fecha normalizada)`:''}${msgProv}`);
   rerender();
 }
 
@@ -710,4 +643,4 @@ function initImportListener(){
 }
 
 
-export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM, splitCSVRow, parseNumSII, parseFechaSII, parseSIICompras, abrirImportSII, handleFileImport, procesarImportText, mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, confirmarImportacion, initImportListener, CF};
+export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, confirmarImportacion, initImportListener, CF};

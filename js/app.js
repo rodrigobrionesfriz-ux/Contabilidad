@@ -31,6 +31,8 @@ import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
 import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas} from './buscadorcuentas.js';
 import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './salida.js';
+import {cargarFichasAux, descargarPlantillaAux, abrirImportFichas,
+        initImportFichasListener, fichasAux, fichaAux} from './importadoraux.js';
 import {cargarComprobantes} from './comprobantestipo.js';
 import {buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal,
         renderCTModal, setCTCuenta, setCTCampo, addCTLinea, delCTLinea, nuevoCT,
@@ -49,7 +51,10 @@ import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, ap
         toggleAllBal, confirmarImportBalance, renderImpBalModal, APF, IMB} from './apertura.js';
 import {onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerrarVF,
         vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta,
-        eliminarVenta, VF} from './ventas.js';
+        eliminarVenta, VF, abrirImportSIIVentas, handleFileImportVentas,
+        cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV,
+        renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
+        initImportListenerV, IMV} from './ventas.js';
 import {onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cerrarCF,
         cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck,
         guardarCompra, eliminarCompra, abrirImportSII, abrirImportModal,
@@ -77,7 +82,8 @@ import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
 import {genDiario, renderDiario, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados} from './reportes.js';
 import {setAuxTab, setAuxView, toggleAux, renderAuxiliares, calcularAging,
-        toggleAgingDetalle} from './auxiliares.js';
+        toggleAgingDetalle, AUX_TAB} from './auxiliares.js';
+// AUX_TAB también viene de auxiliares.js — se recupera desde window.
 import {renderF29, renderPPM} from './tributario.js';
 import {setFCView, renderFlujoCaja} from './flujocaja.js';
 import {renderConciliacion, onSaldoBancoChange, toggleConciliado,
@@ -104,6 +110,7 @@ async function saveAll(){
     if(S.centros&&S.centros.length)await window.storage.set('centros',JSON.stringify(S.centros));
     if(S.cierresCC&&S.cierresCC.length)await window.storage.set('cierresCC',JSON.stringify(S.cierresCC));
     if(S.comprobantesTipo&&S.comprobantesTipo.length)await window.storage.set('comprobantesTipo',JSON.stringify(S.comprobantesTipo));
+    if(S.fichasAux)await window.storage.set('fichasAux',JSON.stringify(S.fichasAux));
     toast('✅ Todos los datos guardados');
   }catch(e){toast('❌ Error: '+e.message,'e');}
   btn.textContent='💾 Guardar Todo';
@@ -182,9 +189,11 @@ async function initApp(){
   }catch(e){console.warn('Error cargando PDC:',e);}
   ys.value=S.empresa.anio;
   await loadYear(S.empresa.anio);
-  await cargarCentros();await cargarCierresCC();await cargarComprobantes();
+  await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();
   fillEmpresaForm();updateHdr();
   initImportListener();
+  initImportListenerV();
+  initImportFichasListener();
   initBDImportListener();
   initBalanceImportListener();
   bdStatusSet('offline');
@@ -290,7 +299,7 @@ async function recargarEmpresaActiva(){
     if(r){const l=JSON.parse(r.value);if(Array.isArray(l)&&l.length){PDC.length=0;l.forEach(c=>PDC.push(c));recalcDerivadasPDC();}}
   }catch(e){}
   await loadYear(S.empresa.anio);
-  await cargarCentros();await cargarCierresCC();await cargarComprobantes();
+  await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();
   fillEmpresaForm();updateHdr();renderSelectorEmpresa();
   rerender();
 }
@@ -305,7 +314,7 @@ setOnAuthReady(initApp);
 // El HTML usa onclick="renderVentas()" etc. Los módulos ES tienen scope propio,
 // así que hay que publicar esas funciones en window.
 // Objetos de estado usados directamente en onclick del HTML
-Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, US, BD, S, getCurSec});
+Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec});
 
 Object.assign(window,{
   // navegación y arranque
@@ -324,6 +333,9 @@ Object.assign(window,{
   onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual, revertirCierreMensual,
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas,
   marcarGuardado, marcarSucio, haySinGuardar,
+  abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV,
+  descargarPlantillaAux, abrirImportFichas, descargarPlantillaAuxActual, abrirImportFichasActual,
+  renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
   buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal, renderCTModal,
   setCTCuenta, setCTCampo, addCTLinea, delCTLinea, nuevoCT, editarCT, guardarCT,
   borrarCT, copiarCTaEmpresa,
@@ -375,6 +387,14 @@ Object.assign(window,{
 
 // Encabezado de impresión
 window.addEventListener('beforeprint', prepararImpresion);
+
+
+// Puentes que traducen el tab activo a 'cliente'/'proveedor'
+function tipoAuxActual(){
+  return (typeof AUX_TAB!=='undefined'?AUX_TAB:'c')==='c'?'cliente':'proveedor';
+}
+function descargarPlantillaAuxActual(){descargarPlantillaAux(tipoAuxActual());}
+function abrirImportFichasActual(){abrirImportFichas(tipoAuxActual());}
 
 // ═══ ARRANQUE ═══
 initTema();

@@ -265,4 +265,4 @@ function renderAuxAging(data){
 
 
 
-export {setAuxTab, setAuxView, toggleAux, renderAuxiliares, AGING_BUCKETS, diasEntre, calcularAging, toggleAgingDetalle, renderAuxAging};
+export {setAuxTab, setAuxView, toggleAux, renderAuxiliares, AGING_BUCKETS, diasEntre, calcularAging, toggleAgingDetalle, renderAuxAging, AUX_TAB};

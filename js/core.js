@@ -320,9 +320,11 @@ let PDC=[
 
 let CUENTAS_SEL=PDC.filter(c=>c.nat);
 let CUENTAS_GASTO=PDC.filter(c=>c.tp==='C');
+let CUENTAS_INGRESO=PDC.filter(c=>c.tp==='I');
 function recalcDerivadasPDC(){
   CUENTAS_SEL=PDC.filter(c=>c.nat);
   CUENTAS_GASTO=PDC.filter(c=>c.tp==='C');
+  CUENTAS_INGRESO=PDC.filter(c=>c.tp==='I');
 }
 const pdcNm=cd=>{const r=PDC.find(x=>x.cd===cd);return r?r.nm:cd;};
 
@@ -391,4 +393,4 @@ function toast(msg,tipo='ok'){
 }
 
 
-export {MESES, MC, IVA, CCOLS, PDC, CUENTAS_SEL, CUENTAS_GASTO, recalcDerivadasPDC, pdcNm, DTE_VENTAS, DTE_COMPRAS, dteV, dteC, rutDV, rutParse, rutFmt, fmt, fmtC, pn, today, toast};
+export {MESES, MC, IVA, CCOLS, PDC, CUENTAS_SEL, CUENTAS_GASTO, CUENTAS_INGRESO, recalcDerivadasPDC, pdcNm, DTE_VENTAS, DTE_COMPRAS, dteV, dteC, rutDV, rutParse, rutFmt, fmt, fmtC, pn, today, toast};

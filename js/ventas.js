@@ -1,6 +1,7 @@
 // ventas.js — Libro de ventas (documentos individuales)
 import {toast, pn, today, MESES, IVA, DTE_VENTAS, dteV, rutParse, rutFmt, rutDV, fmt, fmtC, CUENTAS_INGRESO} from './core.js';
 import {leerArchivo} from './importadorsii.js';
+import {inputCuenta} from './buscadorcuentas.js';
 import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
@@ -313,10 +314,14 @@ function abrirImportModalVentas(){
   anios.add(IMV.periodoAnio);
   selAnio.innerHTML=[...anios].sort().map(y=>`<option value="${y}" ${y===IMV.periodoAnio?'selected':''}>${y}</option>`).join('');
 
-  // Bulk: cuentas de ingreso
-  const bulkSel=document.getElementById('impv-bulk');
-  bulkSel.innerHTML='<option value="">— seleccionar cuenta de ingreso —</option>'+
-    CUENTAS_INGRESO.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+  // Bulk: usa buscador dinámico
+  const bulkWrap=document.getElementById('impv-bulk-wrap');
+  if(bulkWrap){
+    bulkWrap.innerHTML=inputCuenta({id:'impv-bulk-cd',value:'',
+      onPick:"setBulkCuentaImpV('%CD%')",
+      placeholder:'Buscar cuenta de ingreso por código o nombre…',
+      clase:'linea-inp',filtro:'ingreso'});
+  }
 
   renderImportModalVentas();
   document.getElementById('impv-modal').classList.add('open');
@@ -337,8 +342,14 @@ function toggleAllImportV(v){
   renderImportModalVentas();
 }
 
+// Guarda temporalmente la cuenta elegida en el buscador bulk
+let _bulkCuentaImpV='';
+function setBulkCuentaImpV(cd){_bulkCuentaImpV=cd;}
+
 function aplicarCuentaATodosV(){
-  const cd=document.getElementById('impv-bulk').value;
+  const bulkInp=document.getElementById('impv-bulk-cd');
+  const cd=_bulkCuentaImpV||(bulkInp?bulkInp.dataset.cd:'')||
+    (document.getElementById('impv-bulk')&&document.getElementById('impv-bulk').value)||'';
   if(!cd){toast('⚠️ Elige una cuenta primero','e');return;}
   IMV.docs.forEach(d=>{if(d.incluir)d.cuenta=cd;});
   renderImportModalVentas();
@@ -347,8 +358,7 @@ function aplicarCuentaATodosV(){
 function renderImportModalVentas(){
   const forzar=document.getElementById('impv-forzar-periodo').checked;
   const box=document.getElementById('impv-rows');
-  const cuentasOpts='<option value="">— cuenta ingreso —</option>'+
-    CUENTAS_INGRESO.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+
 
   const filas=IMV.docs.map((d,i)=>{
     const fechaMostrar=forzar
@@ -368,7 +378,7 @@ function renderImportModalVentas(){
       <div style="text-align:right;font-family:var(--mono)">${fmtC(d.iva)}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmtC(d.otrosImpuestos||0)}</div>
       <div style="text-align:right;font-family:var(--mono);font-weight:600">${fmtC(d.total)}</div>
-      <div><select onchange="IMV.docs[${i}].cuenta=this.value" style="width:100%;font-size:11px;padding:3px">${cuentasOpts.replace(`value="${d.cuenta}"`,`value="${d.cuenta}" selected`)}</select></div>
+      <div>${inputCuenta({id:`impv-cd-${i}`,value:d.cuenta||'',onPick:`IMV.docs[${i}].cuenta='%CD%';renderImportModalVentas()`,placeholder:'Buscar cuenta…',clase:'linea-inp',filtro:'ingreso'})}</div>
       <div>${estado}</div>
     </div>`;
   }).join('');
@@ -409,20 +419,27 @@ function confirmarImportacionV(){
     }
   });
 
-  // Cargar libro del año destino
-  if(!S.ventas)S.ventas={};
-  if(!S.ventas[anio])S.ventas[anio]=[];
+  // Aviso si el año del archivo no coincide con el año activo:
+  // S.ventas es el libro del año activo; guardar en otro año no se vería.
+  if(anio!==S.empresa.anio){
+    if(!confirm(`El archivo es de ${anio} pero el año activo es ${S.empresa.anio}.\n\nSi importas ahora, los documentos irán al libro de ${S.empresa.anio}. Para importarlos en ${anio}, cambia primero de año con el selector del encabezado.\n\n¿Continuar de todas formas?`))return;
+  }
+
+  // S.ventas es un array plano (el año lo define storage). Reproducimos el
+  // patrón de guardarVenta() individual: push al array y persistir.
+  if(!Array.isArray(S.ventas))S.ventas=[];
 
   let importados=0;
-  incluidos.forEach(d=>{
+  incluidos.forEach((d,i)=>{
     let fecha=d.fecha;
     if(forzar){
       const dia=String(d.fecha).slice(8,10)||'01';
       fecha=`${anio}-${mes}-${dia}`;
     }
-    S.ventas[anio].push({
-      id:'v_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    S.ventas.push({
+      id:'v_imp_'+Date.now()+'_'+i,
       fecha, tipoDTE:d.tipoDTE, numero:d.numero,
+      fechaVencimiento:'',
       rutCodigo:d.rutCodigo, rutDV:d.rutDV, razonSocial:d.razonSocial,
       neto:d.neto, exento:d.exento, iva:d.iva,
       otrosImpuestos:d.otrosImpuestos||0, total:d.total,
@@ -432,7 +449,7 @@ function confirmarImportacionV(){
     importados++;
   });
 
-  window.storage.set('ventas-'+anio,JSON.stringify(S.ventas[anio])).catch(()=>{});
+  window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas)).catch(()=>toast('❌ Error guardando en storage','e'));
   cerrarImportModalVentas();
   const msgClientes=clientesNuevos.size?` · ${clientesNuevos.size} clientes nuevos detectados en auxiliares`:'';
   toast(`✅ ${importados} ventas importadas${msgClientes}`);
@@ -442,6 +459,6 @@ function confirmarImportacionV(){
 
 
 export {onMesChangeV, abrirImportSIIVentas, handleFileImportVentas,
-        cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV,
+        cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV,
         renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas, initImportListenerV,
         IMV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta, VF};

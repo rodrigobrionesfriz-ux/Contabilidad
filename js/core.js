@@ -321,10 +321,18 @@ let PDC=[
 let CUENTAS_SEL=PDC.filter(c=>c.nat);
 let CUENTAS_GASTO=PDC.filter(c=>c.tp==='C');
 let CUENTAS_INGRESO=PDC.filter(c=>c.tp==='I');
+// Cuentas que pueden recibir el neto de una compra: gastos + activos
+// (excluye caja, bancos, cuentas por cobrar e IVA crédito)
+const cdCompraExcluido=cd=>{
+  const s=String(cd);
+  return s.startsWith('1101')||s.startsWith('1102')||s.startsWith('1104')||s.startsWith('1105')||s.startsWith('1108');
+};
+let CUENTAS_COMPRA=PDC.filter(c=>(c.tp==='C'||c.tp==='A')&&!cdCompraExcluido(c.cd));
 function recalcDerivadasPDC(){
   CUENTAS_SEL=PDC.filter(c=>c.nat);
   CUENTAS_GASTO=PDC.filter(c=>c.tp==='C');
   CUENTAS_INGRESO=PDC.filter(c=>c.tp==='I');
+  CUENTAS_COMPRA=PDC.filter(c=>(c.tp==='C'||c.tp==='A')&&!cdCompraExcluido(c.cd));
 }
 const pdcNm=cd=>{const r=PDC.find(x=>x.cd===cd);return r?r.nm:cd;};
 
@@ -393,4 +401,4 @@ function toast(msg,tipo='ok'){
 }
 
 
-export {MESES, MC, IVA, CCOLS, PDC, CUENTAS_SEL, CUENTAS_GASTO, CUENTAS_INGRESO, recalcDerivadasPDC, pdcNm, DTE_VENTAS, DTE_COMPRAS, dteV, dteC, rutDV, rutParse, rutFmt, fmt, fmtC, pn, today, toast};
+export {MESES, MC, IVA, CCOLS, PDC, CUENTAS_SEL, CUENTAS_GASTO, CUENTAS_INGRESO, CUENTAS_COMPRA, recalcDerivadasPDC, pdcNm, DTE_VENTAS, DTE_COMPRAS, dteV, dteC, rutDV, rutParse, rutFmt, fmt, fmtC, pn, today, toast};

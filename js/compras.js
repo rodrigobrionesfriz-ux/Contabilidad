@@ -1,5 +1,5 @@
 // compras.js — Libro de compras + importador SII
-import {toast, fmt, pn, today, MESES, IVA, DTE_COMPRAS, dteC, rutParse, rutFmt, rutDV, pdcNm, CCOLS, CUENTAS_GASTO, fmtC} from './core.js';
+import {toast, fmt, pn, today, MESES, IVA, DTE_COMPRAS, dteC, rutParse, rutFmt, rutDV, pdcNm, CCOLS, CUENTAS_GASTO, CUENTAS_COMPRA, fmtC} from './core.js';
 import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
@@ -31,7 +31,8 @@ function dteComprasOpts(sel=''){
   return '<option value="">— Seleccionar —</option>'+DTE_COMPRAS.map(d=>`<option value="${d.cod}" ${+sel===d.cod?'selected':''}>${d.cod} — ${d.nm}</option>`).join('');
 }
 function cuentasGastoOpts(sel=''){
-  return '<option value="">— cuenta de gasto —</option>'+CUENTAS_GASTO.map(c=>`<option value="${c.cd}" ${c.cd===sel?'selected':''}>${c.cd} — ${c.nm}</option>`).join('');
+  // Ahora incluye gastos + activos (para compras que son inversión, no gasto)
+  return '<option value="">— cuenta de gasto o activo —</option>'+CUENTAS_COMPRA.map(c=>`<option value="${c.cd}" ${c.cd===sel?'selected':''}>${c.cd} — ${c.nm} ${c.tp==='A'?'(activo)':''}</option>`).join('');
 }
 
 function renderCompras(){
@@ -455,9 +456,14 @@ function abrirImportModal(){
   selAnio.innerHTML=aniosOrd.map(y=>`<option value="${y}" ${y===IM.periodoAnio?'selected':''}>${y}</option>`).join('');
 
   // Poblar select bulk
-  const bulkSel=document.getElementById('imp-bulk');
-  bulkSel.innerHTML='<option value="">— seleccionar cuenta de gasto —</option>'+
-    CUENTAS_GASTO.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+  // El bulk usa el buscador dinámico: reemplazamos el <select> por un <input>
+  const bulkWrap=document.getElementById('imp-bulk-wrap');
+  if(bulkWrap){
+    bulkWrap.innerHTML=inputCuenta({id:'imp-bulk-cd',value:'',
+      onPick:"setBulkCuentaImp('%CD%')",
+      placeholder:'Buscar cuenta de gasto o activo por código o nombre…',
+      clase:'linea-inp',filtro:'compra'});
+  }
 
   renderImportModal();
   document.getElementById('imp-modal').classList.add('open');
@@ -528,9 +534,7 @@ function renderImportModal(){
   const chkAll=document.getElementById('imp-all');
   chkAll.checked=incl>0&&incl===IM.docs.filter(d=>!d.dup).length;
 
-  // Filas
-  const opciones='<option value="">— sin asignar —</option>'+
-    CUENTAS_GASTO.map(c=>`<option value="${c.cd}">${c.cd} — ${c.nm}</option>`).join('');
+  // Filas: cada una usa buscador dinámico (compra = gasto + activo)
   document.getElementById('imp-rows').innerHTML=IM.docs.map((d,i)=>{
     const cls='imp-row'+(d.dup?' dup':'')+(!d.incluir?' excluded':'');
     const [y,m]=d.fechaOriginal.split('-');
@@ -541,8 +545,9 @@ function renderImportModal(){
     const estado=d.dup
       ?`<span class="dup-badge">DUPLICADO</span>`
       :(d.cuenta?`<span class="ok-badge">LISTO</span>`:`<span style="color:var(--mt);font-size:10px">pendiente</span>`);
-    const selHtml=`<select onchange="setImportCuenta(${i},this.value)">`+
-      opciones.replace(`value="${d.cuenta}"`,`value="${d.cuenta}" selected`)+'</select>';
+    const selHtml=inputCuenta({id:`imp-cd-${i}`,value:d.cuenta||'',
+      onPick:`setImportCuenta(${i},'%CD%')`,
+      placeholder:'Buscar cuenta…',clase:'linea-inp',filtro:'compra'});
     return `<div class="${cls}">
       <div style="text-align:center"><input type="checkbox" ${d.incluir?'checked':''} ${d.dup?'disabled':''} onchange="toggleImportDoc(${i},this.checked)"></div>
       <div style="font-family:var(--mono);font-size:10px">${fechaShow}</div>
@@ -572,8 +577,15 @@ function setImportCuenta(i,cuenta){
   IM.docs[i].cuenta=cuenta;
   renderImportModal();
 }
+// Guarda temporalmente la cuenta elegida en el buscador bulk
+let _bulkCuentaImp='';
+function setBulkCuentaImp(cd){_bulkCuentaImp=cd;}
+
 function aplicarCuentaATodos(){
-  const cta=document.getElementById('imp-bulk').value;
+  // Leer del buscador (nuevo) o del select antiguo si aún existe
+  const bulkInp=document.getElementById('imp-bulk-cd');
+  const cta=_bulkCuentaImp||(bulkInp?bulkInp.dataset.cd:'')||
+    (document.getElementById('imp-bulk')&&document.getElementById('imp-bulk').value)||'';
   if(!cta){toast('⚠️ Selecciona una cuenta primero','e');return;}
   let n=0;
   IM.docs.forEach(d=>{if(d.incluir){d.cuenta=cta;n++;}});
@@ -643,4 +655,4 @@ function initImportListener(){
 }
 
 
-export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, confirmarImportacion, initImportListener, CF};
+export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setBulkCuentaImp, confirmarImportacion, initImportListener, CF};

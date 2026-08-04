@@ -395,6 +395,7 @@
     <div><div class="sec-title">Libro de Ventas</div><div class="sec-sub" id="ventas-sub">Registro por documento</div></div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-g" onclick="window.print()">🖨️</button>
+      <button class="btn btn-i" onclick="abrirImportSIIVentas()">📥 Importar SII</button>
       <button class="btn btn-p" onclick="abrirVF()">+ Nuevo Documento</button>
     </div>
   </div>
@@ -655,11 +656,14 @@
 <section class="section" id="s-auxiliares">
   <div class="sec-hdr">
     <div><div class="sec-title">Auxiliares</div><div class="sec-sub">Sub-libros por cliente y proveedor</div></div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <div class="aux-tabs" style="margin:0">
         <div class="aux-tab active" id="aux-view-detalle" onclick="setAuxView('detalle')">📋 Detalle</div>
         <div class="aux-tab" id="aux-view-aging" onclick="setAuxView('aging')">📊 Aging</div>
       </div>
+      <button class="btn btn-i" onclick="descargarPlantillaAuxActual()" title="Descargar plantilla Excel para carga masiva">📄 Plantilla</button>
+      <button class="btn btn-i" onclick="abrirImportFichasActual()" title="Importar fichas desde Excel">📥 Importar fichas</button>
+      <input type="file" id="imp-fichas-file" accept=".xlsx,.xls" style="display:none">
       <button class="btn btn-g" onclick="window.print()">🖨️ Imprimir</button>
     </div>
   </div>
@@ -966,7 +970,8 @@
 </div>
 
 <!-- File input oculto para importar -->
-<input type="file" id="imp-file" accept=".csv,.txt" style="display:none">
+<input type="file" id="imp-file" accept=".csv,.txt,.xlsx,.xls" style="display:none">
+<input type="file" id="imp-ventas-file" accept=".csv,.txt,.xlsx,.xls" style="display:none">
 
 <!-- MODAL IMPORTAR BALANCE -->
 <div class="modal-bkd" id="impbal-modal">
@@ -996,6 +1001,60 @@
     </div>
   </div>
 </div>
+
+
+<!-- MODAL IMPORTAR SII VENTAS -->
+<div class="modal-bkd" id="impv-modal">
+  <div class="modal-box" style="max-width:1280px">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">📥 Importar Ventas desde SII</div>
+        <div class="modal-sub">Revisa los documentos detectados y asigna una cuenta de ingreso a cada uno.</div>
+      </div>
+      <button class="modal-close" onclick="cerrarImportModalVentas()">✕</button>
+    </div>
+
+    <div style="background:linear-gradient(135deg,rgba(46,160,67,.1),rgba(88,166,255,.08));border:1px solid rgba(46,160,67,.3);border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:3px">📅 Periodo del Archivo</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="impv-periodo-mes" onchange="cambiarPeriodoImportV()" style="background:var(--sf);border:1px solid var(--bd);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600"></select>
+          <select id="impv-periodo-anio" onchange="cambiarPeriodoImportV()" style="background:var(--sf);border:1px solid var(--bd);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600"></select>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--mt);flex:1" id="impv-periodo-info"></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;user-select:none">
+        <input type="checkbox" id="impv-forzar-periodo" checked onchange="renderImportModalVentas()">
+        <span>Forzar todas las fechas al periodo seleccionado</span>
+      </label>
+    </div>
+
+    <div id="impv-summary" class="info-tip" style="margin-bottom:12px"></div>
+
+    <div class="filter-row" style="padding:10px 12px;background:var(--sf);border:1px solid var(--bd);border-radius:6px;margin-bottom:10px">
+      <span class="f-lbl">Asignar cuenta a TODOS:</span>
+      <select id="impv-bulk" style="min-width:320px"><option value="">— seleccionar cuenta de ingreso —</option></select>
+      <button class="btn btn-s" style="font-size:11px" onclick="aplicarCuentaATodosV()">Aplicar a todos los incluidos</button>
+      <span class="doc-count" id="impv-count"></span>
+    </div>
+
+    <div class="card-np" style="max-height:480px;overflow-y:auto;margin-bottom:12px">
+      <div class="imp-row-hdr" style="display:grid;grid-template-columns:26px 90px 60px 80px 120px 1fr 90px 80px 80px 100px 200px 90px;gap:6px;padding:8px;background:var(--sf2);font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5">
+        <div style="text-align:center"><input type="checkbox" id="impv-all" onchange="toggleAllImportV(this.checked)"></div>
+        <div>FECHA</div><div>DTE</div><div>N° DOC</div><div>RUT</div><div>RAZÓN SOCIAL</div>
+        <div style="text-align:right">NETO</div><div style="text-align:right">IVA</div><div style="text-align:right">OTROS</div><div style="text-align:right">TOTAL</div>
+        <div>CUENTA DE INGRESO</div><div>ESTADO</div>
+      </div>
+      <div id="impv-rows"></div>
+    </div>
+
+    <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 0">
+      <button class="btn btn-d" onclick="cerrarImportModalVentas()">Cancelar</button>
+      <button class="btn btn-p" onclick="confirmarImportacionV()" id="impv-btn-ok">💾 Importar documentos</button>
+    </div>
+  </div>
+</div>
+
 
 <script type="module" src="js/app.js"></script>
 </body>

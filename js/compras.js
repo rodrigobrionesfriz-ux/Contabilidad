@@ -427,13 +427,19 @@ function mostrarDocsImportados(res,nombreArchivo){
   const [periodoTop,cantTop]=periodos[0];
   const [anioTop,mesTop]=periodoTop.split('-');
 
-  // Marcar duplicados
+  // Marcar duplicados: comparamos SIEMPRE como string, porque un doc guardado
+  // manualmente puede tener el número como Number y el CSV lo trae como String.
   const todos=todosDocsCompras();
   res.docs.forEach(d=>{
-    const dup=todos.find(x=>x.rutCodigo===d.rutCodigo&&+x.tipoDTE===+d.tipoDTE&&x.numero===d.numero);
+    const dup=todos.find(x=>
+      x.rutCodigo===d.rutCodigo &&
+      +x.tipoDTE===+d.tipoDTE &&
+      String(x.numero).trim()===String(d.numero).trim()
+    );
     d.dup=dup||null;
     d.incluir=!dup;
     d.cuenta='';
+    d.cc='';                 // centro de costo (nuevo)
     d.fechaOriginal=d.fecha; // preservamos para referencia
   });
 
@@ -464,6 +470,9 @@ function abrirImportModal(){
       placeholder:'Buscar cuenta de gasto o activo por código o nombre…',
       clase:'linea-inp',filtro:'compra'});
   }
+  // Bulk de centro de costo: reutilizamos ccOpts() que ya arma la jerarquía
+  const bulkCC=document.getElementById('imp-bulk-cc');
+  if(bulkCC)bulkCC.innerHTML=ccOpts('');
 
   renderImportModal();
   document.getElementById('imp-modal').classList.add('open');
@@ -548,6 +557,8 @@ function renderImportModal(){
     const selHtml=inputCuenta({id:`imp-cd-${i}`,value:d.cuenta||'',
       onPick:`setImportCuenta(${i},'%CD%')`,
       placeholder:'Buscar cuenta…',clase:'linea-inp',filtro:'compra'});
+    // Selector de centro de costo (opcional)
+    const ccHtml=`<select onchange="setImportCC(${i},this.value)" style="width:100%;font-size:11px;padding:3px">${ccOpts(d.cc||'')}</select>`;
     return `<div class="${cls}">
       <div style="text-align:center"><input type="checkbox" ${d.incluir?'checked':''} ${d.dup?'disabled':''} onchange="toggleImportDoc(${i},this.checked)"></div>
       <div style="font-family:var(--mono);font-size:10px">${fechaShow}</div>
@@ -560,6 +571,7 @@ function renderImportModal(){
       <div style="text-align:right;font-family:var(--mono)">${fmt(d.otrosImpuestos)}</div>
       <div style="text-align:right;font-family:var(--mono);font-weight:600">${fmt(d.total)}</div>
       <div>${selHtml}</div>
+      <div>${ccHtml}</div>
       <div>${estado}</div>
     </div>`;
   }).join('');
@@ -593,6 +605,22 @@ function aplicarCuentaATodos(){
   toast(`✅ Aplicada cuenta a ${n} documento${n===1?'':'s'}`);
 }
 
+// ── Centro de costo en el importador ──
+function setImportCC(i,cc){
+  IM.docs[i].cc=cc;
+}
+function aplicarCCATodos(){
+  const sel=document.getElementById('imp-bulk-cc');
+  const cc=sel?sel.value:'';
+  // Se aplica también con cc vacío: eso significa "quitar CC a todos"
+  let n=0;
+  IM.docs.forEach(d=>{if(d.incluir){d.cc=cc;n++;}});
+  renderImportModal();
+  toast(cc
+    ? `✅ Centro de costo aplicado a ${n} documento${n===1?'':'s'}`
+    : `✅ Centro de costo quitado de ${n} documento${n===1?'':'s'}`);
+}
+
 function confirmarImportacion(){
   const incluidos=IM.docs.filter(d=>d.incluir);
   if(!incluidos.length){toast('⚠️ No hay documentos para importar','e');return;}
@@ -615,6 +643,10 @@ function confirmarImportacion(){
   incluidos.forEach((d,i)=>{
     const fechaFinal=fechaEfectivaImport(d);
     if(fechaFinal!==d.fechaOriginal)normalizados++;
+    // En la distribución guardamos SOLO neto + exento.
+    // Los "otros impuestos" los suma genDiario/reportes a la primera cuenta
+    // de la distribución al generar el asiento (así se evita duplicarlos).
+    const montoDist=d.neto+d.exento;
     const doc={
       id:'c_imp_'+ts+'_'+i,
       fecha:fechaFinal,
@@ -627,13 +659,10 @@ function confirmarImportacion(){
       neto:d.neto,
       exento:d.exento,
       iva:d.iva,
-      otrosImpuestos:d.otrosImpuestos,
+      otrosImpuestos:d.otrosImpuestos||0,
       total:d.total,
-      dist:[{cuenta:d.cuenta,monto:d.neto+d.exento}]
+      dist:[{cuenta:d.cuenta,monto:montoDist,cc:d.cc||''}]
     };
-    const sumDist=doc.dist.reduce((s,l)=>s+l.monto,0);
-    const netoEsperado=d.neto+d.exento;
-    if(Math.abs(sumDist-netoEsperado)>0){doc.dist[0].monto=netoEsperado;}
     S.compras.push(doc);
     agregados++;
   });
@@ -655,4 +684,4 @@ function initImportListener(){
 }
 
 
-export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setBulkCuentaImp, confirmarImportacion, initImportListener, CF};
+export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setImportCC, aplicarCCATodos, setBulkCuentaImp, confirmarImportacion, initImportListener, CF};

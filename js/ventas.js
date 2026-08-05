@@ -289,10 +289,14 @@ function mostrarVentasImportadas(res,nombreArchivo){
   const [periodoTop]=Object.entries(conteo).sort((a,b)=>b[1]-a[1])[0];
   const [anioTop,mesTop]=periodoTop.split('-');
 
-  // Duplicados
+  // Duplicados: comparación como string para tolerar tipos mixtos.
   const todos=todosDocsVentas();
   res.docs.forEach(d=>{
-    const dup=todos.find(x=>x.rutCodigo===d.rutCodigo&&+x.tipoDTE===+d.tipoDTE&&x.numero===d.numero);
+    const dup=todos.find(x=>
+      x.rutCodigo===d.rutCodigo &&
+      +x.tipoDTE===+d.tipoDTE &&
+      String(x.numero).trim()===String(d.numero).trim()
+    );
     d.dup=dup||null;
     d.incluir=!dup;
     d.cuenta='';

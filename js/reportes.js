@@ -73,7 +73,7 @@ function genDiario(){
     const cs=cPorMes[m]||[];
     if(cs.length){
       // Acumular por cuenta de gasto
-      const porCuenta={};let totIva=0,totTotal=0;
+      const porCuenta={};let totIva=0,totTotal=0,totIvaRetenido=0;
       cs.forEach(d=>{
         const signo=(dteC(d.tipoDTE)?.signo)||1;
         const otrosSig=(d.otrosImpuestos||0)*signo;
@@ -83,6 +83,12 @@ function genDiario(){
           // Otros impuestos no recuperables → se suman al gasto de la primera cuenta de distribución
           if(idx===0&&otrosSig)porCuenta[l.cuenta]+=otrosSig;
         });
+        // DTE 46 (Factura de compra): el IVA lo RETIENE el receptor.
+        // El total del documento NO incluye IVA (proveedor no lo recibe).
+        // El IVA es a la vez crédito fiscal Y débito por pagar al SII.
+        if(+d.tipoDTE===46){
+          totIvaRetenido+=(d.iva||0)*signo;
+        }
         totIva+=(d.iva||0)*signo;
         totTotal+=(d.total||0)*signo;
       });
@@ -90,6 +96,8 @@ function genDiario(){
       Object.keys(porCuenta).sort().forEach(cd=>{if(porCuenta[cd])movs.push({cd,nm:pdcNm(cd),debe:porCuenta[cd],haber:0});});
       if(totIva)movs.push({cd:'1108002',nm:pdcNm('1108002'),debe:totIva,haber:0});
       if(totTotal)movs.push({cd:'2102001',nm:pdcNm('2102001'),debe:0,haber:totTotal,desc:'Auxiliar proveedores'});
+      // Retención de IVA de facturas de compra (DTE 46)
+      if(totIvaRetenido)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:0,haber:totIvaRetenido,desc:'IVA retenido facturas compra'});
       if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen compras ${mesNm} ${anio} (${cs.length} doc.)`,movs,origen:'auto'});
     }
 

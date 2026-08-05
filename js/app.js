@@ -60,7 +60,7 @@ import {onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cer
         guardarCompra, eliminarCompra, abrirImportSII, abrirImportModal,
         cambiarPeriodoImport, cerrarImportModal, toggleImportDoc, toggleAllImport,
         setImportCuenta, aplicarCuentaATodos, confirmarImportacion,
-        initImportListener, renderImportModal, setBulkCuentaImp, CF, IM} from './compras.js';
+        initImportListener, renderImportModal, setBulkCuentaImp, setImportCC, aplicarCCATodos, CF, IM} from './compras.js';
 import {renderHon, uhon, addHon, delHon, saveHon} from './honorarios.js';
 import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
         anularAsiento, eliminarAsiento, guardarAsiento, addLinea, delLinea, renderLineas,
@@ -333,7 +333,7 @@ Object.assign(window,{
   onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual, revertirCierreMensual,
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas,
   marcarGuardado, marcarSucio, haySinGuardar,
-  abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp,
+  abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   descargarPlantillaAux, abrirImportFichas, descargarPlantillaAuxActual, abrirImportFichasActual,
   renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
   buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal, renderCTModal,

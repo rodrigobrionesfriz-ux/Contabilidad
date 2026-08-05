@@ -93,40 +93,96 @@ function parseFilas(rows,tipo){
   const cIva    = findCol(headers,'monto iva','iva');
   const cTotal  = findCol(headers,'monto total','total');
   const cOtro   = findCol(headers,'valor otro impuesto','otro impuesto','otros impuestos');
+  const cNetoAF = findCol(headers,'monto neto activo fijo','neto activo fijo');
+  const cIvaAF  = findCol(headers,'iva activo fijo');
+  const cNroSII = findCol(headers,'nro');   // "Nro" (contador SII) — indica documento nuevo
 
   if(cTipo<0||cRut<0||cNro<0||cFecha<0||cTotal<0){
     throw new Error('Faltan columnas esenciales (Tipo Doc, RUT, N° Doc, Fecha, Total). Verifica el archivo.');
   }
 
   const dteValido=tipo==='compra'?dteC:dteV;
-  const docs=[]; let descartados=0;
+  const docs=[]; let descartados=0; let continuaciones=0;
+
+  // Índice para detectar duplicados DENTRO del mismo archivo
+  // (algunos archivos del SII pueden repetir filas de encabezado o notas)
+  const claves=new Map();
+
   for(let i=headerIdx+1;i<rows.length;i++){
     const r=rows[i];
     if(!r||r.length<3)continue;
+
+    // ── Filas continuadas del SII (misma factura, otro impuesto) ──
+    // En el "Detalle de Registro de Compras" del SII, un documento con dos
+    // otros impuestos aparece como DOS filas: la primera con todos los datos,
+    // la segunda con "Nro" vacío y solo los datos del segundo impuesto.
+    // Debemos sumar el impuesto de la continuación al documento anterior,
+    // no crear un documento nuevo.
+    const nroSII=cNroSII>=0?String(r[cNroSII]||'').trim():'x';
+    const numero=String(r[cNro]||'').trim();
+    const esContinuacion=!nroSII&&!!numero===false&&docs.length>0;
+    // Si SII trae "Nro" vacío pero la fila tiene monto de impuesto,
+    // sumarlo al último documento válido
+    if(cNroSII>=0&&!nroSII){
+      if(docs.length){
+        const extra=cOtro>=0?Math.abs(parseNumSII(r[cOtro])):0;
+        if(extra>0){
+          docs[docs.length-1].otrosImpuestos+=extra;
+          continuaciones++;
+        }
+      }
+      continue;
+    }
+
     const tipoDTE=parseInt(r[cTipo],10)||0;
     if(!tipoDTE||!dteValido(tipoDTE)){descartados++;continue;}
     const rutInfo=rutParse(String(r[cRut]||''));
-    if(!rutInfo.codigo){descartados++;continue;} // aceptamos aunque el DV no valide: los archivos del SII pueden traer RUTs con formato distinto
+    if(!rutInfo.codigo){descartados++;continue;}
     const fecha=parseFechaSII(r[cFecha]);
     if(!fecha){descartados++;continue;}
+
+    // Montos: sumamos IVA recuperable + IVA no recuperable + IVA activo fijo
+    // (todos son crédito fiscal según su régimen)
     const neto=Math.abs(parseNumSII(r[cNeto]));
+    const netoAF=cNetoAF>=0?Math.abs(parseNumSII(r[cNetoAF])):0;
     const exento=Math.abs(parseNumSII(r[cExento]));
     let iva=0;
     if(cIvaRec>=0)iva+=Math.abs(parseNumSII(r[cIvaRec]));
     if(cIvaNoRec>=0)iva+=Math.abs(parseNumSII(r[cIvaNoRec]));
+    if(cIvaAF>=0)iva+=Math.abs(parseNumSII(r[cIvaAF]));
     if(!iva&&cIva>=0)iva=Math.abs(parseNumSII(r[cIva]));
     const total=Math.abs(parseNumSII(r[cTotal]));
     const otrosImpuestos=cOtro>=0?Math.abs(parseNumSII(r[cOtro])):0;
-    const numero=String(r[cNro]||'').trim();
+
     if(!numero||total===0){descartados++;continue;}
+
+    // ── DTE 46 (Factura de compra) ──
+    // En este documento el receptor RETIENE el IVA (no lo paga al proveedor).
+    // El campo "Otro Impuesto" (código 331) es la retención de IVA, que es el
+    // MISMO monto del IVA recuperable — duplicado por diseño.
+    // Total del documento = neto (sin IVA, porque el proveedor no lo recibe).
+    // Para que el asiento cuadre, NO sumamos "otros" a otrosImpuestos.
+    let otrosFinal=otrosImpuestos;
+    if(tipoDTE===46){
+      otrosFinal=0;
+    }
+
+    // ── Dedup dentro del archivo ──
+    // Clave: RUT + tipoDTE + número. El SII a veces trae la misma factura
+    // dos veces en distintos "detalles" del mismo documento.
+    const claveDoc=`${rutInfo.codigo}|${tipoDTE}|${numero}`;
+    if(claves.has(claveDoc)){descartados++;continue;}
+    claves.set(claveDoc,true);
+
     docs.push({
       fecha, tipoDTE, numero,
       rutCodigo:rutInfo.codigo, rutDV:rutInfo.dv,
       razonSocial:String(r[cRazon]||'').trim(),
-      neto, exento, iva, otrosImpuestos, total,
+      neto, exento, iva, otrosImpuestos:otrosFinal, total,
+      netoAF,   // porción de neto que es activo fijo (guía para asignar cuenta)
     });
   }
-  return {docs, descartados};
+  return {docs, descartados, continuaciones};
 }
 
 // ── Entradas públicas ──

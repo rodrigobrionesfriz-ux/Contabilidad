@@ -940,7 +940,12 @@
     <div class="filter-row" style="padding:10px 12px;background:var(--sf);border:1px solid var(--bd);border-radius:6px;margin-bottom:10px">
       <span class="f-lbl">Asignar cuenta a TODOS:</span>
       <div id="imp-bulk-wrap" style="min-width:340px;flex:1;max-width:520px"></div>
-      <button class="btn btn-s" style="font-size:11px" onclick="aplicarCuentaATodos()">Aplicar a todos los incluidos</button>
+      <button class="btn btn-s" style="font-size:11px" onclick="aplicarCuentaATodos()">Aplicar</button>
+    </div>
+    <div class="filter-row" style="padding:10px 12px;background:var(--sf);border:1px solid var(--bd);border-radius:6px;margin-bottom:10px">
+      <span class="f-lbl">Asignar centro de costo a TODOS:</span>
+      <select id="imp-bulk-cc" style="min-width:240px;flex:1;max-width:400px"></select>
+      <button class="btn btn-s" style="font-size:11px" onclick="aplicarCCATodos()">Aplicar</button>
       <span class="doc-count" id="imp-count"></span>
     </div>
 
@@ -956,7 +961,8 @@
         <div style="text-align:right">IVA</div>
         <div style="text-align:right">OTROS</div>
         <div style="text-align:right">TOTAL</div>
-        <div>CUENTA DE GASTO</div>
+        <div>CUENTA</div>
+        <div>CENTRO DE COSTO</div>
         <div>ESTADO</div>
       </div>
       <div id="imp-rows"></div>

@@ -451,8 +451,10 @@
     <span class="doc-count" id="vf-count"></span>
   </div>
 
+  <div id="v-bulk-bar" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:rgba(46,160,67,.08);border:1px solid rgba(46,160,67,.3);border-radius:8px;margin-bottom:10px;font-size:12px"></div>
+
   <div class="card-np"><div class="tw"><table>
-    <thead><tr><th class="tl" style="width:55px">FOLIO</th><th class="tl" style="width:90px">F. EMIS.</th><th class="tl" style="width:90px">F. VENC.</th><th class="tl" style="width:60px">DTE</th><th class="tl" style="width:80px">N°</th><th class="tl" style="width:120px">RUT</th><th class="tl">RAZÓN SOCIAL</th><th>NETO</th><th>EXENTO</th><th>IVA</th><th>OTROS</th><th>TOTAL</th><th class="tl" style="width:110px">FORMA PAGO</th><th style="width:80px"></th></tr></thead>
+    <thead><tr><th style="width:26px;text-align:center"><input type="checkbox" onchange="toggleVSelAll(this.checked)" title="Seleccionar todos los visibles"></th><th class="tl" style="width:55px">FOLIO</th><th class="tl" style="width:90px">F. EMIS.</th><th class="tl" style="width:90px">F. VENC.</th><th class="tl" style="width:60px">DTE</th><th class="tl" style="width:80px">N°</th><th class="tl" style="width:120px">RUT</th><th class="tl">RAZÓN SOCIAL</th><th>NETO</th><th>EXENTO</th><th>IVA</th><th>OTROS</th><th>TOTAL</th><th class="tl" style="width:110px">FORMA PAGO</th><th style="width:80px"></th></tr></thead>
     <tbody id="v-tbody"></tbody><tfoot id="v-tfoot"></tfoot>
   </table></div></div>
 
@@ -523,8 +525,10 @@
     <span class="doc-count" id="cf-count"></span>
   </div>
 
+  <div id="c-bulk-bar" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:rgba(46,160,67,.08);border:1px solid rgba(46,160,67,.3);border-radius:8px;margin-bottom:10px;font-size:12px"></div>
+
   <div class="card-np"><div class="tw"><table>
-    <thead><tr><th class="tl" style="width:55px">FOLIO</th><th class="tl" style="width:90px">F. EMIS.</th><th class="tl" style="width:90px">F. VENC.</th><th class="tl" style="width:60px">DTE</th><th class="tl" style="width:80px">N°</th><th class="tl" style="width:120px">RUT</th><th class="tl">RAZÓN SOCIAL</th><th>NETO</th><th>EXENTO</th><th>IVA</th><th>OTROS</th><th>TOTAL</th><th style="width:80px"></th></tr></thead>
+    <thead><tr><th style="width:26px;text-align:center"><input type="checkbox" onchange="toggleCSelAll(this.checked)" title="Seleccionar todos los visibles"></th><th class="tl" style="width:55px">FOLIO</th><th class="tl" style="width:90px">F. EMIS.</th><th class="tl" style="width:90px">F. VENC.</th><th class="tl" style="width:60px">DTE</th><th class="tl" style="width:80px">N°</th><th class="tl" style="width:120px">RUT</th><th class="tl">RAZÓN SOCIAL</th><th>NETO</th><th>EXENTO</th><th>IVA</th><th>OTROS</th><th>TOTAL</th><th style="width:80px"></th></tr></thead>
     <tbody id="c-tbody"></tbody><tfoot id="c-tfoot"></tfoot>
   </table></div></div>
 
@@ -1045,11 +1049,11 @@
     </div>
 
     <div class="card-np" style="max-height:480px;overflow-y:auto;margin-bottom:12px">
-      <div class="imp-row-hdr" style="display:grid;grid-template-columns:26px 90px 60px 80px 120px 1fr 90px 80px 80px 100px 200px 90px;gap:6px;padding:8px;background:var(--sf2);font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5">
+      <div class="imp-row-hdr" style="display:grid;grid-template-columns:26px 90px 60px 80px 120px 1fr 90px 80px 80px 100px 180px 110px 80px;gap:6px;padding:8px;background:var(--sf2);font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5">
         <div style="text-align:center"><input type="checkbox" id="impv-all" onchange="toggleAllImportV(this.checked)"></div>
         <div>FECHA</div><div>DTE</div><div>N° DOC</div><div>RUT</div><div>RAZÓN SOCIAL</div>
         <div style="text-align:right">NETO</div><div style="text-align:right">IVA</div><div style="text-align:right">OTROS</div><div style="text-align:right">TOTAL</div>
-        <div>CUENTA DE INGRESO</div><div>ESTADO</div>
+        <div>CUENTA DE INGRESO</div><div>FORMA PAGO</div><div>ESTADO</div>
       </div>
       <div id="impv-rows"></div>
     </div>

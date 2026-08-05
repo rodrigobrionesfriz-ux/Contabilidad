@@ -35,6 +35,37 @@ function cuentasGastoOpts(sel=''){
   return '<option value="">— cuenta de gasto o activo —</option>'+CUENTAS_COMPRA.map(c=>`<option value="${c.cd}" ${c.cd===sel?'selected':''}>${c.cd} — ${c.nm} ${c.tp==='A'?'(activo)':''}</option>`).join('');
 }
 
+// Estado de selección para acciones masivas
+let CF_SEL=new Set();
+
+function toggleCSel(id){
+  if(CF_SEL.has(id))CF_SEL.delete(id);else CF_SEL.add(id);
+  renderCompras();
+}
+function toggleCSelAll(marcados){
+  const box=document.getElementById('c-tbody');
+  if(!box)return;
+  box.querySelectorAll('input.c-chk[data-id]').forEach(chk=>{
+    const id=chk.dataset.id;
+    if(marcados)CF_SEL.add(id);else CF_SEL.delete(id);
+  });
+  renderCompras();
+}
+function limpiarCSel(){CF_SEL.clear();renderCompras();}
+async function eliminarCSel(){
+  if(!CF_SEL.size){toast('⚠️ No hay documentos seleccionados','e');return;}
+  const n=CF_SEL.size;
+  if(!confirm(`¿Eliminar ${n} documento${n===1?'':'s'} de compra seleccionado${n===1?'':'s'}?\n\nEsta acción no se puede deshacer.`))return;
+  const antes=S.compras.length;
+  S.compras=S.compras.filter(d=>!CF_SEL.has(d.id));
+  const borrados=antes-S.compras.length;
+  CF_SEL.clear();
+  try{await window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras));}catch(e){}
+  toast(`🗑 ${borrados} documento${borrados===1?'':'s'} eliminado${borrados===1?'':'s'}`);
+  logAccion('Eliminó compras masivamente',`${borrados} documentos`);
+  rerender();
+}
+
 function renderCompras(){
   const selMes=document.getElementById('cf-mes');
   if(selMes&&selMes.options.length<=1)selMes.innerHTML=mesOpts(selMes.value);
@@ -59,9 +90,23 @@ function renderCompras(){
   const cntMan=todos.filter(d=>d.origen==='asiento').length;
   document.getElementById('cf-count').textContent=`${fDocs.length} de ${todos.length} documentos${cntMan?` (${cntMan} desde asientos)`:''}`;
 
+  // Barra de acciones masivas
+  const barraSel=document.getElementById('c-bulk-bar');
+  if(barraSel){
+    if(CF_SEL.size){
+      barraSel.style.display='flex';
+      barraSel.innerHTML=`<span style="font-weight:600;color:var(--ac)">${CF_SEL.size} seleccionado${CF_SEL.size===1?'':'s'}</span>
+        <button class="btn btn-d" style="font-size:11px" onclick="eliminarCSel()">🗑 Eliminar seleccionados</button>
+        <button class="btn btn-g" style="font-size:11px" onclick="limpiarCSel()">✕ Limpiar selección</button>`;
+    }else{
+      barraSel.style.display='none';
+      barraSel.innerHTML='';
+    }
+  }
+
   const tb=document.getElementById('c-tbody');
   if(!fDocs.length){
-    tb.innerHTML=`<tr><td colspan="13" class="empty"><div class="ei">🧾</div>${todos.length?'No hay documentos con ese filtro':'No hay documentos de compra. Usa <strong>+ Nuevo Documento</strong> para agregar el primero.'}</td></tr>`;
+    tb.innerHTML=`<tr><td colspan="14" class="empty"><div class="ei">🧾</div>${todos.length?'No hay documentos con ese filtro':'No hay documentos de compra. Usa <strong>+ Nuevo Documento</strong> para agregar el primero.'}</td></tr>`;
     document.getElementById('c-tfoot').innerHTML='';
   }else{
     let tN=0,tE=0,tI=0,tO=0,tT=0;
@@ -78,7 +123,11 @@ function renderCompras(){
       const acciones=esManual
         ?`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="abrirAsientoDesde('${d.asientoId}')">📝 Abrir</button>`
         :`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="editarCompra('${d.id}')">✏️</button> <button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="eliminarCompra('${d.id}')">🗑</button>`;
+      const chk=esManual
+        ?'<span style="color:var(--mt);font-size:10px" title="Viene de un asiento manual">—</span>'
+        :`<input type="checkbox" class="c-chk" data-id="${d.id}" ${CF_SEL.has(d.id)?'checked':''} onchange="toggleCSel('${d.id}')">`;
       return `<tr${rowStyle}>
+        <td style="text-align:center;width:26px">${chk}</td>
         <td class="tl"><span class="doc-folio">${mesSl}-${String(folioNum).padStart(3,'0')}</span></td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}${origenBadge}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px;color:${d.fechaVencimiento?'var(--tx)':'var(--mt)'}">${d.fechaVencimiento||'—'}</td>
@@ -94,7 +143,7 @@ function renderCompras(){
         <td style="text-align:center">${acciones}</td>
       </tr>`;
     }).join('');
-    document.getElementById('c-tfoot').innerHTML=`<tr><td class="tl" colspan="7">TOTALES</td><td>${fmt(tN)}</td><td>${fmt(tE)}</td><td>${fmt(tI)}</td><td>${fmt(tO)}</td><td>${fmt(tT)}</td><td></td></tr>`;
+    document.getElementById('c-tfoot').innerHTML=`<tr><td class="tl" colspan="8">TOTALES</td><td>${fmt(tN)}</td><td>${fmt(tE)}</td><td>${fmt(tI)}</td><td>${fmt(tO)}</td><td>${fmt(tT)}</td><td></td></tr>`;
   }
   renderCResumen();
 }
@@ -684,4 +733,5 @@ function initImportListener(){
 }
 
 
-export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setImportCC, aplicarCCATodos, setBulkCuentaImp, confirmarImportacion, initImportListener, CF};
+export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setImportCC, aplicarCCATodos, setBulkCuentaImp, confirmarImportacion, initImportListener,
+        toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, CF};

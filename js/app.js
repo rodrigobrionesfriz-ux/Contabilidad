@@ -54,13 +54,15 @@ import {onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerra
         eliminarVenta, VF, abrirImportSIIVentas, handleFileImportVentas,
         cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV,
         renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
-        initImportListenerV, setBulkCuentaImpV, IMV} from './ventas.js';
+        initImportListenerV, setBulkCuentaImpV,
+        toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, IMV} from './ventas.js';
 import {onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cerrarCF,
         cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck,
         guardarCompra, eliminarCompra, abrirImportSII, abrirImportModal,
         cambiarPeriodoImport, cerrarImportModal, toggleImportDoc, toggleAllImport,
         setImportCuenta, aplicarCuentaATodos, confirmarImportacion,
-        initImportListener, renderImportModal, setBulkCuentaImp, setImportCC, aplicarCCATodos, CF, IM} from './compras.js';
+        initImportListener, renderImportModal, setBulkCuentaImp, setImportCC, aplicarCCATodos,
+        toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, CF, IM} from './compras.js';
 import {renderHon, uhon, addHon, delHon, saveHon} from './honorarios.js';
 import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
         anularAsiento, eliminarAsiento, guardarAsiento, addLinea, delLinea, renderLineas,
@@ -334,6 +336,7 @@ Object.assign(window,{
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas,
   marcarGuardado, marcarSucio, haySinGuardar,
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
+  toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel,
   descargarPlantillaAux, abrirImportFichas, descargarPlantillaAuxActual, abrirImportFichasActual,
   renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
   buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal, renderCTModal,

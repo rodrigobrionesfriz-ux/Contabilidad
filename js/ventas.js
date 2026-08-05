@@ -26,6 +26,39 @@ function limpiarFiltrosV(){
   ['vf-mes','vf-desde','vf-hasta','vf-dte-flt','vf-search'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   renderVentas();
 }
+// Estado interno: ids de documentos seleccionados para acciones masivas
+let VF_SEL=new Set();
+
+function toggleVSel(id){
+  if(VF_SEL.has(id))VF_SEL.delete(id);else VF_SEL.add(id);
+  renderVentas();
+}
+function toggleVSelAll(marcados){
+  // Solo alterna los que se están mostrando actualmente
+  const box=document.getElementById('v-tbody');
+  if(!box)return;
+  box.querySelectorAll('input.v-chk[data-id]').forEach(chk=>{
+    const id=chk.dataset.id;
+    if(marcados)VF_SEL.add(id);else VF_SEL.delete(id);
+  });
+  renderVentas();
+}
+function limpiarVSel(){VF_SEL.clear();renderVentas();}
+async function eliminarVSel(){
+  if(!VF_SEL.size){toast('⚠️ No hay documentos seleccionados','e');return;}
+  const n=VF_SEL.size;
+  if(!confirm(`¿Eliminar ${n} documento${n===1?'':'s'} de venta seleccionado${n===1?'':'s'}?\n\nEsta acción no se puede deshacer.`))return;
+  // Filtrar el array (solo se pueden eliminar los que no vienen de un asiento)
+  const antes=S.ventas.length;
+  S.ventas=S.ventas.filter(d=>!VF_SEL.has(d.id));
+  const borrados=antes-S.ventas.length;
+  VF_SEL.clear();
+  try{await window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas));}catch(e){}
+  toast(`🗑 ${borrados} documento${borrados===1?'':'s'} eliminado${borrados===1?'':'s'}`);
+  logAccion('Eliminó ventas masivamente',`${borrados} documentos`);
+  rerender();
+}
+
 function renderVentas(){
   const selMes=document.getElementById('vf-mes');
   if(selMes&&selMes.options.length<=1)selMes.innerHTML=mesOpts(selMes.value);
@@ -50,9 +83,23 @@ function renderVentas(){
   const cntMan=todos.filter(d=>d.origen==='asiento').length;
   document.getElementById('vf-count').textContent=`${fDocs.length} de ${todos.length} documentos${cntMan?` (${cntMan} desde asientos)`:''}`;
 
+  // Barra de acciones masivas (solo si hay seleccionados)
+  const barraSel=document.getElementById('v-bulk-bar');
+  if(barraSel){
+    if(VF_SEL.size){
+      barraSel.style.display='flex';
+      barraSel.innerHTML=`<span style="font-weight:600;color:var(--ac)">${VF_SEL.size} seleccionado${VF_SEL.size===1?'':'s'}</span>
+        <button class="btn btn-d" style="font-size:11px" onclick="eliminarVSel()">🗑 Eliminar seleccionados</button>
+        <button class="btn btn-g" style="font-size:11px" onclick="limpiarVSel()">✕ Limpiar selección</button>`;
+    }else{
+      barraSel.style.display='none';
+      barraSel.innerHTML='';
+    }
+  }
+
   const tb=document.getElementById('v-tbody');
   if(!fDocs.length){
-    tb.innerHTML=`<tr><td colspan="14" class="empty"><div class="ei">🛒</div>${todos.length?'No hay documentos con ese filtro':'No hay documentos de venta. Usa <strong>+ Nuevo Documento</strong> para agregar el primero.'}</td></tr>`;
+    tb.innerHTML=`<tr><td colspan="15" class="empty"><div class="ei">🛒</div>${todos.length?'No hay documentos con ese filtro':'No hay documentos de venta. Usa <strong>+ Nuevo Documento</strong> para agregar el primero.'}</td></tr>`;
     document.getElementById('v-tfoot').innerHTML='';
   }else{
     let tN=0,tE=0,tI=0,tO=0,tT=0;
@@ -69,7 +116,13 @@ function renderVentas(){
       const acciones=esManual
         ?`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="abrirAsientoDesde('${d.asientoId}')">📝 Abrir</button>`
         :`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="editarVenta('${d.id}')">✏️</button> <button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="eliminarVenta('${d.id}')">🗑</button>`;
+      // Los documentos originados por asientos no se pueden marcar
+      // (habría que borrar el asiento, no el reflejo en el libro)
+      const chk=esManual
+        ?'<span style="color:var(--mt);font-size:10px" title="Viene de un asiento manual">—</span>'
+        :`<input type="checkbox" class="v-chk" data-id="${d.id}" ${VF_SEL.has(d.id)?'checked':''} onchange="toggleVSel('${d.id}')">`;
       return `<tr${rowStyle}>
+        <td style="text-align:center;width:26px">${chk}</td>
         <td class="tl"><span class="doc-folio">${mesSl}-${String(folioNum).padStart(3,'0')}</span></td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}${origenBadge}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px;color:${d.fechaVencimiento?'var(--tx)':'var(--mt)'}">${d.fechaVencimiento||'—'}</td>
@@ -86,7 +139,7 @@ function renderVentas(){
         <td style="text-align:center">${acciones}</td>
       </tr>`;
     }).join('');
-    document.getElementById('v-tfoot').innerHTML=`<tr><td class="tl" colspan="7">TOTALES</td><td>${fmt(tN)}</td><td>${fmt(tE)}</td><td>${fmt(tI)}</td><td>${fmt(tO)}</td><td>${fmt(tT)}</td><td colspan="2"></td></tr>`;
+    document.getElementById('v-tfoot').innerHTML=`<tr><td class="tl" colspan="8">TOTALES</td><td>${fmt(tN)}</td><td>${fmt(tE)}</td><td>${fmt(tI)}</td><td>${fmt(tO)}</td><td>${fmt(tT)}</td><td colspan="2"></td></tr>`;
   }
   renderVResumen();
 }
@@ -371,7 +424,15 @@ function renderImportModalVentas(){
     const estado=d.dup
       ? '<span style="color:var(--warn);font-size:10px">⚠️ duplicado</span>'
       : (d.incluir?'<span style="color:var(--ach);font-size:10px">✓ nuevo</span>':'<span style="color:var(--mt);font-size:10px">omitido</span>');
-    return `<div class="imp-row" style="display:grid;grid-template-columns:26px 90px 60px 80px 120px 1fr 90px 80px 80px 100px 200px 90px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--bd);font-size:11px;align-items:center">
+    // Por defecto, NC (61) van a clientes (para descontar del auxiliar).
+    // Facturas y boletas quedan como banco (contado) por defecto.
+    if(!d.fp)d.fp=(+d.tipoDTE===61)?'clientes':'banco';
+    const fpSel=`<select onchange="IMV.docs[${i}].fp=this.value" style="width:100%;font-size:11px;padding:3px">
+      <option value="banco" ${d.fp==='banco'?'selected':''}>💵 Banco</option>
+      <option value="clientes" ${d.fp==='clientes'?'selected':''}>📇 Cliente</option>
+      <option value="deudores" ${d.fp==='deudores'?'selected':''}>📋 Deudor</option>
+    </select>`;
+    return `<div class="imp-row" style="display:grid;grid-template-columns:26px 90px 60px 80px 120px 1fr 90px 80px 80px 100px 180px 110px 80px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--bd);font-size:11px;align-items:center">
       <div style="text-align:center">${d.dup?'':`<input type="checkbox" ${d.incluir?'checked':''} onchange="IMV.docs[${i}].incluir=this.checked;renderImportModalVentas()">`}</div>
       <div>${fechaMostrar}</div>
       <div>${d.tipoDTE}</div>
@@ -383,6 +444,7 @@ function renderImportModalVentas(){
       <div style="text-align:right;font-family:var(--mono)">${fmtC(d.otrosImpuestos||0)}</div>
       <div style="text-align:right;font-family:var(--mono);font-weight:600">${fmtC(d.total)}</div>
       <div>${inputCuenta({id:`impv-cd-${i}`,value:d.cuenta||'',onPick:`IMV.docs[${i}].cuenta='%CD%';renderImportModalVentas()`,placeholder:'Buscar cuenta…',clase:'linea-inp',filtro:'ingreso'})}</div>
+      <div>${fpSel}</div>
       <div>${estado}</div>
     </div>`;
   }).join('');
@@ -465,4 +527,5 @@ function confirmarImportacionV(){
 export {onMesChangeV, abrirImportSIIVentas, handleFileImportVentas,
         cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV,
         renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas, initImportListenerV,
-        IMV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta, VF};
+        IMV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta,
+        toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, VF};

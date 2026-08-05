@@ -59,13 +59,25 @@ function genDiario(){
         crIvaDebito+=ivaSig;
       });
       const movs=[];
-      if(debBanco)movs.push({cd:'1101201',nm:pdcNm('1101201'),debe:debBanco,haber:0});
-      if(debClientes)movs.push({cd:'1104001',nm:pdcNm('1104001'),debe:debClientes,haber:0,desc:'Auxiliar clientes'});
-      if(debDeudores)movs.push({cd:'1107003',nm:pdcNm('1107003'),debe:debDeudores,haber:0});
-      if(crFacturas)movs.push({cd:'4101002',nm:pdcNm('4101002'),debe:0,haber:crFacturas});
-      if(crBoletas)movs.push({cd:'4101003',nm:pdcNm('4101003'),debe:0,haber:crBoletas});
-      if(crTerceros)movs.push({cd:'4101003',nm:pdcNm('4101003'),debe:0,haber:crTerceros});
-      if(crIvaDebito)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:0,haber:crIvaDebito});
+      // Cuando el mes tiene más NC que facturas en algún concepto, invertir el
+      // lado del asiento (los débitos negativos pasan a haber y viceversa).
+      const pushDeb=(cd,v,desc)=>{
+        if(!v)return;
+        if(v>0)movs.push(desc?{cd,nm:pdcNm(cd),debe:v,haber:0,desc}:{cd,nm:pdcNm(cd),debe:v,haber:0});
+        else movs.push(desc?{cd,nm:pdcNm(cd),debe:0,haber:-v,desc}:{cd,nm:pdcNm(cd),debe:0,haber:-v});
+      };
+      const pushCr=(cd,v,desc)=>{
+        if(!v)return;
+        if(v>0)movs.push(desc?{cd,nm:pdcNm(cd),debe:0,haber:v,desc}:{cd,nm:pdcNm(cd),debe:0,haber:v});
+        else movs.push(desc?{cd,nm:pdcNm(cd),debe:-v,haber:0,desc}:{cd,nm:pdcNm(cd),debe:-v,haber:0});
+      };
+      pushDeb('1101201',debBanco);
+      pushDeb('1104001',debClientes,'Auxiliar clientes');
+      pushDeb('1107003',debDeudores);
+      pushCr('4101002',crFacturas);
+      pushCr('4101003',crBoletas);
+      pushCr('4101003',crTerceros);
+      pushCr('2103003',crIvaDebito);
       if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen ventas ${mesNm} ${anio} (${vs.length} doc.)`,movs,origen:'auto'});
     }
 
@@ -93,11 +105,23 @@ function genDiario(){
         totTotal+=(d.total||0)*signo;
       });
       const movs=[];
-      Object.keys(porCuenta).sort().forEach(cd=>{if(porCuenta[cd])movs.push({cd,nm:pdcNm(cd),debe:porCuenta[cd],haber:0});});
-      if(totIva)movs.push({cd:'1108002',nm:pdcNm('1108002'),debe:totIva,haber:0});
-      if(totTotal)movs.push({cd:'2102001',nm:pdcNm('2102001'),debe:0,haber:totTotal,desc:'Auxiliar proveedores'});
+      // Si el saldo de una cuenta queda negativo (más NC que facturas del mes),
+      // se registra como HABER en vez de DEBE.
+      Object.keys(porCuenta).sort().forEach(cd=>{
+        const v=porCuenta[cd];
+        if(!v)return;
+        if(v>0)movs.push({cd,nm:pdcNm(cd),debe:v,haber:0});
+        else movs.push({cd,nm:pdcNm(cd),debe:0,haber:-v});
+      });
+      // IVA neto: si el resultado es negativo (más NC que facturas), va al haber
+      if(totIva>0)movs.push({cd:'1108002',nm:pdcNm('1108002'),debe:totIva,haber:0});
+      else if(totIva<0)movs.push({cd:'1108002',nm:pdcNm('1108002'),debe:0,haber:-totIva});
+      // Total neto proveedores
+      if(totTotal>0)movs.push({cd:'2102001',nm:pdcNm('2102001'),debe:0,haber:totTotal,desc:'Auxiliar proveedores'});
+      else if(totTotal<0)movs.push({cd:'2102001',nm:pdcNm('2102001'),debe:-totTotal,haber:0,desc:'Auxiliar proveedores'});
       // Retención de IVA de facturas de compra (DTE 46)
-      if(totIvaRetenido)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:0,haber:totIvaRetenido,desc:'IVA retenido facturas compra'});
+      if(totIvaRetenido>0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:0,haber:totIvaRetenido,desc:'IVA retenido facturas compra'});
+      else if(totIvaRetenido<0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:-totIvaRetenido,haber:0,desc:'IVA retenido facturas compra'});
       if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen compras ${mesNm} ${anio} (${cs.length} doc.)`,movs,origen:'auto'});
     }
 

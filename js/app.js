@@ -84,7 +84,8 @@ import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
 import {genDiario, renderDiario, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados} from './reportes.js';
 import {setAuxTab, setAuxView, toggleAux, renderAuxiliares, calcularAging,
-        toggleAgingDetalle, AUX_TAB} from './auxiliares.js';
+        toggleAgingDetalle, AUX_TAB,
+        abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI} from './auxiliares.js';
 // AUX_TAB también viene de auxiliares.js — se recupera desde window.
 import {renderF29, renderPPM} from './tributario.js';
 import {setFCView, renderFlujoCaja} from './flujocaja.js';
@@ -337,6 +338,7 @@ Object.assign(window,{
   marcarGuardado, marcarSucio, haySinGuardar,
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel,
+  abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
   descargarPlantillaAux, abrirImportFichas, descargarPlantillaAuxActual, abrirImportFichasActual,
   renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
   buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal, renderCTModal,

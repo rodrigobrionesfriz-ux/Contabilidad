@@ -44,7 +44,8 @@ export function fichaAux(tipo,rutCodigo){
 export function descargarPlantillaAux(tipo){
   if(typeof XLSX==='undefined'){toast('⚠️ Librería Excel no cargada','e');return;}
   const encabezado=[
-    'RUT','Razón Social','Giro','Dirección','Comuna','Ciudad','Email','Teléfono','Notas'
+    'RUT','Razón Social','Giro','Dirección','Comuna','Ciudad','Email','Teléfono','Notas',
+    'Cuenta por defecto','Centro de costo por defecto'
   ];
   const ejemplo=[
     '76.543.210-K',
@@ -54,11 +55,12 @@ export function descargarPlantillaAux(tipo){
     'Providencia','Santiago',
     'contacto@ejemplo.cl','+56 9 1234 5678',
     'Notas internas opcionales',
+    tipo==='cliente'?'4101001':'3101006',
+    '',
   ];
   const wb=XLSX.utils.book_new();
   const ws=XLSX.utils.aoa_to_sheet([encabezado,ejemplo,[]]);
-  // Anchos de columna razonables
-  ws['!cols']=[{wch:14},{wch:32},{wch:24},{wch:32},{wch:16},{wch:14},{wch:24},{wch:16},{wch:24}];
+  ws['!cols']=[{wch:14},{wch:32},{wch:24},{wch:32},{wch:16},{wch:14},{wch:24},{wch:16},{wch:24},{wch:16},{wch:16}];
   XLSX.utils.book_append_sheet(wb,ws,tipo==='cliente'?'Clientes':'Proveedores');
   XLSX.writeFile(wb,`plantilla_${tipo==='cliente'?'clientes':'proveedores'}.xlsx`);
   toast('📥 Plantilla descargada — completa las filas y súbela');
@@ -95,6 +97,8 @@ export async function importarFichasExcel(file,tipo){
   const cEmail=col('email','correo');
   const cTel=col('tel','fono','celular');
   const cNotas=col('nota','observ');
+  const cCuenta=col('cuenta');
+  const cCC=col('centro');
 
   const nuevas=[]; const actualizadas=[]; const errores=[];
   const existentes=fichasAux(tipo);
@@ -119,6 +123,8 @@ export async function importarFichasExcel(file,tipo){
       email:cEmail>=0?String(r[cEmail]||'').trim():'',
       telefono:cTel>=0?String(r[cTel]||'').trim():'',
       notas:cNotas>=0?String(r[cNotas]||'').trim():'',
+      cuentaDefault:cCuenta>=0?String(r[cCuenta]||'').trim():'',
+      ccDefault:cCC>=0?String(r[cCC]||'').trim():'',
     };
     if(!ficha.razonSocial){
       errores.push({fila:i+1,rut:rutTxt,motivo:'Falta razón social'});continue;

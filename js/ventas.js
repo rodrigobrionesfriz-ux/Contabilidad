@@ -2,6 +2,7 @@
 import {toast, pn, today, MESES, IVA, DTE_VENTAS, dteV, rutParse, rutFmt, rutDV, fmt, fmtC, CUENTAS_INGRESO} from './core.js';
 import {leerArchivo} from './importadorsii.js';
 import {inputCuenta} from './buscadorcuentas.js';
+import {fichaAux} from './importadoraux.js';
 import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
@@ -352,7 +353,8 @@ function mostrarVentasImportadas(res,nombreArchivo){
     );
     d.dup=dup||null;
     d.incluir=!dup;
-    d.cuenta='';
+    const ficha=fichaAux('cliente',d.rutCodigo);
+    d.cuenta=ficha?.cuentaDefault||'';
     d.fp='banco';
   });
 

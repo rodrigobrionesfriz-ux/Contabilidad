@@ -8,6 +8,7 @@ import {todosDocsCompras, abrirAsientoDesde} from './asientos.js';
 import {ccOpts} from './centroscosto.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {leerArchivo} from './importadorsii.js';
+import {fichaAux} from './importadoraux.js';
 import './storage.js';
 
 // Estado del formulario de compras (interno del módulo)
@@ -487,9 +488,12 @@ function mostrarDocsImportados(res,nombreArchivo){
     );
     d.dup=dup||null;
     d.incluir=!dup;
-    d.cuenta='';
-    d.cc='';                 // centro de costo (nuevo)
-    d.fechaOriginal=d.fecha; // preservamos para referencia
+    // Pre-poblar cuenta y CC desde la ficha del proveedor si existe.
+    // Esto agiliza el flujo: los proveedores recurrentes ya vienen clasificados.
+    const ficha=fichaAux('proveedor',d.rutCodigo);
+    d.cuenta=ficha?.cuentaDefault||'';
+    d.cc=ficha?.ccDefault||'';
+    d.fechaOriginal=d.fecha;
   });
 
   IM={docs:res.docs,descartados:res.descartados||0,archivo:nombreArchivo,

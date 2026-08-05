@@ -101,13 +101,39 @@ export async function crearEmpresa(nombre,rut,marco){
   return id;
 }
 
-export async function eliminarEmpresa(id){
+// Elimina una empresa del catálogo y opcionalmente todos sus datos del storage.
+// Si `borrarDatos` es true, recorre localStorage buscando las claves con
+// el prefijo de esa empresa (`emp1:ventas-2026`, etc.) y las elimina.
+// En Firestore no se puede borrar todo desde el cliente sin listar la colección;
+// se dejan huérfanos y quedan invisibles porque ya no aparece la empresa.
+export async function eliminarEmpresa(id,borrarDatos=false){
   if(EMPRESAS.lista.length<=1)throw new Error('Debe existir al menos una empresa');
+  const era=EMPRESAS.activa===id;
   EMPRESAS.lista=EMPRESAS.lista.filter(e=>e.id!==id);
-  if(EMPRESAS.activa===id)EMPRESAS.activa=EMPRESAS.lista[0].id;
+  if(era)EMPRESAS.activa=EMPRESAS.lista[0].id;
   await guardarCatalogo();
-  // Nota: los datos de esa empresa quedan huérfanos en storage a propósito
-  // (borrarlos requeriría recorrer todas las claves; se puede hacer aparte).
+
+  if(borrarDatos){
+    // Recorrer localStorage y borrar todas las claves de esta empresa.
+    // El storage guarda como `<prefijoInstancia><empresaId>:<clave>` o
+    // directamente `<empresaId>:<clave>` según cómo esté configurado.
+    // Debemos matchear el prefijo de empresa como un segmento COMPLETO
+    // seguido de ":" para no confundir "emp1" con "emp10".
+    const aBorrar=[];
+    try{
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        if(!k)continue;
+        // Coincidencia: empieza con "id:" o contiene ":id:"
+        if(k===id||k.startsWith(id+':')||k.includes(':'+id+':')){
+          aBorrar.push(k);
+        }
+      }
+    }catch(e){}
+    aBorrar.forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
+    return {borradas:aBorrar.length};
+  }
+  return {borradas:0};
 }
 
 export async function actualizarEmpresa(id,campos){

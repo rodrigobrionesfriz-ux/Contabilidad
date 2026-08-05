@@ -1,5 +1,7 @@
 // empresas-ui.js — Vista de gestión de empresas (crear, editar, marco contable)
 import {toast} from './core.js';
+import {esAdmin} from './auth.js';
+import {logAccion} from './firebase.js';
 import {EMPRESAS, MARCOS, marcoInfo, empresaActiva, crearEmpresa,
         eliminarEmpresa, actualizarEmpresa, activarEmpresa} from './empresas.js';
 
@@ -21,7 +23,7 @@ export function renderEmpresas(){
       <td style="text-align:right;white-space:nowrap">
         ${activa?'':`<button class="btn btn-i" onclick="seleccionarEmpresa('${e.id}')" title="Activar">▶</button>`}
         <button class="btn btn-i" onclick="editarEmpresaCat('${e.id}')">✏️</button>
-        ${EMPRESAS.lista.length>1?`<button class="btn btn-d" onclick="borrarEmpresa('${e.id}')">🗑</button>`:''}
+        ${EMPRESAS.lista.length>1&&esAdmin()?`<button class="btn btn-d" onclick="borrarEmpresa('${e.id}')" title="Eliminar empresa (solo administradores)">🗑</button>`:''}
       </td>
     </tr>`;
   }).join('');
@@ -109,12 +111,58 @@ export async function seleccionarEmpresa(id){
 }
 
 export async function borrarEmpresa(id){
+  // Solo administradores pueden eliminar empresas
+  if(!esAdmin()){
+    toast('🔒 Solo los administradores pueden eliminar empresas','e');
+    return;
+  }
   const e=EMPRESAS.lista.find(x=>x.id===id);if(!e)return;
-  if(!confirm(`¿Eliminar "${e.nombre}" del listado?\n\nSus datos NO se borran del almacenamiento, pero dejará de aparecer. Esta acción no se puede deshacer desde la app.`))return;
+
+  // Primer paso: confirmar la eliminación de la empresa del catálogo
+  const nombre=e.nombre||'(sin nombre)';
+  const c1=confirm(
+`⚠️ ELIMINAR EMPRESA
+
+Vas a eliminar "${nombre}" del catálogo.
+
+Esto NO se puede deshacer desde la aplicación. ¿Continuar?`);
+  if(!c1)return;
+
+  // Segundo paso: preguntar si además borrar todos los datos
+  const c2=confirm(
+`🗑 ¿Borrar TAMBIÉN los datos de "${nombre}"?
+
+• SÍ  = Se eliminan todos los libros, asientos, indicadores y configuración de esta empresa (solo del navegador local; la nube no se toca).
+• NO = Se elimina del listado pero los datos quedan huérfanos (podrían recuperarse manualmente).
+
+Recomendación para "empezar de cero": SÍ.`);
+
+  // Tercer paso: para el borrado destructivo, pedir escribir el nombre
+  if(c2){
+    const escrito=prompt(
+`🚨 CONFIRMACIÓN FINAL
+
+Escribe el nombre exacto de la empresa para confirmar el borrado de sus datos:
+
+${nombre}`);
+    if(String(escrito||'').trim()!==nombre){
+      toast('❌ Nombre no coincide — cancelado','e');
+      return;
+    }
+  }
+
   try{
-    await eliminarEmpresa(id);
-    toast('🗑 Empresa eliminada del listado');
+    const {borradas}=await eliminarEmpresa(id,c2);
+    if(c2){
+      toast(`🗑 "${nombre}" eliminada · ${borradas} clave${borradas===1?'':'s'} borrada${borradas===1?'':'s'}`);
+      logAccion('Eliminó empresa (con datos)',`${nombre} · ${borradas} claves`);
+    }else{
+      toast('🗑 "'+nombre+'" eliminada del listado (datos preservados)');
+      logAccion('Eliminó empresa del catálogo',nombre);
+    }
     renderEmpresas();
     if(window.renderSelectorEmpresa)window.renderSelectorEmpresa();
+    // Si borró la activa, hay que recargar todo con la nueva activa
+    if(window.recargarEmpresaActiva)await window.recargarEmpresaActiva();
   }catch(err){toast('⚠️ '+err.message,'e');}
 }

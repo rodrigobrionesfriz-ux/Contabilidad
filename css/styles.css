@@ -222,10 +222,10 @@ td.err{color:var(--err);font-weight:600}
 .linea-dte-badge .ldb-info b{color:var(--ach)}
 .linea-dte-badge button{padding:3px 8px;font-size:10px}
 /* IMPORT SII */
-.imp-row{display:grid;grid-template-columns:26px 75px 55px 80px 110px 1fr 80px 80px 80px 80px 200px 180px 70px;gap:6px;padding:6px 8px;border-bottom:1px solid rgba(48,54,61,.5);align-items:center;font-size:11px}
+.imp-row{display:grid;grid-template-columns:26px 90px 45px 70px 105px 1.5fr 75px 75px 75px 90px 170px 150px 70px;gap:6px;padding:6px 8px;border-bottom:1px solid rgba(48,54,61,.5);align-items:center;font-size:11px}
 .imp-row.dup{background:rgba(248,81,73,.08)}
 .imp-row.excluded{opacity:.4}
-.imp-row-hdr{display:grid;grid-template-columns:26px 75px 55px 80px 110px 1fr 80px 80px 80px 80px 200px 180px 70px;gap:6px;padding:8px;background:var(--sf2);font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5}
+.imp-row-hdr{display:grid;grid-template-columns:26px 90px 45px 70px 105px 1.5fr 75px 75px 75px 90px 170px 150px 70px;gap:6px;padding:8px;background:var(--sf2);font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5}
 .imp-row input[type="checkbox"]{width:16px;height:16px;cursor:pointer}
 .imp-row select{background:var(--sf);border:1px solid var(--bd);color:var(--tx);padding:3px 5px;border-radius:4px;font-size:11px;width:100%;font-family:var(--sans)}
 .imp-row .dup-badge{display:inline-block;background:rgba(248,81,73,.2);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:3px}

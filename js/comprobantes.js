@@ -63,6 +63,17 @@ export function renderComprobantes(){
     });
   }
 
+  // Detectar comprobantes descuadrados (útil para el filtro y para la alerta)
+  const cuadraE=e=>{
+    const d=e.movs.reduce((s,m)=>s+(m.debe||0),0);
+    const h=e.movs.reduce((s,m)=>s+(m.haber||0),0);
+    return Math.abs(d-h)<1;
+  };
+  if(CMP_FILTRO.origen==='descuadrados'){
+    entries=entries.filter(e=>!cuadraE(e));
+  }
+  const descuadres=(CMP_FILTRO.origen==='descuadrados'?entries:entries.filter(e=>!cuadraE(e)));
+
   // Resumen
   const totD=entries.reduce((s,e)=>s+e.movs.reduce((ss,m)=>ss+(m.debe||0),0),0);
   const totH=entries.reduce((s,e)=>s+e.movs.reduce((ss,m)=>ss+(m.haber||0),0),0);
@@ -70,7 +81,18 @@ export function renderComprobantes(){
   const cntMan=entries.filter(e=>e.origen==='manual').length;
   const cntAp=entries.filter(e=>e.origen==='apertura').length;
 
-  let h=`<div class="filter-row" style="margin-bottom:14px">
+  // Panel de alerta cuando hay descuadres (y no estamos ya filtrando solo por ellos)
+  let alerta='';
+  if(descuadres.length&&CMP_FILTRO.origen!=='descuadrados'){
+    alerta=`<div style="background:rgba(248,81,73,.08);border:1px solid var(--err);border-radius:8px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:16px">⚠️</span>
+      <span style="font-weight:700;color:var(--err)">${descuadres.length} comprobante${descuadres.length===1?'':'s'} descuadrado${descuadres.length===1?'':'s'}</span>
+      <span style="font-size:11px;color:var(--mt)">— revisa cada asiento y corrige el documento origen</span>
+      <button class="btn btn-d" style="font-size:11px;margin-left:auto" onclick="setCmpFiltro('origen','descuadrados')">Ver solo descuadrados</button>
+    </div>`;
+  }
+
+  let h=alerta+`<div class="filter-row" style="margin-bottom:14px">
     <span class="f-lbl">Filtrar:</span>
     <select onchange="setCmpFiltro('mes',this.value)">${mesOptsCmp()}</select>
     <select onchange="setCmpFiltro('origen',this.value)">
@@ -81,6 +103,7 @@ export function renderComprobantes(){
       <option value="ventas" ${CMP_FILTRO.origen==='ventas'?'selected':''}>🛒 Auto ventas</option>
       <option value="compras" ${CMP_FILTRO.origen==='compras'?'selected':''}>🧾 Auto compras</option>
       <option value="honorarios" ${CMP_FILTRO.origen==='honorarios'?'selected':''}>📝 Auto honorarios</option>
+      <option value="descuadrados" ${CMP_FILTRO.origen==='descuadrados'?'selected':''}>⚠️ Solo descuadrados</option>
     </select>
     <input type="text" placeholder="Buscar por glosa o cuenta…" value="${CMP_FILTRO.texto.replace(/"/g,'&quot;')}"
       oninput="setCmpFiltro('texto',this.value)" style="min-width:220px">
@@ -114,36 +137,44 @@ export function renderComprobantes(){
     const totED=e.movs.reduce((s,m)=>s+(m.debe||0),0);
     const totEH=e.movs.reduce((s,m)=>s+(m.haber||0),0);
     const detId='cmp-det-'+i;
-    const anulado=e.anulado?' style="opacity:.5;text-decoration:line-through"':'';
+    const anulado=e.anulado?' opacity:.5;text-decoration:line-through;':'';
+    const descuadrado=Math.abs(totED-totEH)>1;
+    const estiloFila=(anulado||descuadrado)?` style="${anulado}${descuadrado?'background:rgba(248,81,73,.05);':''}"`:'';
+    const estiloTotal=descuadrado?'color:var(--err);font-weight:700':'font-family:var(--mono)';
+    const badgeDescuadre=descuadrado
+      ?` <span style="background:rgba(248,81,73,.15);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">⚠ DESCUADRE ${fmtC(Math.abs(totED-totEH))}</span>`
+      :'';
 
-    // Acción según origen
+    // Acción según origen — si hay descuadre, ir directo al documento
     let btnEditar;
     if(e.origen==='manual'){
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="editarAsientoDesdeCmp(${e.ref})" title="Editar asiento manual">✏️ Editar</button>`;
+      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="editarAsientoDesdeCmp(${e.ref})" title="Editar asiento manual">✏️ ${descuadrado?'Corregir':'Editar'}</button>`;
     }else if(e.origen==='apertura'){
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="nav('apertura')" title="Ir a Balance de Apertura">🔰 Abrir</button>`;
+      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="nav('apertura')" title="Ir a Balance de Apertura">🔰 ${descuadrado?'Corregir':'Abrir'}</button>`;
     }else if(e.fuente==='ventas'){
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="nav('ventas')" title="Ir al Libro de Ventas para editar los documentos">🛒 Al libro</button>`;
+      const accion=e.docId?`corregirCmp('ventas','${e.docId}')`:`nav('ventas')`;
+      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="${accion}" title="Editar el documento">🛒 ${descuadrado?'Corregir':'Al doc'}</button>`;
     }else if(e.fuente==='compras'){
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="nav('compras')" title="Ir al Libro de Compras para editar los documentos">🧾 Al libro</button>`;
+      const accion=e.docId?`corregirCmp('compras','${e.docId}')`:`nav('compras')`;
+      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="${accion}" title="Editar el documento">🧾 ${descuadrado?'Corregir':'Al doc'}</button>`;
     }else if(e.fuente==='honorarios'){
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="nav('honorarios')" title="Ir al libro de honorarios">📝 Al libro</button>`;
+      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="nav('honorarios')" title="Ir al libro de honorarios">📝 ${descuadrado?'Corregir':'Al libro'}</button>`;
     }else{
       btnEditar='';
     }
 
-    h+=`<tr${anulado}>
+    h+=`<tr${estiloFila}>
       <td class="tl" style="font-family:var(--mono);font-weight:600">${e.n}</td>
       <td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td>
       <td class="tl">
         <span style="display:inline-flex;align-items:center;gap:4px;background:${o.c}22;color:${o.c};padding:2px 8px;border-radius:100px;font-size:10px;font-weight:600">${o.ic} ${o.nm}</span>
       </td>
       <td class="tl" onclick="toggleCmpDet('${detId}')" style="cursor:pointer">
-        ${e.glosa||''}
+        ${e.glosa||''}${badgeDescuadre}
         <span style="font-size:10px;color:var(--mt);margin-left:6px">▸ ${e.movs.length} línea${e.movs.length===1?'':'s'}</span>
       </td>
-      <td style="text-align:right;font-family:var(--mono)">${fmtC(totED)}</td>
-      <td style="text-align:right;font-family:var(--mono)">${fmtC(totEH)}</td>
+      <td style="text-align:right;${estiloTotal}">${fmtC(totED)}</td>
+      <td style="text-align:right;${estiloTotal}">${fmtC(totEH)}</td>
       <td style="text-align:right;white-space:nowrap">${btnEditar}</td>
     </tr>`;
     // Detalle expandible
@@ -201,4 +232,16 @@ function editarAsientoDesdeCmp(n){
   setTimeout(()=>editarAsiento(a.id),50);
 }
 
-export {setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp};
+// Va al documento origen de un asiento automático (ventas/compras) para editarlo.
+function corregirCmp(fuente,docId){
+  if(!docId){nav(fuente);return;}
+  nav(fuente);
+  setTimeout(()=>{
+    try{
+      if(fuente==='compras'&&window.editarCompra)window.editarCompra(docId);
+      else if(fuente==='ventas'&&window.editarVenta)window.editarVenta(docId);
+    }catch(e){}
+  },80);
+}
+
+export {setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp};

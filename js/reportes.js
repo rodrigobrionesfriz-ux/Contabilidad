@@ -1,6 +1,7 @@
 // reportes.js — Libro Diario, Mayor, Balance, Resultados (núcleo de reportes)
 // genDiario y buildMayor son la base de casi todos los cálculos.
 import {toast, fmtC, fmt, pn, today, MESES, MC, IVA, pdcNm, PDC, CUENTAS_SEL, dteV, dteC} from './core.js';
+import {nav} from './ui.js';
 import {retencionHonorarios} from './indicadores.js';
 import {toggleAgingDetalle} from './auxiliares.js';
 import {S} from './state.js';
@@ -173,24 +174,116 @@ function genDiario(){
 function renderDiario(){
   const entries=genDiario(),el=document.getElementById('diario-content');
   if(!entries.length){el.innerHTML=`<div class="empty"><div class="ei">📖</div>No hay asientos registrados.</div>`;return;}
+
+  // Detectar descuadres. Cada entrada trae fuente/origen que nos permite
+  // ofrecer un link directo para corregirla.
+  const descuadres=[];
+  entries.forEach(e=>{
+    const eD=e.movs.reduce((s,m)=>s+m.debe,0);
+    const eH=e.movs.reduce((s,m)=>s+m.haber,0);
+    const dif=Math.round(eD-eH);
+    if(Math.abs(dif)>1){
+      descuadres.push({n:e.n,fecha:e.fecha,glosa:e.glosa,debe:eD,haber:eH,dif,origen:e.origen,fuente:e.fuente,docId:e.docId,ref:e.ref});
+    }
+  });
+
+  // Panel de alerta en el encabezado si hay descuadres
+  let alerta='';
+  if(descuadres.length){
+    alerta=`<div style="background:rgba(248,81,73,.08);border:1px solid var(--err);border-radius:8px;padding:14px 16px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:18px">⚠️</span>
+        <span style="font-weight:700;color:var(--err)">${descuadres.length} comprobante${descuadres.length===1?'':'s'} descuadrado${descuadres.length===1?'':'s'}</span>
+        <span style="font-size:11px;color:var(--mt)">— la partida doble no cuadra en estos asientos</span>
+      </div>
+      <div style="max-height:180px;overflow-y:auto">
+        <table style="width:100%;font-size:11px">
+          <thead><tr style="color:var(--mt);text-transform:uppercase;font-size:10px">
+            <th class="tl" style="width:40px;padding:4px 8px">N°</th>
+            <th class="tl" style="width:90px;padding:4px 8px">FECHA</th>
+            <th class="tl" style="padding:4px 8px">GLOSA</th>
+            <th style="text-align:right;padding:4px 8px">DEBE</th>
+            <th style="text-align:right;padding:4px 8px">HABER</th>
+            <th style="text-align:right;padding:4px 8px">DIFERENCIA</th>
+            <th style="padding:4px 8px;text-align:center">CORREGIR</th>
+          </tr></thead>
+          <tbody>${descuadres.map(d=>{
+            let btn='';
+            if(d.origen==='manual'){
+              btn=`<button class="btn btn-i" style="font-size:10px;padding:2px 8px" onclick="editarAsientoRef(${d.ref})">✏️ Editar</button>`;
+            }else if(d.fuente==='compras'){
+              btn=`<button class="btn btn-i" style="font-size:10px;padding:2px 8px" onclick="corregirDesdeDiario('compras','${d.docId}')">🧾 Al doc</button>`;
+            }else if(d.fuente==='ventas'){
+              btn=`<button class="btn btn-i" style="font-size:10px;padding:2px 8px" onclick="corregirDesdeDiario('ventas','${d.docId}')">🛒 Al doc</button>`;
+            }else if(d.origen==='apertura'){
+              btn=`<button class="btn btn-i" style="font-size:10px;padding:2px 8px" onclick="nav('apertura')">🔰 Abrir</button>`;
+            }else{
+              btn='<span style="color:var(--mt);font-size:10px">—</span>';
+            }
+            return `<tr>
+              <td class="tl" style="padding:4px 8px;font-family:var(--mono);font-weight:600">${d.n}</td>
+              <td class="tl" style="padding:4px 8px;font-family:var(--mono)">${d.fecha}</td>
+              <td class="tl" style="padding:4px 8px">${d.glosa}</td>
+              <td style="text-align:right;padding:4px 8px;font-family:var(--mono)">${fmtC(d.debe)}</td>
+              <td style="text-align:right;padding:4px 8px;font-family:var(--mono)">${fmtC(d.haber)}</td>
+              <td style="text-align:right;padding:4px 8px;font-family:var(--mono);color:var(--err);font-weight:700">${fmtC(Math.abs(d.dif))}</td>
+              <td style="padding:4px 8px;text-align:center">${btn}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
   let tD=0,tH=0;
-  let h=`<div class="card-np"><div class="tw"><table>
+  let h=alerta+`<div class="card-np"><div class="tw"><table>
     <thead><tr><th class="tl" style="width:38px">N°</th><th class="tl" style="width:92px">FECHA</th><th class="tl">GLOSA / CUENTA</th><th class="tl" style="width:82px">CÓD.</th><th style="min-width:110px">DEBE</th><th style="min-width:110px">HABER</th><th class="tl" style="width:65px">ORIGEN</th></tr></thead><tbody>`;
   entries.forEach(e=>{
     const eD=e.movs.reduce((s,m)=>s+m.debe,0),eH=e.movs.reduce((s,m)=>s+m.haber,0);
     tD+=eD;tH+=eH;
+    // ¿Este asiento cuadra?
+    const asDescuadrado=Math.abs(eD-eH)>1;
+    const estiloTotal=asDescuadrado?'color:var(--err);font-weight:700':'';
     const ob=e.origen==='manual'?`<span class="badge bb">Manual</span>`:`<span class="badge" style="background:rgba(130,130,130,.12);color:var(--mt)">Auto</span>`;
-    h+=`<tr class="rth"><td class="tl">${e.n}</td><td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td><td class="tl" colspan="2">${e.glosa}</td><td>${fmtC(eD)}</td><td>${fmtC(eH)}</td><td>${ob}</td></tr>`;
+    // Fila del encabezado con marca roja si descuadra
+    const trStyle=asDescuadrado?' style="background:rgba(248,81,73,.05)"':'';
+    const badgeDescuadre=asDescuadrado?' <span style="background:rgba(248,81,73,.15);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">⚠ DESCUADRE</span>':'';
+    h+=`<tr class="rth"${trStyle}><td class="tl">${e.n}</td><td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td><td class="tl" colspan="2">${e.glosa}${badgeDescuadre}</td><td style="${estiloTotal}">${fmtC(eD)}</td><td style="${estiloTotal}">${fmtC(eH)}</td><td>${ob}</td></tr>`;
     e.movs.forEach(m=>{
       const isH=m.haber>0;
       h+=`<tr><td></td><td></td><td class="tnm" style="${isH?'padding-left:28px;color:var(--mt)':''}">${m.nm||pdcNm(m.cd)}${m.desc?` <span style="color:var(--mt);font-size:11px">— ${m.desc}</span>`:''}</td><td class="tl" style="font-family:var(--mono);font-size:11px;color:var(--mt)">${m.cd}</td><td>${m.debe?fmtC(m.debe):''}</td><td>${m.haber?fmtC(m.haber):''}</td><td></td></tr>`;
     });
   });
-  h+=`</tbody><tfoot><tr><td class="tl" colspan="4">TOTALES</td><td>${fmtC(tD)}</td><td>${fmtC(tH)}</td><td></td></tr></tfoot></table></div></div>`;
-  const ok=tD===tH;
+  const ok=Math.abs(tD-tH)<1;
+  h+=`</tbody><tfoot><tr><td class="tl" colspan="4">TOTALES</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tD)}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tH)}</td><td></td></tr></tfoot></table></div></div>`;
   h+=`<div style="margin-top:10px;font-size:12px;color:${ok?'var(--ach)':'var(--err)'}">
-    ${ok?'✅ Partida doble cuadrada — Debe = Haber = '+fmtC(tD):'⚠️ Descuadre: Debe '+fmtC(tD)+' | Haber '+fmtC(tH)}</div>`;
+    ${ok?'✅ Partida doble cuadrada — Debe = Haber = '+fmtC(tD):'⚠️ Descuadre global: Debe '+fmtC(tD)+' | Haber '+fmtC(tH)+' | Diferencia '+fmtC(Math.abs(tD-tH))}</div>`;
   el.innerHTML=h;
+}
+
+// Puentes usados desde el reporte de descuadres del libro diario y desde Comprobantes.
+// - Manuales: abrir editor de asientos
+// - Compras/ventas: navegar al libro y filtrar por el número
+async function corregirDesdeDiario(fuente,docId){
+  if(!docId){nav(fuente);return;}
+  nav(fuente);
+  // Le damos tiempo a la sección para renderizarse y luego intentamos abrir el
+  // editor del documento específico. Los IDs de docs importados llevan
+  // prefijo 'c_imp_' o 'v_imp_'.
+  setTimeout(()=>{
+    try{
+      if(fuente==='compras'&&window.editarCompra)window.editarCompra(docId);
+      else if(fuente==='ventas'&&window.editarVenta)window.editarVenta(docId);
+    }catch(e){}
+  },80);
+}
+
+// Abre el editor de un asiento manual por su n° correlativo
+function editarAsientoRef(n){
+  const a=S.asientos.find(x=>x.n===n);
+  if(!a)return;
+  nav('asientos');
+  setTimeout(()=>{try{window.editarAsiento&&window.editarAsiento(a.id);}catch(e){}},50);
 }
 
 // ═══ MAYOR ═══
@@ -510,4 +603,4 @@ async function renderResultados(){
 }
 
 
-export {genDiario, renderDiario, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados};
+export {genDiario, renderDiario, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados, corregirDesdeDiario, editarAsientoRef};

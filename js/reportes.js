@@ -23,10 +23,12 @@ function genDiario(){
   }
 
   // Agrupar ventas por mes
+  // Excluimos los documentos que el usuario convirtió a asiento manual desde
+  // Comprobantes: sus movimientos ya están representados en S.asientos.
   const vPorMes={};
-  S.ventas.forEach(d=>{const m=+d.fecha.slice(5,7);if(!m)return;if(!vPorMes[m])vPorMes[m]=[];vPorMes[m].push(d);});
+  S.ventas.forEach(d=>{if(d.excluidoAuto)return;const m=+d.fecha.slice(5,7);if(!m)return;if(!vPorMes[m])vPorMes[m]=[];vPorMes[m].push(d);});
   const cPorMes={};
-  S.compras.forEach(d=>{const m=+d.fecha.slice(5,7);if(!m)return;if(!cPorMes[m])cPorMes[m]=[];cPorMes[m].push(d);});
+  S.compras.forEach(d=>{if(d.excluidoAuto)return;const m=+d.fecha.slice(5,7);if(!m)return;if(!cPorMes[m])cPorMes[m]=[];cPorMes[m].push(d);});
 
   MESES.forEach((mesNm,i)=>{
     const m=i+1;

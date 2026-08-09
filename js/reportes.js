@@ -84,45 +84,67 @@ function genDiario(){
     // COMPRAS del mes — asiento agregado (CREDITO A PROVEEDORES)
     const cs=cPorMes[m]||[];
     if(cs.length){
-      // Acumular por cuenta de gasto
-      const porCuenta={};let totIva=0,totTotal=0,totIvaRetenido=0;
-      cs.forEach(d=>{
-        const signo=(dteC(d.tipoDTE)?.signo)||1;
-        const otrosSig=(d.otrosImpuestos||0)*signo;
+      // UN ASIENTO POR CADA DOCUMENTO — así el auxiliar de proveedores muestra
+      // cada movimiento con su folio y su fecha real, y el libro mayor los
+      // separa. Las NC quedan como cargo a proveedores (rebaja) y las ND como
+      // abono adicional (aumento), gracias al signo del DTE.
+      cs.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).forEach(d=>{
+        const signo=(dteC(d.tipoDTE)?.signo)||1;   // NC: -1, todo lo demás: +1
+        const dteInfo=dteC(d.tipoDTE);
+        const nombreDoc=dteInfo?.nm||('DTE '+d.tipoDTE);
+        const glosa=`${nombreDoc} N°${d.numero} — ${d.razonSocial||'proveedor'}`;
+        const movs=[];
+
+        // Gasto/activo (una línea por cuenta en la distribución).
+        // El signo positivo → DEBE aumenta; signo negativo (NC) → invierte.
+        // Los "otros impuestos" (patente, específico combustible, tabacos, etc.)
+        // se acumulan en la primera cuenta como parte del costo.
+        const otros=(d.otrosImpuestos||0)*signo;
         (d.dist||[]).forEach((l,idx)=>{
-          if(!porCuenta[l.cuenta])porCuenta[l.cuenta]=0;
-          porCuenta[l.cuenta]+=(l.monto||0)*signo;
-          // Otros impuestos no recuperables → se suman al gasto de la primera cuenta de distribución
-          if(idx===0&&otrosSig)porCuenta[l.cuenta]+=otrosSig;
+          let monto=(l.monto||0)*signo;
+          if(idx===0)monto+=otros;   // primera línea absorbe los otros impuestos
+          if(!monto)return;
+          const desc=l.cc?`CC: ${l.cc}`:'';
+          if(monto>0)movs.push({cd:l.cuenta,nm:pdcNm(l.cuenta),debe:monto,haber:0,desc});
+          else movs.push({cd:l.cuenta,nm:pdcNm(l.cuenta),debe:0,haber:-monto,desc});
         });
-        // DTE 46 (Factura de compra): el IVA lo RETIENE el receptor.
-        // El total del documento NO incluye IVA (proveedor no lo recibe).
-        // El IVA es a la vez crédito fiscal Y débito por pagar al SII.
-        if(+d.tipoDTE===46){
-          totIvaRetenido+=(d.iva||0)*signo;
+        // IVA crédito fiscal
+        const iva=(d.iva||0)*signo;
+        if(iva){
+          if(iva>0)movs.push({cd:'1108002',nm:pdcNm('1108002'),debe:iva,haber:0});
+          else movs.push({cd:'1108002',nm:pdcNm('1108002'),debe:0,haber:-iva});
         }
-        totIva+=(d.iva||0)*signo;
-        totTotal+=(d.total||0)*signo;
+        // Proveedor (auxiliar) — el HABER normal, DEBE cuando es NC
+        const totalProv=(d.total||0)*signo;
+        // Para DTE 46 (factura de compra) el total no incluye IVA porque el
+        // receptor retiene. La cuenta proveedor solo recibe lo neto.
+        if(totalProv){
+          const desc=`${d.razonSocial||''} · ${nombreDoc} N°${d.numero}`.trim();
+          if(totalProv>0)movs.push({cd:'2102001',nm:pdcNm('2102001'),debe:0,haber:totalProv,desc,rutCodigo:d.rutCodigo,rutDV:d.rutDV,folio:d.numero,tipoDTE:d.tipoDTE});
+          else movs.push({cd:'2102001',nm:pdcNm('2102001'),debe:-totalProv,haber:0,desc,rutCodigo:d.rutCodigo,rutDV:d.rutDV,folio:d.numero,tipoDTE:d.tipoDTE});
+        }
+        // DTE 46: IVA retenido va al haber (obligación con el SII)
+        if(+d.tipoDTE===46){
+          const ret=(d.iva||0)*signo;
+          if(ret>0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:0,haber:ret,desc:'IVA retenido factura compra'});
+          else if(ret<0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:-ret,haber:0,desc:'IVA retenido factura compra'});
+        }
+
+        if(movs.length){
+          entries.push({
+            n:n++,
+            fecha:d.fecha,
+            glosa,
+            movs,
+            origen:'auto',
+            fuente:'compras',
+            docId:d.id,
+            tipoDTE:d.tipoDTE,
+            folio:d.numero,
+            rutCodigo:d.rutCodigo,
+          });
+        }
       });
-      const movs=[];
-      // Si el saldo de una cuenta queda negativo (más NC que facturas del mes),
-      // se registra como HABER en vez de DEBE.
-      Object.keys(porCuenta).sort().forEach(cd=>{
-        const v=porCuenta[cd];
-        if(!v)return;
-        if(v>0)movs.push({cd,nm:pdcNm(cd),debe:v,haber:0});
-        else movs.push({cd,nm:pdcNm(cd),debe:0,haber:-v});
-      });
-      // IVA neto: si el resultado es negativo (más NC que facturas), va al haber
-      if(totIva>0)movs.push({cd:'1108002',nm:pdcNm('1108002'),debe:totIva,haber:0});
-      else if(totIva<0)movs.push({cd:'1108002',nm:pdcNm('1108002'),debe:0,haber:-totIva});
-      // Total neto proveedores
-      if(totTotal>0)movs.push({cd:'2102001',nm:pdcNm('2102001'),debe:0,haber:totTotal,desc:'Auxiliar proveedores'});
-      else if(totTotal<0)movs.push({cd:'2102001',nm:pdcNm('2102001'),debe:-totTotal,haber:0,desc:'Auxiliar proveedores'});
-      // Retención de IVA de facturas de compra (DTE 46)
-      if(totIvaRetenido>0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:0,haber:totIvaRetenido,desc:'IVA retenido facturas compra'});
-      else if(totIvaRetenido<0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:-totIvaRetenido,haber:0,desc:'IVA retenido facturas compra'});
-      if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen compras ${mesNm} ${anio} (${cs.length} doc.)`,movs,origen:'auto',fuente:'compras',mes:m,anio});
     }
 
     // HONORARIOS

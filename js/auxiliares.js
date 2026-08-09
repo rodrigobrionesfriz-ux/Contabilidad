@@ -88,11 +88,11 @@ function renderAuxiliares(){
   const keys=Object.keys(data).sort((a,b)=>(data[b].total-data[a].total));
   const tipoLbl=AUX_TAB==='c'?'clientes':'proveedores';
   const tipoIco=AUX_TAB==='c'?'📇':'🏭';
-  const cuentaLbl=AUX_TAB==='c'?'CLIENTES (01.01.03)':'PROVEEDORES (02.01.03)';
+  const cuentaLbl=AUX_TAB==='c'?'CLIENTES (1104001)':'PROVEEDORES (2102001)';
   const saldoLbl=AUX_TAB==='c'?'Por Cobrar':'Por Pagar';
 
   if(!keys.length){
-    el.innerHTML=`<div class="empty"><div class="ei">${tipoIco}</div>No hay ${tipoLbl} registrados aún.${AUX_TAB==='c'?'<br><br>Los clientes aparecen automáticamente al registrar ventas con forma de pago <strong>Crédito Cliente</strong>, o al hacer un asiento manual que cargue/abone la cuenta <strong>01.01.03 CLIENTES</strong>.':'<br><br>Los proveedores aparecen automáticamente al registrar documentos en el Libro de Compras, o al hacer un asiento manual que cargue/abone la cuenta <strong>02.01.03 PROVEEDORES</strong>.'}</div>`;
+    el.innerHTML=`<div class="empty"><div class="ei">${tipoIco}</div>No hay ${tipoLbl} registrados aún.${AUX_TAB==='c'?'<br><br>Los clientes aparecen automáticamente al registrar ventas con forma de pago <strong>Crédito Cliente</strong>, o al hacer un asiento manual que cargue/abone la cuenta <strong>1104001 CLIENTES</strong>.':'<br><br>Los proveedores aparecen automáticamente al registrar documentos en el Libro de Compras, o al hacer un asiento manual que cargue/abone la cuenta <strong>2102001 PROVEEDORES</strong>.'}</div>`;
   return;
   }
 

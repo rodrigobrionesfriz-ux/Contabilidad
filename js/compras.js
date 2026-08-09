@@ -696,10 +696,14 @@ function confirmarImportacion(){
   incluidos.forEach((d,i)=>{
     const fechaFinal=fechaEfectivaImport(d);
     if(fechaFinal!==d.fechaOriginal)normalizados++;
-    // En la distribución guardamos SOLO neto + exento.
-    // Los "otros impuestos" los suma genDiario/reportes a la primera cuenta
-    // de la distribución al generar el asiento (así se evita duplicarlos).
-    const montoDist=d.neto+d.exento;
+    // Calculamos el gasto como (total - IVA recuperable). Es lo que
+    // efectivamente le cuesta a la empresa. Con esta fórmula:
+    //   - El asiento SIEMPRE cuadra: DEBE(gasto) + DEBE(IVA) = HABER(prov)
+    //   - Absorbe inconsistencias del CSV (cuando neto+iva+otros ≠ total)
+    //   - Los "otros impuestos" quedan implícitamente incluidos en el gasto
+    // DTE 46 (factura de compra): el IVA lo retiene el receptor, así que el
+    // proveedor solo recibe `total` (= neto). El gasto es igual al total.
+    const montoDist=+d.tipoDTE===46 ? d.total : (d.total-d.iva);
     const doc={
       id:'c_imp_'+ts+'_'+i,
       fecha:fechaFinal,
@@ -712,7 +716,11 @@ function confirmarImportacion(){
       neto:d.neto,
       exento:d.exento,
       iva:d.iva,
-      otrosImpuestos:d.otrosImpuestos||0,
+      // otrosImpuestos ya está incluido en montoDist (por ser total-iva),
+      // así que lo dejamos en 0 para que genDiario no lo sume dos veces.
+      otrosImpuestos:0,
+      // Guardamos el valor original por si se necesita para reportes SII.
+      otrosImpuestosOriginal:d.otrosImpuestos||0,
       total:d.total,
       dist:[{cuenta:d.cuenta,monto:montoDist,cc:d.cc||''}]
     };

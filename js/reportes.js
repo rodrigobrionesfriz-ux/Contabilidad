@@ -78,7 +78,7 @@ function genDiario(){
       pushCr('4101003',crBoletas);
       pushCr('4101003',crTerceros);
       pushCr('2103003',crIvaDebito);
-      if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen ventas ${mesNm} ${anio} (${vs.length} doc.)`,movs,origen:'auto'});
+      if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen ventas ${mesNm} ${anio} (${vs.length} doc.)`,movs,origen:'auto',fuente:'ventas',mes:m,anio});
     }
 
     // COMPRAS del mes — asiento agregado (CREDITO A PROVEEDORES)
@@ -122,7 +122,7 @@ function genDiario(){
       // Retención de IVA de facturas de compra (DTE 46)
       if(totIvaRetenido>0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:0,haber:totIvaRetenido,desc:'IVA retenido facturas compra'});
       else if(totIvaRetenido<0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:-totIvaRetenido,haber:0,desc:'IVA retenido facturas compra'});
-      if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen compras ${mesNm} ${anio} (${cs.length} doc.)`,movs,origen:'auto'});
+      if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen compras ${mesNm} ${anio} (${cs.length} doc.)`,movs,origen:'auto',fuente:'compras',mes:m,anio});
     }
 
     // HONORARIOS
@@ -133,7 +133,7 @@ function genDiario(){
         {cd:'3202019',nm:'HONORARIOS',debe:tBruto,haber:0},
         {cd:'2102006',nm:pdcNm('2102006'),debe:0,haber:tRet},
         {cd:'1101201',nm:pdcNm('1101201'),debe:0,haber:tBruto-tRet},
-      ],origen:'auto'});
+      ],origen:'auto',fuente:'honorarios',mes:m,anio});
     }
   });
   // Asientos manuales (excluir anulados de todos los cómputos)

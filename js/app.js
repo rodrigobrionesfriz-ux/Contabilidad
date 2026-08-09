@@ -83,6 +83,7 @@ import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
 // Reportes
 import {genDiario, renderDiario, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados} from './reportes.js';
+import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp} from './comprobantes.js';
 import {setAuxTab, setAuxView, toggleAux, renderAuxiliares, calcularAging,
         toggleAgingDetalle, AUX_TAB,
         abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI} from './auxiliares.js';
@@ -91,7 +92,6 @@ import {renderF29, renderPPM} from './tributario.js';
 import {setFCView, renderFlujoCaja} from './flujocaja.js';
 import {renderConciliacion, onSaldoBancoChange, toggleConciliado,
         marcarTodosConciliados, cargarCartola, autoConciliarCartola} from './conciliacion.js';
-import {renderXmlSii, generarXmlSii} from './xmlsii.js';
 import {abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda,
         irAResultado} from './busqueda.js';
 import {prepararImpresion} from './impresion.js';
@@ -256,9 +256,9 @@ function renderSec(s){
   else if(s==='resultados')renderResultados();
   else if(s==='flujocaja')renderFlujoCaja();
   else if(s==='conciliacion')renderConciliacion();
+  else if(s==='comprobantes')renderComprobantes();
   else if(s==='f29')renderF29();
   else if(s==='ppm')renderPPM();
-  else if(s==='xmlsii')renderXmlSii();
   else if(s==='activofijo')renderActivoFijo();
   else if(s==='provisiones')renderProvisiones();
   else if(s==='correccion')renderCorreccion();
@@ -339,6 +339,7 @@ Object.assign(window,{
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel,
   abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
+  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp,
   descargarPlantillaAux, abrirImportFichas, descargarPlantillaAuxActual, abrirImportFichasActual,
   renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
   buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal, renderCTModal,
@@ -381,7 +382,6 @@ Object.assign(window,{
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,
   cargarCartola, autoConciliarCartola,
-  renderXmlSii, generarXmlSii,
   // búsqueda / backup
   abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda, irAResultado,
   cambiarTema, aplicarTema, onCambiarEmpresa, renderSelectorEmpresa, recargarEmpresaActiva,

@@ -8,7 +8,7 @@ import {todosDocsCompras, abrirAsientoDesde} from './asientos.js';
 import {ccOpts} from './centroscosto.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {leerArchivo} from './importadorsii.js';
-import {fichaAux} from './importadoraux.js';
+import {fichaAux, fichasAux, guardarFichasAux} from './importadoraux.js';
 import './storage.js';
 
 // Estado del formulario de compras (interno del módulo)
@@ -728,10 +728,57 @@ function confirmarImportacion(){
     agregados++;
   });
   window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>toast('❌ Error guardando en storage','e'));
+
+  // Guardar cuenta y CC como default en la ficha del proveedor.
+  // Reglas:
+  //  - Si el proveedor NO tiene ficha, se crea con los datos actuales.
+  //  - Si tiene ficha pero SIN cuentaDefault/ccDefault, se completan.
+  //  - Si ya tiene cuentaDefault/ccDefault configurados por el usuario,
+  //    NO se sobreescriben (respetamos su configuración).
+  //  - Cuando un proveedor tiene documentos con distinta cuenta en el mismo
+  //    batch, se usa la más frecuente.
+  const asignaciones={};  // rut → { cuenta:{cd→count}, cc:{cd→count}, dv, razon }
+  incluidos.forEach(d=>{
+    if(!d.cuenta)return;
+    const key=d.rutCodigo;
+    if(!asignaciones[key])asignaciones[key]={cuenta:{},cc:{},rutDV:d.rutDV,razonSocial:d.razonSocial};
+    asignaciones[key].cuenta[d.cuenta]=(asignaciones[key].cuenta[d.cuenta]||0)+1;
+    if(d.cc)asignaciones[key].cc[d.cc]=(asignaciones[key].cc[d.cc]||0)+1;
+  });
+  let fichasCreadas=0, fichasActualizadas=0;
+  const proveedoresF=fichasAux('proveedor');
+  Object.entries(asignaciones).forEach(([rut,a])=>{
+    const cuentaTop=Object.entries(a.cuenta).sort((x,y)=>y[1]-x[1])[0]?.[0]||'';
+    const ccTop=Object.entries(a.cc).sort((x,y)=>y[1]-x[1])[0]?.[0]||'';
+    const ficha=proveedoresF[rut];
+    if(!ficha){
+      // Ficha nueva
+      proveedoresF[rut]={
+        rutCodigo:rut, rutDV:a.rutDV, razonSocial:a.razonSocial,
+        cuentaDefault:cuentaTop, ccDefault:ccTop,
+        giro:'', direccion:'', comuna:'', ciudad:'', email:'', telefono:'', notas:'',
+      };
+      fichasCreadas++;
+    }else{
+      // Completar solo los campos vacíos, respetando lo que el usuario ya haya
+      // configurado manualmente
+      let cambio=false;
+      if(!ficha.cuentaDefault&&cuentaTop){ficha.cuentaDefault=cuentaTop;cambio=true;}
+      if(!ficha.ccDefault&&ccTop){ficha.ccDefault=ccTop;cambio=true;}
+      if(!ficha.razonSocial&&a.razonSocial){ficha.razonSocial=a.razonSocial;cambio=true;}
+      if(cambio)fichasActualizadas++;
+    }
+  });
+  if(fichasCreadas||fichasActualizadas){
+    guardarFichasAux().catch(()=>{});
+  }
+
   cerrarImportModal();
   const periodoStr=`${MESES[IM.periodoMes-1]} ${IM.periodoAnio}`;
   const msgProv=proveedoresNuevos.size?` · ${proveedoresNuevos.size} proveedor${proveedoresNuevos.size===1?'':'es'} nuevo${proveedoresNuevos.size===1?'':'s'} detectado${proveedoresNuevos.size===1?'':'s'} en auxiliares`:'';
-  toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${normalizados?` (${normalizados} con fecha normalizada)`:''}${msgProv}`);
+  const msgFichas=(fichasCreadas||fichasActualizadas)?` · fichas: ${fichasCreadas} nuevas${fichasActualizadas?', '+fichasActualizadas+' completadas':''}`:'';
+  toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${normalizados?` (${normalizados} con fecha normalizada)`:''}${msgProv}${msgFichas}`);
+  logAccion('Importó compras SII',`${agregados} documentos${msgFichas}`);
   rerender();
 }
 

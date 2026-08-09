@@ -2,7 +2,7 @@
 import {toast, pn, today, MESES, IVA, DTE_VENTAS, dteV, rutParse, rutFmt, rutDV, fmt, fmtC, CUENTAS_INGRESO} from './core.js';
 import {leerArchivo} from './importadorsii.js';
 import {inputCuenta} from './buscadorcuentas.js';
-import {fichaAux} from './importadoraux.js';
+import {fichaAux, fichasAux, guardarFichasAux} from './importadoraux.js';
 import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
@@ -518,10 +518,44 @@ function confirmarImportacionV(){
   });
 
   window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas)).catch(()=>toast('❌ Error guardando en storage','e'));
+
+  // Guardar cuenta de ingreso como default en la ficha del cliente.
+  // Solo se crea/completa si el usuario no tiene ya configurada una cuenta.
+  const asignaciones={};  // rut → {cuenta:{cd→count}, dv, razon}
+  incluidos.forEach(d=>{
+    if(!d.cuenta)return;
+    const key=d.rutCodigo;
+    if(!asignaciones[key])asignaciones[key]={cuenta:{},rutDV:d.rutDV,razonSocial:d.razonSocial};
+    asignaciones[key].cuenta[d.cuenta]=(asignaciones[key].cuenta[d.cuenta]||0)+1;
+  });
+  let fichasCreadas=0, fichasActualizadas=0;
+  const clientesF=fichasAux('cliente');
+  Object.entries(asignaciones).forEach(([rut,a])=>{
+    const cuentaTop=Object.entries(a.cuenta).sort((x,y)=>y[1]-x[1])[0]?.[0]||'';
+    const ficha=clientesF[rut];
+    if(!ficha){
+      clientesF[rut]={
+        rutCodigo:rut, rutDV:a.rutDV, razonSocial:a.razonSocial,
+        cuentaDefault:cuentaTop, ccDefault:'',
+        giro:'', direccion:'', comuna:'', ciudad:'', email:'', telefono:'', notas:'',
+      };
+      fichasCreadas++;
+    }else{
+      let cambio=false;
+      if(!ficha.cuentaDefault&&cuentaTop){ficha.cuentaDefault=cuentaTop;cambio=true;}
+      if(!ficha.razonSocial&&a.razonSocial){ficha.razonSocial=a.razonSocial;cambio=true;}
+      if(cambio)fichasActualizadas++;
+    }
+  });
+  if(fichasCreadas||fichasActualizadas){
+    guardarFichasAux().catch(()=>{});
+  }
+
   cerrarImportModalVentas();
   const msgClientes=clientesNuevos.size?` · ${clientesNuevos.size} clientes nuevos detectados en auxiliares`:'';
-  toast(`✅ ${importados} ventas importadas${msgClientes}`);
-  logAccion('Importó ventas SII',`${importados} documentos${msgClientes}`);
+  const msgFichas=(fichasCreadas||fichasActualizadas)?` · fichas: ${fichasCreadas} nuevas${fichasActualizadas?', '+fichasActualizadas+' completadas':''}`:'';
+  toast(`✅ ${importados} ventas importadas${msgClientes}${msgFichas}`);
+  logAccion('Importó ventas SII',`${importados} documentos${msgFichas}`);
   rerender();
 }
 

@@ -44,6 +44,7 @@ const SECCIONES=[
   {id:'remuneraciones',lbl:'Remuneraciones'},
   {id:'asientos',lbl:'Asientos Manuales'},
   {id:'auxiliares',lbl:'Auxiliares'},
+  {id:'pagos',lbl:'Pagos y Cobros'},
   {id:'diario',lbl:'Libro Diario'},
   {id:'mayor',lbl:'Libro Mayor'},
   {id:'balance',lbl:'Balance General'},

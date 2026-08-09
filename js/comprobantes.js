@@ -8,11 +8,11 @@
 // automáticos llevan al origen (Libro de Ventas/Compras/Honorarios) para
 // que se corrijan los documentos que los generaron.
 
-import {fmt, fmtC, MESES, pdcNm, today, toast} from './core.js';
+import {fmt, fmtC, MESES, pdcNm, today, toast, rutFmt, dteV, dteC, rutParse, DTE_VENTAS, DTE_COMPRAS, IVA} from './core.js';
 import {S} from './state.js';
 import {nav, rerender} from './ui.js';
 import {genDiario} from './reportes.js';
-import {editarAsiento, sigAsiento} from './asientos.js';
+import {editarAsiento, proxFolioAsiento, CUENTAS_AUX, esAux} from './asientos.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {logAccion} from './firebase.js';
 
@@ -335,8 +335,25 @@ function renderCmpModalEdit(box,e,o){
       placeholder:'Buscar cuenta…',
       clase:'linea-inp',
     });
+    // Si la cuenta maneja auxiliar (proveedor / cliente / honorario),
+    // mostramos un resumen de los datos DTE ya asociados y un botón para
+    // editarlos en un modal aparte.
+    const aux=m.cd?CUENTAS_AUX[m.cd]:'';
+    let dteBloque='';
+    if(aux){
+      const d=m.dte||{};
+      const dteInfo=aux==='cliente'?dteV(d.tipoDTE):dteC(d.tipoDTE);
+      const dteNm=dteInfo?.nm||(d.tipoDTE?`DTE ${d.tipoDTE}`:'sin definir');
+      const tieneDatos=d.rutCodigo&&d.numero;
+      dteBloque=`<div style="margin-top:4px;padding:6px 8px;background:${tieneDatos?'rgba(88,166,255,.06)':'rgba(255,193,7,.08)'};border:1px solid ${tieneDatos?'rgba(88,166,255,.3)':'rgba(255,193,7,.35)'};border-radius:4px;font-size:10px">
+        ${tieneDatos
+          ? `<span style="color:var(--info);font-weight:600">📄 ${dteNm} N°${d.numero||'?'}</span> · ${d.fecha||''} · ${d.rutCodigo?rutFmt(d.rutCodigo,d.rutDV):''} · ${d.razonSocial||''}${d.total?` · <b>${fmtC(d.total)}</b>`:''}`
+          : `<span style="color:var(--warn)">⚠️ Falta ${aux==='cliente'?'datos del cliente':aux==='proveedor'?'datos del proveedor':'datos del honorario'}</span>`}
+        <button class="btn btn-i" style="padding:2px 8px;font-size:10px;margin-left:8px" onclick="abrirCmpEdDte(${i})">${tieneDatos?'✏️ Editar':'+ Agregar'} datos</button>
+      </div>`;
+    }
     return `<tr>
-      <td style="padding:4px 6px;min-width:220px">${busc}</td>
+      <td style="padding:4px 6px;min-width:220px">${busc}${dteBloque}</td>
       <td style="padding:4px 6px"><input type="text" class="linea-inp" placeholder="Descripción"
         value="${(m.desc||'').replace(/"/g,'&quot;')}" oninput="setCmpEdCampo(${i},'desc',this.value)"></td>
       <td style="padding:4px 6px"><input type="number" class="linea-num-inp" placeholder="Debe"
@@ -408,16 +425,56 @@ function cmpModalEditar(){
   const e=CMP_ENTRIES[CMP_MODAL.idx];
   if(!e)return;
   CMP_MODAL.mode='edit';
+
+  // Si el comprobante viene de un doc de compras/ventas, buscamos ese doc
+  // para pre-poblar los datos DTE en la línea del auxiliar (proveedor/cliente).
+  let docOrigen=null;
+  if(e.docId&&(e.fuente==='compras'||e.fuente==='ventas')){
+    const arr=e.fuente==='compras'?S.compras:S.ventas;
+    docOrigen=arr.find(x=>x.id===e.docId);
+  }
+
   CMP_MODAL.edit={
     glosa:e.glosa||'',
     fecha:e.fecha||today(),
-    movs:e.movs.map(m=>({
-      cd:m.cd||'',
-      nm:m.nm||pdcNm(m.cd)||'',
-      desc:m.desc||'',
-      debe:+m.debe||0,
-      haber:+m.haber||0,
-    })),
+    movs:e.movs.map(m=>{
+      const linea={
+        cd:m.cd||'',
+        nm:m.nm||pdcNm(m.cd)||'',
+        desc:m.desc||'',
+        debe:+m.debe||0,
+        haber:+m.haber||0,
+      };
+      // Si la cuenta es auxiliar y hay un doc origen, poblar los datos DTE
+      const aux=m.cd?CUENTAS_AUX[m.cd]:'';
+      if(aux&&docOrigen&&(aux==='proveedor'||aux==='cliente')){
+        linea.dte={
+          fecha:docOrigen.fecha||e.fecha,
+          fechaVencimiento:docOrigen.fechaVencimiento||'',
+          tipoDTE:docOrigen.tipoDTE,
+          numero:docOrigen.numero,
+          rutCodigo:docOrigen.rutCodigo,
+          rutDV:docOrigen.rutDV,
+          razonSocial:docOrigen.razonSocial,
+          neto:docOrigen.neto||0,
+          exento:docOrigen.exento||0,
+          iva:docOrigen.iva||0,
+          otrosImpuestos:docOrigen.otrosImpuestos||0,
+          retencion:docOrigen.retencion||0,
+          total:docOrigen.total||0,
+        };
+      }
+      // Preservar los datos DTE si ya venían en el mov (asientos manuales)
+      if(m.dte)linea.dte={...linea.dte,...m.dte};
+      // Preservar campos que traía el mov original
+      if(m.rutCodigo&&!linea.dte){
+        linea.dte={
+          fecha:e.fecha,tipoDTE:m.tipoDTE,numero:m.folio,
+          rutCodigo:m.rutCodigo,rutDV:m.rutDV,
+        };
+      }
+      return linea;
+    }),
   };
   // Asegurar al menos 2 líneas
   while(CMP_MODAL.edit.movs.length<2)CMP_MODAL.edit.movs.push({cd:'',nm:'',desc:'',debe:0,haber:0});
@@ -482,11 +539,15 @@ async function cmpModalGuardar(){
     toast(`⚠️ ${sinCuenta.length} línea${sinCuenta.length===1?'':'s'} sin cuenta asignada`,'e');
     return;
   }
-  // Filtrar líneas vacías
-  const movsClean=ed.movs.filter(m=>m.cd&&(m.debe||m.haber)).map(m=>({
-    cd:m.cd, nm:pdcNm(m.cd), desc:m.desc||'',
-    debe:+m.debe||0, haber:+m.haber||0,
-  }));
+  // Filtrar líneas vacías (preservando los datos DTE en cuentas auxiliares)
+  const movsClean=ed.movs.filter(m=>m.cd&&(m.debe||m.haber)).map(m=>{
+    const mv={
+      cd:m.cd, nm:pdcNm(m.cd), desc:m.desc||'',
+      debe:+m.debe||0, haber:+m.haber||0,
+    };
+    if(m.dte)mv.dte=m.dte;
+    return mv;
+  });
   if(movsClean.length<2){
     toast('⚠️ El asiento debe tener al menos 2 líneas con monto','e');
     return;
@@ -517,10 +578,31 @@ async function cmpModalGuardar(){
     // automática (excluidoAuto:true). El resumen agregado del mes ya no lo tomará.
     const arr=e.fuente==='compras'?S.compras:S.ventas;
     const doc=arr.find(x=>x.id===e.docId);
-    if(doc)doc.excluidoAuto=true;
+    if(doc){
+      doc.excluidoAuto=true;
+      // Si el usuario editó los datos DTE en alguna línea auxiliar, propagar
+      // esos cambios al documento origen para mantener consistencia con el
+      // libro de compras/ventas y auxiliares.
+      const movAux=movsClean.find(m=>m.dte&&m.dte.rutCodigo);
+      if(movAux){
+        const d=movAux.dte;
+        if(d.fecha)doc.fecha=d.fecha;
+        if(d.fechaVencimiento)doc.fechaVencimiento=d.fechaVencimiento;
+        if(d.tipoDTE)doc.tipoDTE=+d.tipoDTE;
+        if(d.numero)doc.numero=String(d.numero);
+        if(d.rutCodigo)doc.rutCodigo=d.rutCodigo;
+        if(d.rutDV)doc.rutDV=d.rutDV;
+        if(d.razonSocial)doc.razonSocial=d.razonSocial;
+        if(d.neto!==undefined)doc.neto=+d.neto||0;
+        if(d.exento!==undefined)doc.exento=+d.exento||0;
+        if(d.iva!==undefined)doc.iva=+d.iva||0;
+        if(d.otrosImpuestos!==undefined)doc.otrosImpuestos=+d.otrosImpuestos||0;
+        if(d.total!==undefined)doc.total=+d.total||0;
+      }
+    }
     // Crear asiento manual
     if(!S.asientos)S.asientos=[];
-    const n=sigAsiento();
+    const n=proxFolioAsiento();
     S.asientos.push({
       id:'a_'+Date.now(),
       n,
@@ -539,6 +621,160 @@ async function cmpModalGuardar(){
   rerender();
 }
 
+// ═══ MODAL DE DATOS DTE PARA LÍNEA AUXILIAR ═══
+//
+// Cuando en el editor de comprobantes hay una línea con cuenta auxiliar
+// (proveedor / cliente / honorario), este modal permite editar todos los
+// campos del documento asociado: fecha, RUT, razón social, tipo DTE, folio,
+// fecha vencimiento, neto, IVA, retención, total.
+//
+// Es un modal secundario que se abre sobre el editor principal.
+
+let CMP_DTE={lineaIdx:-1,dte:null,tipoAux:''};
+
+function abrirCmpEdDte(lineaIdx){
+  const l=CMP_MODAL.edit.movs[lineaIdx];
+  if(!l||!l.cd)return;
+  const tipoAux=CUENTAS_AUX[l.cd];
+  if(!tipoAux)return;
+  CMP_DTE={
+    lineaIdx,
+    tipoAux,
+    dte:l.dte?{...l.dte}:{
+      fecha:CMP_MODAL.edit.fecha||today(),
+      fechaVencimiento:'',
+      tipoDTE:'', numero:'',
+      rutCodigo:'', rutDV:'', razonSocial:'',
+      neto:0, exento:0, iva:0, otrosImpuestos:0, retencion:0, total:0,
+    },
+  };
+  document.getElementById('cmp-dte-modal').classList.add('open');
+  renderCmpDteModal();
+}
+
+function cerrarCmpEdDte(){
+  document.getElementById('cmp-dte-modal').classList.remove('open');
+  CMP_DTE={lineaIdx:-1,dte:null,tipoAux:''};
+}
+
+function renderCmpDteModal(){
+  const box=document.getElementById('cmp-dte-modal-body');
+  if(!box)return;
+  const d=CMP_DTE.dte;
+  const tipoAux=CMP_DTE.tipoAux;
+  const tipoLbl=tipoAux==='cliente'?'Cliente':tipoAux==='proveedor'?'Proveedor':'Honorario';
+  const rutLbl=tipoAux==='cliente'?'RUT Cliente':tipoAux==='proveedor'?'RUT Proveedor':'RUT Prestador';
+
+  // Opciones de DTE según tipo auxiliar
+  let dteOpts='<option value="">— tipo documento —</option>';
+  if(tipoAux==='cliente'){
+    DTE_VENTAS.forEach(x=>{dteOpts+=`<option value="${x.cod}" ${+d.tipoDTE===x.cod?'selected':''}>${x.cod} — ${x.nm}</option>`;});
+  }else if(tipoAux==='proveedor'){
+    DTE_COMPRAS.forEach(x=>{dteOpts+=`<option value="${x.cod}" ${+d.tipoDTE===x.cod?'selected':''}>${x.cod} — ${x.nm}</option>`;});
+  }else{
+    dteOpts+=`<option value="70" ${+d.tipoDTE===70?'selected':''}>70 — Boleta de Honorarios</option>
+              <option value="71" ${+d.tipoDTE===71?'selected':''}>71 — Boleta de Honorarios Electrónica</option>`;
+  }
+
+  const rutFmt2=d.rutCodigo?`${d.rutCodigo}-${d.rutDV||''}`:'';
+  const esHono=tipoAux==='honorario';
+
+  box.innerHTML=`
+    <div style="padding:16px 20px">
+      <div style="background:var(--sf2);border-radius:6px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;color:var(--mt);text-transform:uppercase;font-weight:700">${tipoLbl}</span>
+        <span style="font-family:var(--mono);font-size:11px">${pdcNm(CMP_MODAL.edit.movs[CMP_DTE.lineaIdx]?.cd||'')}</span>
+      </div>
+
+      <div class="fg">
+        <div class="grp"><label>Fecha emisión</label>
+          <input type="date" id="cmpdte-fecha" value="${d.fecha||''}" oninput="setCmpDteCampo('fecha',this.value)"></div>
+        <div class="grp"><label>Fecha vencimiento</label>
+          <input type="date" id="cmpdte-fvenc" value="${d.fechaVencimiento||''}" oninput="setCmpDteCampo('fechaVencimiento',this.value)"></div>
+
+        <div class="grp"><label>${rutLbl}</label>
+          <input type="text" id="cmpdte-rut" value="${rutFmt2}" placeholder="12345678-9" oninput="setCmpDteRut(this.value)"></div>
+        <div class="grp"><label>Razón social / Nombre</label>
+          <input type="text" id="cmpdte-razon" value="${(d.razonSocial||'').replace(/"/g,'&quot;')}" oninput="setCmpDteCampo('razonSocial',this.value)"></div>
+
+        <div class="grp"><label>Tipo de documento</label>
+          <select id="cmpdte-tipo" onchange="setCmpDteCampo('tipoDTE',+this.value)">${dteOpts}</select></div>
+        <div class="grp"><label>Folio / N° documento</label>
+          <input type="text" id="cmpdte-numero" value="${d.numero||''}" oninput="setCmpDteCampo('numero',this.value)"></div>
+      </div>
+
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--bd)">
+        <div style="font-size:11px;font-weight:600;margin-bottom:8px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em">Montos</div>
+        <div class="fg">
+          ${esHono?`
+          <div class="grp"><label>Bruto (base honorarios)</label>
+            <input type="number" id="cmpdte-neto" value="${d.neto||''}" oninput="setCmpDteCampo('neto',+this.value)"></div>
+          <div class="grp"><label>Retención</label>
+            <input type="number" id="cmpdte-ret" value="${d.retencion||''}" oninput="setCmpDteCampo('retencion',+this.value)"></div>
+          `:`
+          <div class="grp"><label>Neto</label>
+            <input type="number" id="cmpdte-neto" value="${d.neto||''}" oninput="setCmpDteCampo('neto',+this.value);cmpDteAutoTotal()"></div>
+          <div class="grp"><label>Exento</label>
+            <input type="number" id="cmpdte-exento" value="${d.exento||''}" oninput="setCmpDteCampo('exento',+this.value);cmpDteAutoTotal()"></div>
+          <div class="grp"><label>IVA</label>
+            <input type="number" id="cmpdte-iva" value="${d.iva||''}" oninput="setCmpDteCampo('iva',+this.value);cmpDteAutoTotal()"></div>
+          <div class="grp"><label>Otros impuestos / Retención</label>
+            <input type="number" id="cmpdte-otros" value="${d.otrosImpuestos||d.retencion||''}" oninput="setCmpDteCampo('otrosImpuestos',+this.value);cmpDteAutoTotal()"></div>
+          `}
+          <div class="grp full"><label style="font-weight:700">Total documento</label>
+            <input type="number" id="cmpdte-total" style="font-weight:700;font-size:14px" value="${d.total||''}" oninput="setCmpDteCampo('total',+this.value)"></div>
+        </div>
+        ${!esHono?`<div style="font-size:10px;color:var(--mt);margin-top:6px">💡 El total se recalcula automáticamente al editar neto/exento/IVA. Puedes ajustarlo manualmente si hay diferencias con el documento real.</div>`:''}
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button class="btn btn-g" onclick="cerrarCmpEdDte()">Cancelar</button>
+        <button class="btn btn-p" onclick="guardarCmpEdDte()">💾 Guardar datos</button>
+      </div>
+    </div>`;
+}
+
+function setCmpDteCampo(campo,valor){
+  if(!CMP_DTE.dte)return;
+  CMP_DTE.dte[campo]=valor;
+}
+function setCmpDteRut(txt){
+  if(!CMP_DTE.dte)return;
+  const info=rutParse(txt||'');
+  CMP_DTE.dte.rutCodigo=info.codigo||'';
+  CMP_DTE.dte.rutDV=info.dv||'';
+}
+function cmpDteAutoTotal(){
+  const d=CMP_DTE.dte;if(!d)return;
+  const total=(+d.neto||0)+(+d.exento||0)+(+d.iva||0)+(+d.otrosImpuestos||0);
+  const inp=document.getElementById('cmpdte-total');
+  if(inp&&document.activeElement!==inp){inp.value=total;d.total=total;}
+}
+
+function guardarCmpEdDte(){
+  const d=CMP_DTE.dte;
+  const li=CMP_DTE.lineaIdx;
+  if(!d||li<0)return;
+  if(!d.rutCodigo){toast('⚠️ Falta el RUT','e');return;}
+  if(!d.tipoDTE){toast('⚠️ Falta el tipo de documento','e');return;}
+  if(!String(d.numero||'').trim()){toast('⚠️ Falta el folio','e');return;}
+  if(!d.fecha){toast('⚠️ Falta la fecha','e');return;}
+
+  CMP_MODAL.edit.movs[li].dte={...d};
+  const m=CMP_MODAL.edit.movs[li];
+  // Sugerir monto según tipo de cuenta si aún no hay debe/haber
+  if(!m.debe&&!m.haber&&d.total){
+    const cuentaTipo=CUENTAS_AUX[m.cd];
+    if(cuentaTipo==='proveedor'||m.cd==='2102006')m.haber=+d.total;
+    else if(cuentaTipo==='cliente')m.debe=+d.total;
+    else m.debe=+d.total;
+  }
+  cerrarCmpEdDte();
+  renderCmpModal();
+  toast('✅ Datos del documento actualizados');
+}
+
 export {setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
-        setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, addCmpEdLinea, delCmpEdLinea};
+        setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, addCmpEdLinea, delCmpEdLinea,
+        abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte};

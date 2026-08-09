@@ -43,7 +43,7 @@ function renderAuxiliares(){
     if(!clientes[k])clientes[k]={rutCodigo:k,rutDV:d.rutDV,razonSocial:d.razonSocial||'',docs:[],total:0};
     const signo=(dteV(d.tipoDTE)?.signo)||1;
     const tot=(d.total||0)*signo;
-    clientes[k].docs.push({tipo:'doc',origen:d.origen,asientoId:d.asientoId,asientoN:d.asientoN,fecha:d.fecha,fechaVencimiento:d.fechaVencimiento,tipoDTE:d.tipoDTE,numero:d.numero,neto:d.neto,iva:d.iva,total:d.total,montoSigno:tot,debe:tot>0?tot:0,haber:tot<0?-tot:0});
+    clientes[k].docs.push({tipo:'doc',origen:d.origen,asientoId:d.asientoId,asientoN:d.asientoN,docOriginalId:d.origen==='libro'?d.id:null,fecha:d.fecha,fechaVencimiento:d.fechaVencimiento,tipoDTE:d.tipoDTE,numero:d.numero,neto:d.neto,iva:d.iva,total:d.total,montoSigno:tot,debe:tot>0?tot:0,haber:tot<0?-tot:0});
     clientes[k].total+=tot;
     if(d.razonSocial)clientes[k].razonSocial=d.razonSocial;
   });
@@ -54,7 +54,7 @@ function renderAuxiliares(){
     if(!proveedores[k])proveedores[k]={rutCodigo:k,rutDV:d.rutDV,razonSocial:d.razonSocial||'',docs:[],total:0};
     const signo=(dteC(d.tipoDTE)?.signo)||1;
     const tot=(d.total||0)*signo;
-    proveedores[k].docs.push({tipo:'doc',origen:d.origen,asientoId:d.asientoId,asientoN:d.asientoN,fecha:d.fecha,fechaVencimiento:d.fechaVencimiento,tipoDTE:d.tipoDTE,numero:d.numero,neto:d.neto,iva:d.iva,total:d.total,dist:d.dist,montoSigno:tot,debe:tot<0?-tot:0,haber:tot>0?tot:0});
+    proveedores[k].docs.push({tipo:'doc',origen:d.origen,asientoId:d.asientoId,asientoN:d.asientoN,docOriginalId:d.origen==='libro'?d.id:null,fecha:d.fecha,fechaVencimiento:d.fechaVencimiento,tipoDTE:d.tipoDTE,numero:d.numero,neto:d.neto,iva:d.iva,total:d.total,dist:d.dist,montoSigno:tot,debe:tot<0?-tot:0,haber:tot>0?tot:0});
     proveedores[k].total+=tot;
     if(d.razonSocial)proveedores[k].razonSocial=d.razonSocial;
   });
@@ -113,9 +113,25 @@ function renderAuxiliares(){
         const neg=signo<0;
         const origenBadge=d.origen==='asiento'?`<span style="color:var(--info);font-size:9px;margin-left:5px;cursor:pointer" onclick="abrirAsientoDesde('${d.asientoId}')">✏ Asiento N°${d.asientoN}</span>`:'';
         const vence=d.fechaVencimiento?`<span style="color:var(--mt);font-size:9px;margin-left:4px">(vto: ${d.fechaVencimiento})</span>`:'';
+        // Estado de pago: buscar el doc original en S.compras/S.ventas
+        let estadoPago='';
+        if(d.docOriginalId){
+          const arrOrig=AUX_TAB==='c'?S.ventas:S.compras;
+          const orig=arrOrig.find(x=>x.id===d.docOriginalId);
+          if(orig){
+            const total=(orig.total||0)*signo;
+            const pagado=(orig.pagos||[]).reduce((s,p)=>s+(p.monto||0),0);
+            const saldoPendiente=total-pagado;
+            if(pagado>0&&Math.abs(saldoPendiente)<1){
+              estadoPago=`<span style="background:rgba(46,160,67,.15);color:var(--ach);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">✓ PAGADO</span>`;
+            }else if(pagado>0){
+              estadoPago=`<span style="background:rgba(255,193,7,.12);color:var(--warn);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px" title="Total ${fmtC(total)} · Pagado ${fmtC(pagado)}">◐ SALDO ${fmtC(saldoPendiente)}</span>`;
+            }
+          }
+        }
         return `<tr${neg?' style="color:var(--err)"':''}>
           <td class="tl" style="font-family:var(--mono);font-size:10px">${d.fecha}${vence}</td>
-          <td class="tl" style="font-size:11px">DTE ${d.tipoDTE}<span style="color:var(--mt);margin-left:5px;font-size:10px">${dteNm.slice(0,16)} N°${d.numero||''}</span>${origenBadge}</td>
+          <td class="tl" style="font-size:11px">DTE ${d.tipoDTE}<span style="color:var(--mt);margin-left:5px;font-size:10px">${dteNm.slice(0,16)} N°${d.numero||''}</span>${origenBadge}${estadoPago}</td>
           <td>${d.debe?fmt(d.debe):'–'}</td>
           <td>${d.haber?fmt(d.haber):'–'}</td>
           <td style="font-weight:600;color:${saldo>=0?'var(--ach)':'var(--err)'}">${fmtC(saldo)}</td>

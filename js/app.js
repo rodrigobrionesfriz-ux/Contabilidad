@@ -85,7 +85,9 @@ import {genDiario, renderDiario, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados, corregirDesdeDiario, editarAsientoRef} from './reportes.js';
 import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
-        setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, addCmpEdLinea, delCmpEdLinea} from './comprobantes.js';
+        setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, addCmpEdLinea, delCmpEdLinea,
+        abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte} from './comprobantes.js';
+import {renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro, togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago} from './pagos.js';
 import {setAuxTab, setAuxView, toggleAux, renderAuxiliares, calcularAging,
         toggleAgingDetalle, AUX_TAB,
         abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI} from './auxiliares.js';
@@ -259,6 +261,7 @@ function renderSec(s){
   else if(s==='flujocaja')renderFlujoCaja();
   else if(s==='conciliacion')renderConciliacion();
   else if(s==='comprobantes')renderComprobantes();
+  else if(s==='pagos')renderPagos();
   else if(s==='f29')renderF29();
   else if(s==='ppm')renderPPM();
   else if(s==='activofijo')renderActivoFijo();
@@ -344,6 +347,8 @@ Object.assign(window,{
   renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
   abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
   setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, addCmpEdLinea, delCmpEdLinea,
+  abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte,
+  renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro, togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago,
   corregirDesdeDiario, editarAsientoRef,
   descargarPlantillaAux, abrirImportFichas, descargarPlantillaAuxActual, abrirImportFichasActual,
   renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,

@@ -102,10 +102,10 @@
   <div class="nav-item" onclick="nav('resultados')" data-s="resultados"><span class="nav-icon">📈</span>Resultados</div>
   <div class="nav-item" onclick="nav('flujocaja')" data-s="flujocaja"><span class="nav-icon">💵</span>Flujo de Caja</div>
   <div class="nav-item" onclick="nav('conciliacion')" data-s="conciliacion"><span class="nav-icon">🏦</span>Conciliación Bancaria</div>
+  <div class="nav-item" onclick="nav('comprobantes')" data-s="comprobantes"><span class="nav-icon">📔</span>Comprobantes</div>
   <div class="nav-label">Tributario SII</div>
   <div class="nav-item" onclick="nav('f29')" data-s="f29"><span class="nav-icon">📄</span>Formulario 29</div>
   <div class="nav-item" onclick="nav('ppm')" data-s="ppm"><span class="nav-icon">💰</span>PPM</div>
-  <div class="nav-item" onclick="nav('xmlsii')" data-s="xmlsii"><span class="nav-icon">📤</span>Exportar XML SII</div>
   <div class="nav-label">Activo Fijo</div>
   <div class="nav-item" onclick="nav('activofijo')" data-s="activofijo"><span class="nav-icon">🏗️</span>Activos Fijos<span class="nav-badge" id="nb-af">0</span></div>
   <div class="nav-label">Cierre de Ejercicio</div>
@@ -766,17 +766,22 @@
   <div id="ppm-content"></div>
 </section>
 
-<!-- EXPORTAR XML SII (IECV) -->
-<section class="section" id="s-xmlsii">
-  <div class="sec-hdr"><div><div class="sec-title">Exportar XML SII</div><div class="sec-sub">Información Electrónica de Compras y Ventas (IECV)</div></div></div>
-  <div class="card" style="margin-bottom:14px">
-    <div class="fg">
-      <div class="grp"><label>Tipo de libro</label><select id="xml-tipo" onchange="renderXmlSii()"><option value="VENTA">Libro de Ventas</option><option value="COMPRA">Libro de Compras</option></select></div>
-      <div class="grp"><label>Período (mes)</label><select id="xml-mes" onchange="renderXmlSii()"></select></div>
+<!-- COMPROBANTES -->
+<section class="section" id="s-comprobantes">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">📔 Comprobantes</div>
+      <div class="sec-sub">Todos los asientos del libro diario — apertura, automáticos y manuales</div>
     </div>
-    <div style="font-size:11px;color:var(--mt);margin-top:4px">Genera el archivo XML del período según el formato IECV del SII (esquema LibroCV_v10).</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-g" onclick="window.print()">🖨️ Imprimir</button>
+    </div>
   </div>
-  <div id="xml-content"></div>
+  <div class="info-tip" style="margin-bottom:14px">
+    💡 Los <strong>comprobantes automáticos</strong> se generan a partir de los libros de ventas, compras y honorarios.
+    Para modificarlos, edita el documento origen. Los <strong>manuales</strong> se editan directamente.
+  </div>
+  <div id="comprobantes-content"></div>
 </section>
 
 <!-- ACTIVO FIJO -->

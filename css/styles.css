@@ -99,6 +99,12 @@ td.ok{color:var(--ach);font-weight:600}
 td.err{color:var(--err);font-weight:600}
 .btn{display:inline-flex;align-items:center;gap:5px;border:none;border-radius:6px;padding:7px 13px;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
 .btn-p{background:var(--ac);color:#fff}.btn-p:hover{background:var(--ach)}
+.btn-w{background:#c9a227;color:#fff}.btn-w:hover{background:#b28900}
+/* Quitar los botones de aumentar/disminuir de todos los inputs numéricos.
+   Permite escribir libremente sin interferencia de spinners nativos. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 .btn-s{background:var(--sf2);color:var(--tx);border:1px solid var(--bd)}.btn-s:hover{background:var(--bd)}
 .btn-d{background:transparent;color:var(--err);border:1px solid rgba(248,81,73,.4);padding:4px 9px;font-size:11px}.btn-d:hover{background:rgba(248,81,73,.1);border-color:var(--err)}
 .btn-i{background:transparent;color:var(--info);border:1px solid rgba(88,166,255,.4);padding:4px 9px;font-size:11px}.btn-i:hover{background:rgba(88,166,255,.08)}

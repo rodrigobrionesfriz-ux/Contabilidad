@@ -117,15 +117,20 @@ td.err{color:var(--err);font-weight:600}
 .as-form{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:20px;margin-bottom:16px}
 .as-form.editing{border-color:var(--info);box-shadow:0 0 0 2px rgba(88,166,255,.15)}
 .as-meta{display:grid;grid-template-columns:180px 1fr;gap:12px;margin-bottom:16px;align-items:end}
-.lineas-hdr{display:grid;grid-template-columns:36px 200px 1fr 120px 110px 110px 36px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
+.lineas-hdr{display:grid;grid-template-columns:36px 160px 1fr 150px 110px 110px 36px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
+.lineas-hdr-6{grid-template-columns:36px 200px 1fr 110px 110px 36px}
 .lineas-box{border:1px solid var(--bd);border-radius:0 0 6px 6px;margin-bottom:10px;background:var(--bg)}
-.linea-row{display:grid;grid-template-columns:36px 200px 1fr 120px 110px 110px 36px;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(48,54,61,.7);align-items:center}
+.linea-row{display:grid;grid-template-columns:36px 160px 1fr 150px 110px 110px 36px;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(48,54,61,.7);align-items:center}
 .linea-row:last-child{border-bottom:none}
 .linea-num{font-family:var(--mono);font-size:11px;color:var(--mt);text-align:center;line-height:1}
 .linea-inp{background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:5px 8px;font-family:var(--sans);font-size:12px;width:100%;transition:border-color .12s}
 .linea-inp:focus{outline:none;border-color:var(--ac);background:rgba(46,160,67,.04)}
-.linea-num-inp{background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:5px 8px;font-family:var(--mono);font-size:12px;width:100%;text-align:right;transition:border-color .12s}
+.linea-num-inp{background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:5px 8px;font-family:var(--mono);font-size:12px;width:100%;text-align:right;transition:border-color .12s,font-size .12s}
 .linea-num-inp:focus{outline:none;border-color:var(--ac);background:rgba(46,160,67,.04)}
+/* Auto-shrink de fuente para montos largos: hasta 16 chars en el ancho del input */
+.linea-num-inp.digs-10{font-size:11px}
+.linea-num-inp.digs-13{font-size:10px}
+.linea-num-inp.digs-15{font-size:9px}
 .linea-lbl-m{display:none}
 
 /* MÓVIL: cada línea como card vertical con etiquetas */
@@ -136,12 +141,12 @@ td.err{color:var(--err);font-weight:600}
   /* Card por línea con # arriba a la izquierda, ✕ arriba a la derecha */
   .linea-row{
     display:grid;
-    grid-template-columns:32px 1fr 36px;
+    grid-template-columns:32px 1fr 1fr 36px;
     grid-template-areas:
-      "num    cuenta cuenta"
-      "desc   desc   desc"
-      "cc     cc     cc"
-      "debe   haber  del";
+      "num    cuenta cuenta cuenta"
+      "desc   desc   desc   desc"
+      "cc     cc     cc     cc"
+      "debe   debe   haber  del";
     gap:8px;
     padding:12px;
     background:var(--sf);
@@ -156,12 +161,14 @@ td.err{color:var(--err);font-weight:600}
   .linea-row > *:nth-child(2){grid-area:cuenta}
   .linea-row > *:nth-child(3){grid-area:desc}
   .linea-row > *:nth-child(4){grid-area:cc}
-  .linea-row > *:nth-child(5){grid-area:debe;display:flex;flex-direction:column}
-  .linea-row > *:nth-child(6){grid-area:haber;display:flex;flex-direction:column}
+  .linea-row > *:nth-child(5){grid-area:debe;display:flex;flex-direction:column;min-width:0}
+  .linea-row > *:nth-child(6){grid-area:haber;display:flex;flex-direction:column;min-width:0}
   .linea-row > *:nth-child(7){grid-area:del;align-self:center}
   /* Inputs de debe/haber con label arriba en móvil */
   .linea-row > *:nth-child(5)::before{content:"DEBE";display:block;font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
   .linea-row > *:nth-child(6)::before{content:"HABER";display:block;font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+  /* Fuente más chica en debe/haber para que quepa el separador de miles */
+  .linea-row .linea-num-inp{font-size:11px;padding:6px 6px;width:100%;min-width:0;box-sizing:border-box}
   .linea-row .btn-d{padding:8px 10px !important;min-width:36px;font-size:14px}
   /* Fecha + glosa apiladas */
   .as-meta{grid-template-columns:1fr;gap:10px}

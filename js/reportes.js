@@ -135,7 +135,7 @@ function genDiario(){
 
         if(movs.length){
           entries.push({
-            n:n++,
+            n:d.folioComp||n++,   // usar el folio persistente del doc
             fecha:d.fecha,
             glosa,
             movs,
@@ -163,7 +163,7 @@ function genDiario(){
   });
   // Asientos manuales (excluir anulados de todos los cómputos)
   [...S.asientos].filter(a=>!a.anulado).sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(a=>{
-    entries.push({n:n++,fecha:a.fecha,glosa:a.glosa,movs:a.movs,origen:'manual',ref:a.n});
+    entries.push({n:a.folioComp||a.n||n++,fecha:a.fecha,glosa:a.glosa,movs:a.movs,origen:'manual',ref:a.n});
   });
   return entries.sort((a,b)=>{
     // Apertura siempre primero

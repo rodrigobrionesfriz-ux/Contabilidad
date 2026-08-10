@@ -70,7 +70,7 @@ import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
         abrirDteModal, cerrarDteModal, dtmGuardar, dtmRefresh, dtmCalcTotals, dtmRutInput,
         dtmCheckDup, dtmAddDist, dtmDelDist, dtmRenderDist, dtmUpdDistCheck, dtmRemover,
         quitarDte, folioPreviewDte, abrirAsientoDesde, cuentasOpts,
-        proxFolioAsiento, AF} from './asientos.js';
+        proxFolioAsiento, proxFolioComprobante, migrarFoliosComprobante, AF} from './asientos.js';
 import {renderActivoFijo, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF,
         editarAF, eliminarAF, generarAsientoDepreciacion, AFB} from './activofijo.js';
 import {renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange,
@@ -83,7 +83,7 @@ import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
 // Reportes
 import {genDiario, renderDiario, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados, corregirDesdeDiario, editarAsientoRef} from './reportes.js';
-import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
+import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
         abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte} from './comprobantes.js';
@@ -197,6 +197,19 @@ async function initApp(){
   ys.value=S.empresa.anio;
   await loadYear(S.empresa.anio);
   await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();
+  // Migración de folios de comprobante para datos preexistentes:
+  // asigna folioComp a asientos manuales, compras, ventas y apertura que no
+  // lo tengan, respetando el orden cronológico.
+  const migrados=migrarFoliosComprobante();
+  if(migrados){
+    console.log(`Migración: ${migrados} elementos recibieron folio de comprobante`);
+    // Persistir los cambios de migración
+    try{
+      if(S.asientos?.length)await window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos));
+      if(S.compras?.length)await window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras));
+      if(S.ventas?.length)await window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas));
+    }catch(e){console.warn('Error persistiendo migración de folios:',e);}
+  }
   fillEmpresaForm();updateHdr();
   initImportListener();
   initImportListenerV();
@@ -344,7 +357,7 @@ Object.assign(window,{
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel,
   abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
-  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
+  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
   abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
   setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
   abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte,

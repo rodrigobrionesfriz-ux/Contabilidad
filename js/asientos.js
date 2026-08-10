@@ -640,8 +640,46 @@ function dtmRemover(){
 }
 
 
-function proxFolioAsiento(){
-  return S.asientos.length?Math.max(...S.asientos.map(a=>a.n||0))+1:1;
+// Correlativo GLOBAL de comprobantes contables. Considera:
+//   - Asientos manuales (S.asientos[].folioComp)
+//   - Documentos de compras (S.compras[].folioComp) - cada doc genera 1 asiento
+//   - Documentos de ventas (S.ventas[].folioComp)
+//   - Balance de apertura (S.apertura?.folioComp — usualmente 1)
+// Este correlativo NUNCA se reasigna: cada elemento lo obtiene una vez al crearse
+// y lo conserva de por vida. Al importar 100 facturas, cada una recibe un folio
+// consecutivo. Los asientos manuales toman el siguiente disponible.
+function proxFolioComprobante(){
+  let max=0;
+  (S.asientos||[]).forEach(a=>{const n=+a.folioComp||+a.n||0;if(n>max)max=n;});
+  (S.compras||[]).forEach(d=>{const n=+d.folioComp||0;if(n>max)max=n;});
+  (S.ventas||[]).forEach(d=>{const n=+d.folioComp||0;if(n>max)max=n;});
+  const ap=S.apertura?.folioComp||0;
+  if(ap>max)max=ap;
+  return max+1;
+}
+// Compat: proxFolioAsiento (para código legacy que lo llamaba) ahora devuelve
+// el próximo folio del pool global, no solo el max de asientos manuales.
+function proxFolioAsiento(){return proxFolioComprobante();}
+
+// Asegura que TODOS los elementos existentes tengan folioComp asignado. Se
+// invoca al arrancar la app: docs importados en versiones previas obtienen
+// folios secuenciales por fecha (para no romper la vista Comprobantes).
+function migrarFoliosComprobante(){
+  const items=[];
+  // Ordenar por fecha para asignar correlativos consistentes
+  (S.asientos||[]).filter(a=>!a.folioComp).forEach(a=>items.push({obj:a,fecha:a.fecha||'',tipo:'m'}));
+  (S.compras||[]).filter(d=>!d.folioComp).forEach(d=>items.push({obj:d,fecha:d.fecha||'',tipo:'c'}));
+  (S.ventas||[]).filter(d=>!d.folioComp).forEach(d=>items.push({obj:d,fecha:d.fecha||'',tipo:'v'}));
+  if(S.apertura&&!S.apertura.folioComp)items.unshift({obj:S.apertura,fecha:S.apertura.fecha||'',tipo:'a'});
+  if(!items.length)return 0;
+  items.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  // Iniciar desde el max existente + 1
+  let next=1;
+  (S.asientos||[]).forEach(a=>{const n=+a.folioComp||0;if(n>=next)next=n+1;});
+  (S.compras||[]).forEach(d=>{const n=+d.folioComp||0;if(n>=next)next=n+1;});
+  (S.ventas||[]).forEach(d=>{const n=+d.folioComp||0;if(n>=next)next=n+1;});
+  items.forEach(it=>{it.obj.folioComp=next++;});
+  return items.length;
 }
 
 function abrirForm(){
@@ -839,8 +877,8 @@ function guardarAsiento(){
   }
 
   // Asiento nuevo
-  folioGuardado=proxFolioAsiento();
-  S.asientos.push({id:'as_'+Date.now(),n:folioGuardado,fecha,glosa,movs:movsClean});
+  folioGuardado=proxFolioComprobante();
+  S.asientos.push({id:'as_'+Date.now(),n:folioGuardado,folioComp:folioGuardado,fecha,glosa,movs:movsClean});
   logAccion('Creó asiento',`N°${folioGuardado} — ${glosa}`);
   toast('✅ Asiento N°'+folioGuardado+' registrado');
   window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos)).catch(()=>toast('❌ Error al guardar en storage','e'));
@@ -862,4 +900,4 @@ function eliminarAsiento(id){
 }
 
 
-export {CUENTAS_AUX, esAux, renderAsientos, toggleAs, cuentasOpts, renderLineas, lCd, lRut, lVal, lValFmt, lValFmtBlur, quitarDte, delLinea, addLinea, updCuadre, todosDocsVentas, todosDocsCompras, todosDocsComprasConBorrador, todosDocsVentasConBorrador, folioPreviewDte, DM, abrirDteModal, cerrarDteModal, dtmRutInput, dtmCalcTotals, dtmRefresh, dtmCheckDup, dtmRenderDist, dtmAddDist, dtmDelDist, dtmUpdDistCheck, dtmGuardar, dtmRemover, proxFolioAsiento, abrirForm, editarAsiento, cerrarForm, duplicarAsiento, anularAsiento, abrirAsientoDesde, sigAsiento, limpiarFormAsiento, guardarAsiento, eliminarAsiento, AF};
+export {CUENTAS_AUX, esAux, renderAsientos, toggleAs, cuentasOpts, renderLineas, lCd, lRut, lVal, lValFmt, lValFmtBlur, quitarDte, delLinea, addLinea, updCuadre, todosDocsVentas, todosDocsCompras, todosDocsComprasConBorrador, todosDocsVentasConBorrador, folioPreviewDte, DM, abrirDteModal, cerrarDteModal, dtmRutInput, dtmCalcTotals, dtmRefresh, dtmCheckDup, dtmRenderDist, dtmAddDist, dtmDelDist, dtmUpdDistCheck, dtmGuardar, dtmRemover, proxFolioAsiento, proxFolioComprobante, migrarFoliosComprobante, abrirForm, editarAsiento, cerrarForm, duplicarAsiento, anularAsiento, abrirAsientoDesde, sigAsiento, limpiarFormAsiento, guardarAsiento, eliminarAsiento, AF};

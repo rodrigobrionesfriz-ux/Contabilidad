@@ -4,7 +4,7 @@ import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {mesOpts, foliosMensuales, mesRango} from './helpers.js';
-import {todosDocsCompras, abrirAsientoDesde} from './asientos.js';
+import {todosDocsCompras, abrirAsientoDesde, proxFolioComprobante} from './asientos.js';
 import {ccOpts} from './centroscosto.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {leerArchivo} from './importadorsii.js';
@@ -693,6 +693,10 @@ function confirmarImportacion(){
   // Crear registros de compras
   let agregados=0,normalizados=0;
   const ts=Date.now();
+  // Reservar el rango de folios de comprobante ANTES de crear los docs, así
+  // cada uno recibe un correlativo único y consecutivo aunque el import
+  // se interrumpa a mitad.
+  let folioNext=proxFolioComprobante();
   incluidos.forEach((d,i)=>{
     const fechaFinal=fechaEfectivaImport(d);
     if(fechaFinal!==d.fechaOriginal)normalizados++;
@@ -706,6 +710,7 @@ function confirmarImportacion(){
     const montoDist=+d.tipoDTE===46 ? d.total : (d.total-d.iva);
     const doc={
       id:'c_imp_'+ts+'_'+i,
+      folioComp:folioNext++,   // correlativo único de comprobante contable
       fecha:fechaFinal,
       fechaVencimiento:'',
       tipoDTE:d.tipoDTE,

@@ -17,7 +17,7 @@ import {inputCuenta} from './buscadorcuentas.js';
 import {logAccion} from './firebase.js';
 
 // Filtros
-let CMP_FILTRO={mes:'',origen:'',texto:''};
+let CMP_FILTRO={mes:'',origen:'',texto:'',numero:''};
 
 function mesOptsCmp(){
   let h='<option value="">Todos los meses</option>';
@@ -61,11 +61,18 @@ export function renderComprobantes(){
     });
   }
   if(CMP_FILTRO.texto){
-    const t=CMP_FILTRO.texto.toLowerCase();
+    const t=CMP_FILTRO.texto.toLowerCase().trim();
+    // Buscar también por N° de comprobante (folio) — coincidencia exacta o parcial
     entries=entries.filter(e=>{
+      if(String(e.n||'').includes(t))return true;
       if((e.glosa||'').toLowerCase().includes(t))return true;
       return e.movs.some(m=>String(m.cd).includes(t)||(m.nm||'').toLowerCase().includes(t));
     });
+  }
+  if(CMP_FILTRO.numero){
+    // Búsqueda EXACTA o "empieza con" del N° de comprobante
+    const q=String(CMP_FILTRO.numero).trim();
+    entries=entries.filter(e=>String(e.n||'').startsWith(q));
   }
 
   // Detectar comprobantes descuadrados (útil para el filtro y para la alerta)
@@ -97,7 +104,7 @@ export function renderComprobantes(){
     </div>`;
   }
 
-  let h=alerta+`<div class="filter-row" style="margin-bottom:14px">
+  let h=alerta+`<div class="filter-row" style="margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
     <span class="f-lbl">Filtrar:</span>
     <select onchange="setCmpFiltro('mes',this.value)">${mesOptsCmp()}</select>
     <select onchange="setCmpFiltro('origen',this.value)">
@@ -110,8 +117,17 @@ export function renderComprobantes(){
       <option value="honorarios" ${CMP_FILTRO.origen==='honorarios'?'selected':''}>📝 Auto honorarios</option>
       <option value="descuadrados" ${CMP_FILTRO.origen==='descuadrados'?'selected':''}>⚠️ Solo descuadrados</option>
     </select>
+    <div style="position:relative;min-width:150px">
+      <input type="text" id="cmp-num-input" inputmode="numeric" placeholder="N° comprobante…" autocomplete="off"
+        value="${CMP_FILTRO.numero.replace(/"/g,'&quot;')}"
+        oninput="cmpNumeroBuscar(this.value)"
+        onfocus="cmpNumeroBuscar(this.value)"
+        onblur="setTimeout(()=>renderCmpNumeroList([]),160)"
+        style="width:100%">
+      <div id="cmp-num-list" class="ac-lista" style="display:none;min-width:280px"></div>
+    </div>
     <input type="text" placeholder="Buscar por glosa o cuenta…" value="${CMP_FILTRO.texto.replace(/"/g,'&quot;')}"
-      oninput="setCmpFiltro('texto',this.value)" style="min-width:220px">
+      oninput="setCmpFiltro('texto',this.value)" style="min-width:180px">
     <button class="btn btn-g" onclick="limpiarCmpFiltro()">Limpiar</button>
     <span class="doc-count">${entries.length} comprobantes${cntAp?' · '+cntAp+' apertura':''}${cntAuto?' · '+cntAuto+' automáticos':''}${cntMan?' · '+cntMan+' manuales':''}</span>
   </div>`;
@@ -205,8 +221,55 @@ function setCmpFiltro(campo,valor){
   renderComprobantes();
 }
 
+// Búsqueda dinámica por N° de comprobante: filtra los entries del año actual
+// que empiecen con el número tipeado y muestra una lista dropdown.
+function cmpNumeroBuscar(q){
+  const box=document.getElementById('cmp-num-list');
+  if(!box)return;
+  const qs=String(q||'').trim();
+  if(!qs){
+    // sin query: limpiar filtro y ocultar lista
+    if(CMP_FILTRO.numero){
+      CMP_FILTRO.numero='';
+      renderComprobantes();
+    }else{
+      renderCmpNumeroList([]);
+    }
+    return;
+  }
+  // Obtener el universo actual de comprobantes del año
+  const todos=(CMP_ENTRIES&&CMP_ENTRIES.length)?CMP_ENTRIES:genDiario();
+  const filtrados=todos.filter(e=>String(e.n||'').startsWith(qs)).slice(0,15);
+  renderCmpNumeroList(filtrados);
+}
+
+function renderCmpNumeroList(items){
+  const box=document.getElementById('cmp-num-list');
+  if(!box)return;
+  if(!items.length){box.style.display='none';box.innerHTML='';return;}
+  box.innerHTML=items.map(e=>`
+    <div class="ac-item" onmousedown="cmpNumeroElegir(${e.n})">
+      <span style="font-family:var(--mono);color:var(--info);font-weight:700">N°${e.n}</span>
+      <span style="margin-left:8px;color:var(--mt);font-size:11px">${e.fecha}</span>
+      <span style="margin-left:8px">${(e.glosa||'').slice(0,50)}</span>
+    </div>`).join('');
+  box.style.display='block';
+}
+
+function cmpNumeroElegir(n){
+  CMP_FILTRO.numero=String(n);
+  CMP_FILTRO.mes=''; CMP_FILTRO.origen=''; CMP_FILTRO.texto='';
+  const box=document.getElementById('cmp-num-list');
+  if(box){box.style.display='none';box.innerHTML='';}
+  renderComprobantes();
+  // Auto-abrir el modal del comprobante elegido
+  const idx=(CMP_ENTRIES||[]).findIndex(e=>+e.n===+n);
+  if(idx>=0)setTimeout(()=>abrirCmpModal(idx),100);
+}
+
 function limpiarCmpFiltro(){
-  CMP_FILTRO={mes:'',origen:'',texto:''};
+  CMP_FILTRO={mes:'',origen:'',texto:'',numero:''};
+  renderCmpNumeroList([]);
   renderComprobantes();
 }
 
@@ -850,6 +913,7 @@ function guardarCmpEdDte(){
 }
 
 export {setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
+        cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
         abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte};

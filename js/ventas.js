@@ -7,7 +7,7 @@ import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {mesRango, mesOpts, dteVentasOpts, foliosMensuales} from './helpers.js';
-import {todosDocsVentas, abrirAsientoDesde} from './asientos.js';
+import {todosDocsVentas, abrirAsientoDesde, proxFolioComprobante} from './asientos.js';
 import './storage.js';
 
 // Estado del formulario de ventas (interno del módulo)
@@ -498,6 +498,8 @@ function confirmarImportacionV(){
   if(!Array.isArray(S.ventas))S.ventas=[];
 
   let importados=0;
+  // Reservar rango de folios de comprobante para las ventas.
+  let folioNext=proxFolioComprobante();
   incluidos.forEach((d,i)=>{
     let fecha=d.fecha;
     if(forzar){
@@ -506,6 +508,7 @@ function confirmarImportacionV(){
     }
     S.ventas.push({
       id:'v_imp_'+Date.now()+'_'+i,
+      folioComp:folioNext++,   // correlativo único de comprobante contable
       fecha, tipoDTE:d.tipoDTE, numero:d.numero,
       fechaVencimiento:'',
       rutCodigo:d.rutCodigo, rutDV:d.rutDV, razonSocial:d.razonSocial,

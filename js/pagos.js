@@ -30,18 +30,81 @@ let PAG={
 
 // ═══ HELPERS ═══
 
-// Documentos con saldo pendiente (proveedores en compras, clientes en ventas)
+// Documentos con saldo pendiente, aplicando efecto de NC/ND referenciadas.
+//
+// Reglas:
+//   - Facturas (DTE 30/33/34/45/46 compras · 33/34/39/41 ventas): aparecen
+//     como docs pendientes con su saldo real (total - NC referenciadas + ND
+//     referenciadas - pagos).
+//   - NC/ND que tienen `folioRef` apuntando a una factura: NO aparecen como
+//     doc separado; su monto se aplica al saldo de la factura referenciada.
+//   - NC/ND SIN referencia ("huérfanas"): aparecen aparte con badge amarillo
+//     pidiendo que se asocien a una factura del mismo proveedor/cliente.
 function docsPendientes(tipo){
   const arr=tipo==='proveedor'?S.compras:S.ventas;
-  return arr.map(d=>{
+  // Separar facturas de NC/ND
+  const facturas=[];
+  const notasReferenciadas={};   // key = rut|folioRef -> [notas]
+  const huerfanas=[];
+  arr.forEach(d=>{
     const dteInfo=tipo==='proveedor'?dteC(d.tipoDTE):dteV(d.tipoDTE);
     const signo=dteInfo?.signo||1;
-    // Total del documento con signo (NC restan)
-    const totalSigno=(d.total||0)*signo;
-    const pagosSum=(d.pagos||[]).reduce((s,p)=>s+(p.monto||0),0);
+    if(signo<0||+d.tipoDTE===56){   // NC (signo -1) o ND (56)
+      if(d.folioRef){
+        const key=d.rutCodigo+'|'+String(d.folioRef).trim();
+        if(!notasReferenciadas[key])notasReferenciadas[key]=[];
+        notasReferenciadas[key].push({...d,dteInfo,signo});
+      }else{
+        huerfanas.push({...d,dteInfo,signo});
+      }
+    }else{
+      facturas.push({...d,dteInfo,signo});
+    }
+  });
+
+  // Calcular saldos de facturas aplicando NC/ND referenciadas
+  const resultado=[];
+  facturas.forEach(f=>{
+    const key=f.rutCodigo+'|'+String(f.numero).trim();
+    const notas=notasReferenciadas[key]||[];
+    const efectoNotas=notas.reduce((s,n)=>s+((n.total||0)*n.signo),0);
+    // Total: factura + notas (NC restan, ND suman)
+    const totalReal=(f.total||0)+efectoNotas;
+    const pagosSum=(f.pagos||[]).reduce((s,p)=>s+(p.monto||0),0);
+    const saldo=totalReal-pagosSum;
+    if(Math.abs(saldo)>1){
+      resultado.push({
+        ...f,
+        totalSigno:totalReal,
+        pagosSum,
+        saldo,
+        notas,   // NC/ND asociadas para mostrar en detalle
+      });
+    }
+  });
+
+  // Huérfanas: agregar como docs independientes con badge de advertencia
+  huerfanas.forEach(h=>{
+    const totalSigno=(h.total||0)*h.signo;
+    const pagosSum=(h.pagos||[]).reduce((s,p)=>s+(p.monto||0),0);
     const saldo=totalSigno-pagosSum;
-    return {...d,dteInfo,signo,totalSigno,pagosSum,saldo};
-  }).filter(d=>Math.abs(d.saldo)>1);   // solo con saldo pendiente
+    if(Math.abs(saldo)>1){
+      resultado.push({...h,totalSigno,pagosSum,saldo,huerfana:true});
+    }
+  });
+
+  return resultado;
+}
+
+// Facturas del mismo proveedor/cliente (para el selector "asociar a factura")
+function facturasDelAuxiliar(tipo,rutCodigo){
+  const arr=tipo==='proveedor'?S.compras:S.ventas;
+  return arr.filter(d=>{
+    if(d.rutCodigo!==rutCodigo)return false;
+    const dteInfo=tipo==='proveedor'?dteC(d.tipoDTE):dteV(d.tipoDTE);
+    const signo=dteInfo?.signo||1;
+    return signo>0&&+d.tipoDTE!==56;   // solo facturas, no NC ni ND
+  }).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
 }
 
 // Cuentas de caja y banco disponibles (código 1101xxx)
@@ -95,6 +158,7 @@ function renderPagos(){
 
   const tipoLbl=PAG.tipo==='proveedor'?'a Proveedores':'de Clientes';
   const accionLbl=PAG.tipo==='proveedor'?'Pagar':'Cobrar';
+  const sustantivo=PAG.tipo==='proveedor'?'pago':'cobro';   // "fecha del pago" / "datos del cobro"
 
   let h=`
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
@@ -103,16 +167,16 @@ function renderPagos(){
     </div>
 
     <div class="card" style="margin-bottom:14px">
-      <div class="card-title">💳 Datos del ${accionLbl.toLowerCase()}</div>
+      <div class="card-title">💳 Datos del ${sustantivo}</div>
       <div class="fg">
-        <div class="grp"><label>Fecha del ${accionLbl.toLowerCase()}</label>
+        <div class="grp"><label>Fecha del ${sustantivo}</label>
           <input type="date" value="${PAG.fecha}" oninput="setPagCampo('fecha',this.value)"></div>
         <div class="grp"><label>${PAG.tipo==='proveedor'?'Cuenta de origen':'Cuenta de destino'} (caja / banco)</label>
           <select onchange="setPagCampo('cuentaPago',this.value)">${cuentasPagoOpts()}</select></div>
         <div class="grp full"><label>Glosa del asiento (opcional)</label>
           <input type="text" placeholder="Ej: Pago proveedores julio 2026" value="${PAG.glosa.replace(/"/g,'&quot;')}" oninput="setPagCampo('glosa',this.value)"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 14px;background:${cntSel?'rgba(46,160,67,.08)':'var(--sf2)'};border-radius:6px;border:1px solid ${cntSel?'var(--ach)':'var(--bd)'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 14px;background:${cntSel?'rgba(46,160,67,.08)':'var(--sf2)'};border-radius:6px;border:1px solid ${cntSel?'var(--ach)':'var(--bd)'};gap:10px;flex-wrap:wrap">
         <div style="font-size:12px">
           <strong>${cntSel}</strong> ${cntSel===1?'documento':'documentos'} seleccionado${cntSel===1?'':'s'}
           <span style="color:var(--mt);margin-left:8px">Total: <span style="font-family:var(--mono);font-weight:700;color:var(--tx)">${fmtC(totSel)}</span></span>
@@ -139,7 +203,7 @@ function renderPagos(){
   if(!filtrados.length){
     h+=`<div style="text-align:center;padding:40px;color:var(--mt)">
       <div style="font-size:36px;margin-bottom:8px">${PAG.tipo==='proveedor'?'💰':'📥'}</div>
-      No hay documentos pendientes de ${accionLbl.toLowerCase()}
+      No hay documentos pendientes de ${sustantivo}
     </div>`;
     cont.innerHTML=h;
     return;
@@ -174,11 +238,18 @@ function renderPagos(){
       const sel=PAG.seleccionados.has(d.id);
       const dteNm=d.dteInfo?.nm||`DTE ${d.tipoDTE}`;
       const montoDef=PAG.montoParcial[d.id]!=null?PAG.montoParcial[d.id]:d.saldo;
+
+      // Badge de huérfana: NC/ND sin referencia
+      const badgeHuerfana=d.huerfana?`
+        <span style="background:rgba(255,193,7,.15);color:var(--warn);padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px;cursor:pointer" onclick="event.stopPropagation();abrirAsociarNota('${d.id}','${d.rutCodigo}')">
+          ⚠ SIN REFERENCIA · Asociar
+        </span>`:'';
+
       h+=`<tr ${sel?'style="background:rgba(46,160,67,.04)"':''}>
         <td style="text-align:center"><input type="checkbox" ${sel?'checked':''} onchange="togglePagSel('${d.id}',this.checked)"></td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}</td>
         <td class="tl" style="font-size:11px">${dteNm}</td>
-        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.numero}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.numero}${badgeHuerfana}</td>
         <td class="tl" style="color:var(--mt);font-size:11px">${d.fechaVencimiento?'Vence '+d.fechaVencimiento:''}</td>
         <td style="text-align:right;font-family:var(--mono)">${fmtC(d.totalSigno)}</td>
         <td style="text-align:right;font-family:var(--mono);color:${d.pagosSum?'var(--ach)':'var(--mt)'}">${d.pagosSum?fmtC(d.pagosSum):'—'}</td>
@@ -189,6 +260,24 @@ function renderPagos(){
             ${sel?'':'disabled style="opacity:.4"'}>
         </td>
       </tr>`;
+      // Sub-líneas: NC/ND asociadas a esta factura
+      (d.notas||[]).forEach(n=>{
+        const nmN=n.dteInfo?.nm||`DTE ${n.tipoDTE}`;
+        const efecto=(n.total||0)*n.signo;
+        h+=`<tr style="background:rgba(88,166,255,.04)">
+          <td></td>
+          <td class="tl" style="font-family:var(--mono);font-size:10px;padding-left:20px;color:var(--mt)">${n.fecha}</td>
+          <td class="tl" style="font-size:10px;color:var(--info)">↳ ${nmN}</td>
+          <td class="tl" style="font-family:var(--mono);font-size:10px;color:var(--mt)">${n.numero}
+            <button class="btn btn-g" style="font-size:9px;padding:1px 5px;margin-left:4px" onclick="quitarReferencia('${n.id}')" title="Quitar referencia a factura">✕</button>
+          </td>
+          <td class="tl" style="color:var(--mt);font-size:10px">aplicado a N°${d.numero}</td>
+          <td style="text-align:right;font-family:var(--mono);font-size:10px;color:${efecto<0?'var(--err)':'var(--ach)'}">${efecto>0?'+':''}${fmtC(efecto)}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>`;
+      });
     });
   });
   h+='</tbody></table></div></div>';
@@ -331,5 +420,97 @@ async function ejecutarPago(){
   rerender();
 }
 
+// ═══ ASOCIAR NC/ND A FACTURA DE REFERENCIA ═══
+//
+// En Chile, las NC y ND se emiten CONTRA un documento específico (una factura,
+// típicamente). El SII trae el campo "Folio Documento Referenciado" solo en el
+// XML del DTE, no en el resumen RCV, así que el usuario debe asociarlas
+// manualmente. Al asociar, la NC se descuenta del saldo pendiente de la factura.
+
+function abrirAsociarNota(notaId,rutCodigo){
+  const arr=PAG.tipo==='proveedor'?S.compras:S.ventas;
+  const nota=arr.find(d=>d.id===notaId);
+  if(!nota)return;
+  const facturas=facturasDelAuxiliar(PAG.tipo,rutCodigo);
+  if(!facturas.length){
+    toast('⚠️ No hay facturas de este auxiliar para asociar','e');
+    return;
+  }
+  const dteNotaInfo=PAG.tipo==='proveedor'?dteC(nota.tipoDTE):dteV(nota.tipoDTE);
+  const nombreNota=dteNotaInfo?.nm||`DTE ${nota.tipoDTE}`;
+
+  const box=document.getElementById('asoc-nota-modal-body');
+  const modal=document.getElementById('asoc-nota-modal');
+  if(!box||!modal)return;
+
+  box.innerHTML=`
+    <div style="padding:16px 20px">
+      <div style="background:var(--sf2);border-radius:6px;padding:10px 14px;margin-bottom:14px">
+        <div style="font-size:11px;color:var(--mt);text-transform:uppercase;font-weight:700;margin-bottom:4px">Nota a asociar</div>
+        <div style="font-weight:600">${nombreNota} N°${nota.numero} · ${nota.fecha}</div>
+        <div style="font-family:var(--mono);font-size:12px;margin-top:2px">Monto: ${fmtC(nota.total)}</div>
+        <div style="font-size:11px;color:var(--mt);margin-top:2px">${nota.razonSocial||''} · ${rutFmt(nota.rutCodigo,nota.rutDV)}</div>
+      </div>
+
+      <div style="font-size:11px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:8px">
+        Selecciona la factura de referencia
+      </div>
+
+      <div style="max-height:360px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px">
+        ${facturas.map(f=>{
+          const fInfo=PAG.tipo==='proveedor'?dteC(f.tipoDTE):dteV(f.tipoDTE);
+          const fNm=fInfo?.nm||`DTE ${f.tipoDTE}`;
+          return `<div style="padding:10px 14px;border-bottom:1px solid var(--bd);cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="confirmarAsociar('${nota.id}','${f.numero}')" onmouseover="this.style.background='rgba(88,166,255,.06)'" onmouseout="this.style.background=''">
+            <div>
+              <div style="font-weight:600;font-size:12px">${fNm} N°${f.numero}</div>
+              <div style="font-size:10px;color:var(--mt);font-family:var(--mono);margin-top:2px">${f.fecha}${f.fechaVencimiento?' · Vence '+f.fechaVencimiento:''}</div>
+            </div>
+            <div style="font-family:var(--mono);font-weight:700;font-size:12px">${fmtC(f.total)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+        <button class="btn btn-g" onclick="cerrarAsociarNota()">Cancelar</button>
+      </div>
+    </div>`;
+  modal.classList.add('open');
+}
+
+function cerrarAsociarNota(){
+  const m=document.getElementById('asoc-nota-modal');
+  if(m)m.classList.remove('open');
+}
+
+async function confirmarAsociar(notaId,folioFactura){
+  const arr=PAG.tipo==='proveedor'?S.compras:S.ventas;
+  const nota=arr.find(d=>d.id===notaId);
+  if(!nota)return;
+  nota.folioRef=String(folioFactura);
+  const clave=PAG.tipo==='proveedor'?'compras':'ventas';
+  await window.storage.set(clave+'-'+S.empresa.anio,JSON.stringify(arr)).catch(()=>{});
+  logAccion('Asoció NC/ND a factura',`${nota.razonSocial} · Doc N°${nota.numero} → Fact N°${folioFactura}`);
+  toast(`✅ Nota asociada a factura N°${folioFactura}`);
+  cerrarAsociarNota();
+  // Quitar de selección si estaba
+  PAG.seleccionados.delete(notaId);
+  renderPagos();
+}
+
+async function quitarReferencia(notaId){
+  const arr=PAG.tipo==='proveedor'?S.compras:S.ventas;
+  const nota=arr.find(d=>d.id===notaId);
+  if(!nota)return;
+  const conf=confirm('¿Quitar la referencia de esta nota? Volverá a aparecer como documento independiente.');
+  if(!conf)return;
+  delete nota.folioRef;
+  const clave=PAG.tipo==='proveedor'?'compras':'ventas';
+  await window.storage.set(clave+'-'+S.empresa.anio,JSON.stringify(arr)).catch(()=>{});
+  logAccion('Quitó referencia de NC/ND',`${nota.razonSocial} · Doc N°${nota.numero}`);
+  toast('Referencia removida');
+  renderPagos();
+}
+
 export {PAG, renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro,
-        togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago};
+        togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago,
+        abrirAsociarNota, cerrarAsociarNota, confirmarAsociar, quitarReferencia};

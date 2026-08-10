@@ -162,8 +162,8 @@ function renderAuxiliares(){
       <div class="aux-hdr" onclick="toggleAux('${bodyId}')">
         <div class="aux-rut">${rutFmt(a.rutCodigo,a.rutDV)}</div>
         <div class="aux-rs">${a.razonSocial||'(sin razón social)'}${detalleFicha?`<div style="font-size:10px;color:var(--mt);margin-top:2px">${detalleFicha}</div>`:''}</div>
-        <div style="font-size:11px;color:var(--mt);font-family:var(--mono);text-align:right">${docs.length} mov</div>
-        <div style="font-family:var(--mono);font-weight:700;text-align:right;color:${a.total>=0?'var(--ach)':'var(--err)'}">${fmtC(a.total)}</div>
+        <div class="aux-mov-count">${docs.length} mov</div>
+        <div class="aux-saldo" style="color:${a.total>=0?'var(--ach)':'var(--err)'}">${fmtC(a.total)}</div>
         <div class="aux-chev">▸</div>
       </div>
       <div class="aux-body" id="${bodyId}">

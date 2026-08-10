@@ -58,7 +58,7 @@
 
 <header>
   <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
-  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.09-2057</span></div>
+  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.10-0219</span></div>
   <div class="hdr-empresa" id="hdr-empresa">Configure los datos de empresa</div>
   <span id="save-indicator" style="font-size:10px;color:var(--mt);white-space:nowrap"></span>
   <button id="btn-tema" onclick="cambiarTema()" title="Cambiar tema" style="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mt);font-size:13px;cursor:pointer;padding:5px 10px;line-height:1">🌙</button>
@@ -680,10 +680,10 @@
         <div class="aux-tab active" id="aux-view-detalle" onclick="setAuxView('detalle')">📋 Detalle</div>
         <div class="aux-tab" id="aux-view-aging" onclick="setAuxView('aging')">📊 Aging</div>
       </div>
-      <button class="btn btn-i" onclick="descargarPlantillaAuxActual()" title="Descargar plantilla Excel para carga masiva">📄 Plantilla</button>
-      <button class="btn btn-i" onclick="abrirImportFichasActual()" title="Importar fichas desde Excel">📥 Importar fichas</button>
+      <button class="btn btn-i btn-icon-mobile" onclick="descargarPlantillaAuxActual()" title="Descargar plantilla Excel para carga masiva">📄 <span class="btn-lbl">Plantilla</span></button>
+      <button class="btn btn-i btn-icon-mobile" onclick="abrirImportFichasActual()" title="Importar fichas desde Excel">📥 <span class="btn-lbl">Importar fichas</span></button>
       <input type="file" id="imp-fichas-file" accept=".xlsx,.xls" style="display:none">
-      <button class="btn btn-g" onclick="window.print()">🖨️ Imprimir</button>
+      <button class="btn btn-g btn-icon-mobile" onclick="window.print()" title="Imprimir">🖨️ <span class="btn-lbl">Imprimir</span></button>
     </div>
   </div>
   <div class="aux-tabs">
@@ -1128,6 +1128,20 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=1786309033"></script>
+<!-- MODAL ASOCIAR NC/ND A FACTURA -->
+<div class="modal-bkd" id="asoc-nota-modal">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">🔗 Asociar Nota a Factura</div>
+        <div class="modal-sub">La nota se aplicará al saldo de la factura seleccionada</div>
+      </div>
+      <button class="modal-close" onclick="cerrarAsociarNota()">✕</button>
+    </div>
+    <div id="asoc-nota-modal-body"></div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js?v=1786328382"></script>
 </body>
 </html>

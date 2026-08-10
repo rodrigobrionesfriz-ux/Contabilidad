@@ -138,10 +138,10 @@ function renderLineas(){
     return `<div class="linea-row">
       <div class="linea-num">${i+1}</div>
       <div>${inputCuenta({id:`ln-cd-${i}`,value:l.cd,onPick:`lCd(${i},'%CD%')`,placeholder:'Código o nombre…'})}</div>
-      <div><input type="text" class="linea-inp" placeholder="Descripción libre" value="${l.desc||''}" oninput="AF.lineas[${i}].desc=this.value"></div>
       <div>${inputCC({id:`ln-cc-${i}`,value:l.cc||'',onPick:`AF.lineas[${i}].cc='%CC%'`,placeholder:'Buscar centro…'})}</div>
       <div><input type="text" class="linea-num-inp ${digitsClass(l.debe)}" inputmode="numeric" placeholder="0" value="${l.debe?new Intl.NumberFormat('es-CL').format(Math.round(l.debe)):''}" oninput="lValFmt(this,${i},'debe')" onblur="lValFmtBlur(this,${i},'debe')" onfocus="this.select()"></div>
       <div><input type="text" class="linea-num-inp ${digitsClass(l.haber)}" inputmode="numeric" placeholder="0" value="${l.haber?new Intl.NumberFormat('es-CL').format(Math.round(l.haber)):''}" oninput="lValFmt(this,${i},'haber')" onblur="lValFmtBlur(this,${i},'haber')" onfocus="this.select()"></div>
+      <div><input type="text" class="linea-inp" placeholder="Descripción libre" maxlength="120" value="${(l.desc||'').replace(/"/g,'&quot;')}" oninput="AF.lineas[${i}].desc=this.value"></div>
       <div style="text-align:center"><button class="btn btn-d" onclick="delLinea(${i})">✕</button></div>
     </div>${auxHtml}`;
   }).join('');

@@ -117,15 +117,55 @@ td.err{color:var(--err);font-weight:600}
 .as-form{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:20px;margin-bottom:16px}
 .as-form.editing{border-color:var(--info);box-shadow:0 0 0 2px rgba(88,166,255,.15)}
 .as-meta{display:grid;grid-template-columns:180px 1fr;gap:12px;margin-bottom:16px;align-items:end}
-.lineas-hdr{display:grid;grid-template-columns:36px 200px 1fr 110px 110px 36px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
+.lineas-hdr{display:grid;grid-template-columns:36px 200px 1fr 120px 110px 110px 36px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
 .lineas-box{border:1px solid var(--bd);border-radius:0 0 6px 6px;margin-bottom:10px;background:var(--bg)}
-.linea-row{display:grid;grid-template-columns:36px 200px 1fr 110px 110px 36px;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(48,54,61,.7);align-items:center}
+.linea-row{display:grid;grid-template-columns:36px 200px 1fr 120px 110px 110px 36px;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(48,54,61,.7);align-items:center}
 .linea-row:last-child{border-bottom:none}
 .linea-num{font-family:var(--mono);font-size:11px;color:var(--mt);text-align:center;line-height:1}
 .linea-inp{background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:5px 8px;font-family:var(--sans);font-size:12px;width:100%;transition:border-color .12s}
 .linea-inp:focus{outline:none;border-color:var(--ac);background:rgba(46,160,67,.04)}
 .linea-num-inp{background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:5px 8px;font-family:var(--mono);font-size:12px;width:100%;text-align:right;transition:border-color .12s}
 .linea-num-inp:focus{outline:none;border-color:var(--ac);background:rgba(46,160,67,.04)}
+.linea-lbl-m{display:none}
+
+/* MÓVIL: cada línea como card vertical con etiquetas */
+@media (max-width:720px){
+  /* Ocultar el encabezado de columnas — las etiquetas van dentro de cada card */
+  .lineas-hdr{display:none}
+  .lineas-box{border-radius:6px;background:transparent;border:none}
+  /* Card por línea con # arriba a la izquierda, ✕ arriba a la derecha */
+  .linea-row{
+    display:grid;
+    grid-template-columns:32px 1fr 36px;
+    grid-template-areas:
+      "num    cuenta cuenta"
+      "desc   desc   desc"
+      "cc     cc     cc"
+      "debe   haber  del";
+    gap:8px;
+    padding:12px;
+    background:var(--sf);
+    margin-bottom:10px;
+    border-radius:8px;
+    border:1px solid var(--bd);
+    align-items:stretch;
+  }
+  /* Ubicar por índice de hijo, según el orden del HTML:
+     1=num, 2=cuenta, 3=desc, 4=cc, 5=debe, 6=haber, 7=del */
+  .linea-row > *:nth-child(1){grid-area:num;align-self:center;font-size:14px;font-weight:700;color:var(--info);background:var(--sf2);border-radius:6px;padding:6px 0;text-align:center}
+  .linea-row > *:nth-child(2){grid-area:cuenta}
+  .linea-row > *:nth-child(3){grid-area:desc}
+  .linea-row > *:nth-child(4){grid-area:cc}
+  .linea-row > *:nth-child(5){grid-area:debe;display:flex;flex-direction:column}
+  .linea-row > *:nth-child(6){grid-area:haber;display:flex;flex-direction:column}
+  .linea-row > *:nth-child(7){grid-area:del;align-self:center}
+  /* Inputs de debe/haber con label arriba en móvil */
+  .linea-row > *:nth-child(5)::before{content:"DEBE";display:block;font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+  .linea-row > *:nth-child(6)::before{content:"HABER";display:block;font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+  .linea-row .btn-d{padding:8px 10px !important;min-width:36px;font-size:14px}
+  /* Fecha + glosa apiladas */
+  .as-meta{grid-template-columns:1fr;gap:10px}
+}
 .as-cuadre{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:6px;font-size:12px;font-weight:600;margin-bottom:14px}
 .as-cuadre.ok{background:rgba(46,160,67,.1);border:1px solid rgba(46,160,67,.3);color:var(--ach)}
 .as-cuadre.err{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);color:var(--err)}
@@ -271,6 +311,38 @@ td.err{color:var(--err);font-weight:600}
 .linea-aux .rut-wrap{position:relative}
 .linea-aux .rut-wrap input{padding-right:34px;font-family:var(--mono);font-size:11px}
 .linea-aux .rut-dv-ln{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:10px;color:var(--mt);pointer-events:none;font-weight:700}
+
+@media (max-width:720px){
+  /* linea-dte-badge: en móvil apilar info y botones abajo */
+  .linea-dte-badge{
+    grid-template-columns:1fr;
+    padding:10px 12px;
+    margin-top:-6px;
+    margin-bottom:10px;
+    border-left:none;
+    border-top:2px solid var(--ach);
+    border-radius:0 0 8px 8px;
+  }
+  .linea-dte-badge .ldb-lbl{text-align:left;font-size:9px}
+  .linea-dte-badge .ldb-info{font-size:11px;line-height:1.5}
+  .linea-dte-badge > div:last-child{justify-content:flex-end}
+  /* linea-aux: apilar en móvil (RUT arriba, razón social abajo) */
+  .linea-aux{
+    grid-template-columns:1fr;
+    grid-template-areas:"lbl" "rut" "rs";
+    padding:10px 12px;
+    margin-top:-6px;
+    margin-bottom:10px;
+    border-left:none;
+    border-top:2px solid var(--info);
+    border-radius:0 0 8px 8px;
+    gap:6px;
+  }
+  .linea-aux > *:nth-child(1){display:none}   /* espaciador vacío */
+  .linea-aux > *:nth-child(2){grid-area:lbl;text-align:left;font-size:9px}
+  .linea-aux > *:nth-child(3){grid-area:rut}
+  .linea-aux > *:nth-child(4){grid-area:rs}
+}
 .linea-aux .rut-dv-ln.ok{color:var(--ach)}
 .linea-aux .rut-dv-ln.bad{color:var(--err)}
 /* RESPONSIVE MÓVIL */

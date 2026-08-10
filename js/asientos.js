@@ -8,7 +8,7 @@ import {logAccion} from './firebase.js';
 import {foliosMensuales, dteVentasOpts} from './helpers.js';
 import {retencionHonorarios} from './indicadores.js';
 import {ccOpts} from './centroscosto.js';
-import {inputCuenta} from './buscadorcuentas.js';
+import {inputCuenta, inputCC} from './buscadorcuentas.js';
 import './storage.js';
 
 // Estado del formulario de asientos (interno del módulo; se reasigna al abrir/editar)
@@ -139,9 +139,9 @@ function renderLineas(){
       <div class="linea-num">${i+1}</div>
       <div>${inputCuenta({id:`ln-cd-${i}`,value:l.cd,onPick:`lCd(${i},'%CD%')`,placeholder:'Código o nombre…'})}</div>
       <div><input type="text" class="linea-inp" placeholder="Descripción libre" value="${l.desc||''}" oninput="AF.lineas[${i}].desc=this.value"></div>
-      <div><select class="linea-inp" title="Centro de costo" onchange="AF.lineas[${i}].cc=this.value">${ccOpts(l.cc||'')}</select></div>
-      <div><input type="number" class="linea-num-inp" min="0" placeholder="0" value="${l.debe||''}" oninput="lVal(${i},'debe',this.value)"></div>
-      <div><input type="number" class="linea-num-inp" min="0" placeholder="0" value="${l.haber||''}" oninput="lVal(${i},'haber',this.value)"></div>
+      <div>${inputCC({id:`ln-cc-${i}`,value:l.cc||'',onPick:`AF.lineas[${i}].cc='%CC%'`,placeholder:'Buscar centro…'})}</div>
+      <div><input type="text" class="linea-num-inp ${digitsClass(l.debe)}" inputmode="numeric" placeholder="0" value="${l.debe?new Intl.NumberFormat('es-CL').format(Math.round(l.debe)):''}" oninput="lValFmt(this,${i},'debe')" onblur="lValFmtBlur(this,${i},'debe')" onfocus="this.select()"></div>
+      <div><input type="text" class="linea-num-inp ${digitsClass(l.haber)}" inputmode="numeric" placeholder="0" value="${l.haber?new Intl.NumberFormat('es-CL').format(Math.round(l.haber)):''}" oninput="lValFmt(this,${i},'haber')" onblur="lValFmtBlur(this,${i},'haber')" onfocus="this.select()"></div>
       <div style="text-align:center"><button class="btn btn-d" onclick="delLinea(${i})">✕</button></div>
     </div>${auxHtml}`;
   }).join('');
@@ -193,6 +193,61 @@ function lVal(i,side,val){
     l._promptedDte=true;
     setTimeout(()=>abrirDteModal(i),150);
   }
+}
+// Input formateado con separador de miles.
+// Mientras se escribe, quitamos los puntos, guardamos el número puro y
+// reformateamos manteniendo el cursor al final si el usuario está tipeando ahí.
+// Auto-shrink: aplicamos una clase digs-N según la cantidad de caracteres del
+// valor formateado, para que se reduzca la fuente y quepa hasta ~16 caracteres.
+function digitsClass(n){
+  const v=Math.round(+n||0);
+  if(!v)return '';
+  const len=new Intl.NumberFormat('es-CL').format(v).length;
+  if(len>=15)return 'digs-15';
+  if(len>=13)return 'digs-13';
+  if(len>=10)return 'digs-10';
+  return '';
+}
+function lValFmt(inp,i,side){
+  const raw=String(inp.value||'').replace(/[^\d]/g,'');
+  const num=+raw||0;
+  AF.lineas[i][side]=num;
+  if(side==='debe'&&num>0)AF.lineas[i].haber=0;
+  if(side==='haber'&&num>0)AF.lineas[i].debe=0;
+  // Reformatear con separador de miles conservando el foco.
+  const formatted=num?new Intl.NumberFormat('es-CL').format(num):'';
+  const posEnd=inp.selectionStart===inp.value.length;
+  if(inp.value!==formatted){
+    inp.value=formatted;
+    if(posEnd)try{inp.setSelectionRange(formatted.length,formatted.length);}catch(e){}
+  }
+  // Aplicar clase de auto-shrink según el largo
+  inp.classList.remove('digs-10','digs-13','digs-15');
+  const cls=digitsClass(num);
+  if(cls)inp.classList.add(cls);
+  // Actualizar el input de la pareja (si borra debe, mostrar '' en haber)
+  const par=side==='debe'?'haber':'debe';
+  if(num>0){
+    const inputs=inp.parentElement.parentElement.querySelectorAll('.linea-num-inp');
+    if(inputs.length===2){
+      const otro=inputs[side==='debe'?1:0];
+      if(otro&&otro!==inp){otro.value='';otro.classList.remove('digs-10','digs-13','digs-15');}
+    }
+  }
+  updCuadre();
+  // Auto-abrir DTE modal para cuentas auxiliares
+  const l=AF.lineas[i];
+  if(esAux(l.cd)&&num>0&&!l.dte&&!l._promptedDte){
+    l._promptedDte=true;
+    setTimeout(()=>abrirDteModal(i),150);
+  }
+}
+function lValFmtBlur(inp,i,side){
+  const num=+AF.lineas[i][side]||0;
+  inp.value=num?new Intl.NumberFormat('es-CL').format(num):'';
+  inp.classList.remove('digs-10','digs-13','digs-15');
+  const cls=digitsClass(num);
+  if(cls)inp.classList.add(cls);
 }
 function quitarDte(i){
   if(!confirm('¿Quitar el DTE asociado a esta línea?\n(El asiento contable se mantiene, solo se retira el documento del libro/auxiliar)'))return;
@@ -807,4 +862,4 @@ function eliminarAsiento(id){
 }
 
 
-export {CUENTAS_AUX, esAux, renderAsientos, toggleAs, cuentasOpts, renderLineas, lCd, lRut, lVal, quitarDte, delLinea, addLinea, updCuadre, todosDocsVentas, todosDocsCompras, todosDocsComprasConBorrador, todosDocsVentasConBorrador, folioPreviewDte, DM, abrirDteModal, cerrarDteModal, dtmRutInput, dtmCalcTotals, dtmRefresh, dtmCheckDup, dtmRenderDist, dtmAddDist, dtmDelDist, dtmUpdDistCheck, dtmGuardar, dtmRemover, proxFolioAsiento, abrirForm, editarAsiento, cerrarForm, duplicarAsiento, anularAsiento, abrirAsientoDesde, sigAsiento, limpiarFormAsiento, guardarAsiento, eliminarAsiento, AF};
+export {CUENTAS_AUX, esAux, renderAsientos, toggleAs, cuentasOpts, renderLineas, lCd, lRut, lVal, lValFmt, lValFmtBlur, quitarDte, delLinea, addLinea, updCuadre, todosDocsVentas, todosDocsCompras, todosDocsComprasConBorrador, todosDocsVentasConBorrador, folioPreviewDte, DM, abrirDteModal, cerrarDteModal, dtmRutInput, dtmCalcTotals, dtmRefresh, dtmCheckDup, dtmRenderDist, dtmAddDist, dtmDelDist, dtmUpdDistCheck, dtmGuardar, dtmRemover, proxFolioAsiento, abrirForm, editarAsiento, cerrarForm, duplicarAsiento, anularAsiento, abrirAsientoDesde, sigAsiento, limpiarFormAsiento, guardarAsiento, eliminarAsiento, AF};

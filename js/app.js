@@ -29,7 +29,7 @@ import {savePDC, renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm,
 import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
         getIndicadores, IND, actualizarDesdeBancoCentral} from './indicadores.js';
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
-import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas} from './buscadorcuentas.js';
+import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif} from './buscadorcuentas.js';
 import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './salida.js';
 import {cargarFichasAux, descargarPlantillaAux, abrirImportFichas,
         initImportFichasListener, fichasAux, fichaAux} from './importadoraux.js';
@@ -66,7 +66,7 @@ import {onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cer
 import {renderHon, uhon, addHon, delHon, saveHon} from './honorarios.js';
 import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
         anularAsiento, eliminarAsiento, guardarAsiento, addLinea, delLinea, renderLineas,
-        lCd, lVal, lRut, toggleAs, updCuadre, limpiarFormAsiento, sigAsiento,
+        lCd, lVal, lValFmt, lValFmtBlur, lRut, toggleAs, updCuadre, limpiarFormAsiento, sigAsiento,
         abrirDteModal, cerrarDteModal, dtmGuardar, dtmRefresh, dtmCalcTotals, dtmRutInput,
         dtmCheckDup, dtmAddDist, dtmDelDist, dtmRenderDist, dtmUpdDistCheck, dtmRemover,
         quitarDte, folioPreviewDte, abrirAsientoDesde, cuentasOpts,
@@ -339,7 +339,7 @@ Object.assign(window,{
   renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
   verDetalleCC, abrirCapitalizar, confirmarCapitalizar, ccOpts, ccNombre,
   onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual, revertirCierreMensual,
-  acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas,
+  acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif,
   marcarGuardado, marcarSucio, haySinGuardar,
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel,
@@ -373,7 +373,7 @@ Object.assign(window,{
   renderHon, uhon, addHon, delHon, saveHon,
   // asientos
   renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento, anularAsiento,
-  eliminarAsiento, guardarAsiento, addLinea, delLinea, renderLineas, lCd, lVal, lRut,
+  eliminarAsiento, guardarAsiento, addLinea, delLinea, renderLineas, lCd, lVal, lValFmt, lValFmtBlur, lRut,
   toggleAs, updCuadre, limpiarFormAsiento, sigAsiento, abrirDteModal, cerrarDteModal,
   dtmGuardar, dtmRefresh, dtmCalcTotals, dtmRutInput, dtmCheckDup, dtmAddDist, dtmDelDist,
   dtmRenderDist, dtmUpdDistCheck, dtmRemover, quitarDte, folioPreviewDte, abrirAsientoDesde,

@@ -132,3 +132,111 @@ export function acCerrarDif(id){
     else if(inp.value&&!cd)inp.value=''; // texto sin selección válida
   },160);
 }
+
+// ═══ BUSCADOR DINÁMICO DE CENTROS DE COSTO ═══
+// Reutiliza los mismos patrones que el buscador de cuentas contables.
+// Ejemplo:
+//   inputCC({id:'ln-cc-0', value:'cc_abc', onPick:"lCC(0,'%CC%')"})
+import {S as _SCC} from './state.js';
+
+let CC_RES=[], CC_ACTIVO=null, CC_SEL=0;
+
+function ccNombreCompleto(id){
+  const c=(_SCC.centros||[]).find(x=>x.id===id);
+  if(!c)return '';
+  if(c.nivel===1)return c.nombre;
+  const p=(_SCC.centros||[]).find(x=>x.id===c.padre);
+  return (p?p.nombre+' › ':'')+c.nombre;
+}
+
+function buscarCC(q){
+  const centros=_SCC.centros||[];
+  if(!q||!q.trim())return centros.slice(0,40);
+  const t=q.toLowerCase().trim();
+  return centros.filter(c=>{
+    const nombreCompleto=ccNombreCompleto(c.id).toLowerCase();
+    return (c.codigo||'').toLowerCase().includes(t)||
+           nombreCompleto.includes(t)||
+           (c.nombre||'').toLowerCase().includes(t);
+  }).slice(0,40);
+}
+
+export function inputCC({id,value='',onPick='',placeholder='Buscar centro de costo…',clase='linea-inp'}){
+  const txt=value?ccNombreCompleto(value):'';
+  const op=String(onPick).replace(/"/g,'&quot;');
+  return `<div class="ac-wrap" style="position:relative">
+    <input type="text" id="${id}" class="${clase}" value="${txt.replace(/"/g,'&quot;')}"
+      placeholder="${placeholder}" autocomplete="off"
+      data-cc="${value}" data-onpick="${op}"
+      oninput="ccAcBuscar('${id}')" onfocus="ccAcBuscar('${id}')"
+      onkeydown="ccAcTecla(event,'${id}')" onblur="ccAcCerrarDif('${id}')">
+    <div id="${id}-ac" class="ac-lista" style="display:none"></div>
+  </div>`;
+}
+
+export function ccAcBuscar(id){
+  const inp=document.getElementById(id);
+  const box=document.getElementById(id+'-ac');
+  if(!inp||!box)return;
+  const q=inp.value===ccNombreCompleto(inp.dataset.cc)?'':inp.value;
+  CC_RES=buscarCC(q);
+  CC_ACTIVO=id; CC_SEL=0;
+  if(!CC_RES.length){
+    box.innerHTML='<div class="ac-item" style="color:var(--mt)">Sin centros de costo definidos</div>';
+    box.style.display='block';return;
+  }
+  pintarListaCC(id,box);
+}
+
+function pintarListaCC(id,box){
+  box.innerHTML=[
+    `<div class="ac-item${CC_SEL===-1?' sel':''}" onmousedown="ccAcElegir('${id}','')" style="color:var(--mt);font-style:italic">
+      — sin centro de costo —
+    </div>`,
+    ...CC_RES.map((c,i)=>`
+      <div class="ac-item${i===CC_SEL?' sel':''}" onmousedown="ccAcElegir('${id}','${c.id}')">
+        ${c.codigo?`<span style="font-family:var(--mono);color:var(--ac);font-size:11px">${c.codigo}</span>`:''}
+        <span style="margin-left:6px">${ccNombreCompleto(c.id)}</span>
+      </div>`)
+  ].join('');
+  box.style.display='block';
+}
+
+export function ccAcTecla(ev,id){
+  const box=document.getElementById(id+'-ac');
+  if(!box||box.style.display==='none')return;
+  if(ev.key==='ArrowDown'){ev.preventDefault();CC_SEL=Math.min(CC_SEL+1,CC_RES.length-1);pintarListaCC(id,box);}
+  else if(ev.key==='ArrowUp'){ev.preventDefault();CC_SEL=Math.max(CC_SEL-1,-1);pintarListaCC(id,box);}
+  else if(ev.key==='Enter'){
+    ev.preventDefault();
+    if(CC_SEL===-1)ccAcElegir(id,'');
+    else if(CC_RES[CC_SEL])ccAcElegir(id,CC_RES[CC_SEL].id);
+  }
+  else if(ev.key==='Escape'){box.style.display='none';}
+}
+
+export function ccAcElegir(id,ccId){
+  const inp=document.getElementById(id);
+  const box=document.getElementById(id+'-ac');
+  if(!inp)return;
+  inp.value=ccId?ccNombreCompleto(ccId):'';
+  inp.dataset.cc=ccId;
+  if(box)box.style.display='none';
+  const acc=inp.dataset.onpick;
+  if(acc){
+    try{ new Function('cc',acc.replace(/%CC%/g,ccId))(ccId); }
+    catch(e){ console.warn('ccAcElegir:',e); }
+  }
+}
+
+export function ccAcCerrarDif(id){
+  setTimeout(()=>{
+    const inp=document.getElementById(id);
+    const box=document.getElementById(id+'-ac');
+    if(box)box.style.display='none';
+    if(!inp)return;
+    const ccId=inp.dataset.cc;
+    if(ccId)inp.value=ccNombreCompleto(ccId);
+    else if(inp.value&&!ccId)inp.value='';
+  },160);
+}

@@ -117,10 +117,10 @@ td.err{color:var(--err);font-weight:600}
 .as-form{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:20px;margin-bottom:16px}
 .as-form.editing{border-color:var(--info);box-shadow:0 0 0 2px rgba(88,166,255,.15)}
 .as-meta{display:grid;grid-template-columns:180px 1fr;gap:12px;margin-bottom:16px;align-items:end}
-.lineas-hdr{display:grid;grid-template-columns:36px 160px 1fr 150px 110px 110px 36px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
+.lineas-hdr{display:grid;grid-template-columns:36px 200px 150px 110px 110px minmax(230px,1fr) 36px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
 .lineas-hdr-6{grid-template-columns:36px 200px 1fr 110px 110px 36px}
 .lineas-box{border:1px solid var(--bd);border-radius:0 0 6px 6px;margin-bottom:10px;background:var(--bg)}
-.linea-row{display:grid;grid-template-columns:36px 160px 1fr 150px 110px 110px 36px;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(48,54,61,.7);align-items:center}
+.linea-row{display:grid;grid-template-columns:36px 200px 150px 110px 110px minmax(230px,1fr) 36px;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(48,54,61,.7);align-items:center}
 .linea-row:last-child{border-bottom:none}
 .linea-num{font-family:var(--mono);font-size:11px;color:var(--mt);text-align:center;line-height:1}
 .linea-inp{background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:5px 8px;font-family:var(--sans);font-size:12px;width:100%;transition:border-color .12s}
@@ -144,9 +144,9 @@ td.err{color:var(--err);font-weight:600}
     grid-template-columns:32px 1fr 1fr 36px;
     grid-template-areas:
       "num    cuenta cuenta cuenta"
-      "desc   desc   desc   desc"
       "cc     cc     cc     cc"
-      "debe   debe   haber  del";
+      "debe   debe   haber  haber"
+      "desc   desc   desc   del";
     gap:8px;
     padding:12px;
     background:var(--sf);
@@ -155,18 +155,18 @@ td.err{color:var(--err);font-weight:600}
     border:1px solid var(--bd);
     align-items:stretch;
   }
-  /* Ubicar por índice de hijo, según el orden del HTML:
-     1=num, 2=cuenta, 3=desc, 4=cc, 5=debe, 6=haber, 7=del */
+  /* Orden de hijos:
+     1=num, 2=cuenta, 3=cc, 4=debe, 5=haber, 6=descripción, 7=del */
   .linea-row > *:nth-child(1){grid-area:num;align-self:center;font-size:14px;font-weight:700;color:var(--info);background:var(--sf2);border-radius:6px;padding:6px 0;text-align:center}
   .linea-row > *:nth-child(2){grid-area:cuenta}
-  .linea-row > *:nth-child(3){grid-area:desc}
-  .linea-row > *:nth-child(4){grid-area:cc}
-  .linea-row > *:nth-child(5){grid-area:debe;display:flex;flex-direction:column;min-width:0}
-  .linea-row > *:nth-child(6){grid-area:haber;display:flex;flex-direction:column;min-width:0}
+  .linea-row > *:nth-child(3){grid-area:cc}
+  .linea-row > *:nth-child(4){grid-area:debe;display:flex;flex-direction:column;min-width:0}
+  .linea-row > *:nth-child(5){grid-area:haber;display:flex;flex-direction:column;min-width:0}
+  .linea-row > *:nth-child(6){grid-area:desc}
   .linea-row > *:nth-child(7){grid-area:del;align-self:center}
   /* Inputs de debe/haber con label arriba en móvil */
-  .linea-row > *:nth-child(5)::before{content:"DEBE";display:block;font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
-  .linea-row > *:nth-child(6)::before{content:"HABER";display:block;font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+  .linea-row > *:nth-child(4)::before{content:"DEBE";display:block;font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+  .linea-row > *:nth-child(5)::before{content:"HABER";display:block;font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
   /* Fuente más chica en debe/haber para que quepa el separador de miles */
   .linea-row .linea-num-inp{font-size:11px;padding:6px 6px;width:100%;min-width:0;box-sizing:border-box}
   .linea-row .btn-d{padding:8px 10px !important;min-width:36px;font-size:14px}

@@ -356,10 +356,12 @@ function renderCmpModalEdit(box,e,o){
       <td style="padding:4px 6px;min-width:220px">${busc}${dteBloque}</td>
       <td style="padding:4px 6px"><input type="text" class="linea-inp" placeholder="Descripción"
         value="${(m.desc||'').replace(/"/g,'&quot;')}" oninput="setCmpEdCampo(${i},'desc',this.value)"></td>
-      <td style="padding:4px 6px"><input type="number" class="linea-num-inp" placeholder="Debe"
-        value="${m.debe||''}" oninput="setCmpEdCampo(${i},'debe',this.value)"></td>
-      <td style="padding:4px 6px"><input type="number" class="linea-num-inp" placeholder="Haber"
-        value="${m.haber||''}" oninput="setCmpEdCampo(${i},'haber',this.value)"></td>
+      <td style="padding:4px 6px"><input type="text" class="linea-num-inp" inputmode="numeric" placeholder="0"
+        value="${m.debe?new Intl.NumberFormat('es-CL').format(Math.round(m.debe)):''}"
+        oninput="setCmpEdMonto(${i},'debe',this)" onblur="setCmpEdMontoBlur(${i},'debe',this)" onfocus="this.select()"></td>
+      <td style="padding:4px 6px"><input type="text" class="linea-num-inp" inputmode="numeric" placeholder="0"
+        value="${m.haber?new Intl.NumberFormat('es-CL').format(Math.round(m.haber)):''}"
+        oninput="setCmpEdMonto(${i},'haber',this)" onblur="setCmpEdMontoBlur(${i},'haber',this)" onfocus="this.select()"></td>
       <td style="padding:4px 6px;text-align:center">
         <button class="btn btn-d" style="padding:3px 8px;font-size:10px" onclick="delCmpEdLinea(${i})" ${ed.movs.length<=2?'disabled':''}>✕</button>
       </td>
@@ -407,7 +409,7 @@ function renderCmpModalEdit(box,e,o){
 
       <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-i" onclick="addCmpEdLinea()">+ Agregar línea</button>
-        <div style="flex:1;padding:6px 12px;border-radius:6px;background:${cuadra?'rgba(46,160,67,.08)':'rgba(248,81,73,.08)'};border:1px solid ${cuadra?'var(--ach)':'var(--err)'};display:flex;gap:16px;font-size:12px;font-weight:600">
+        <div data-cuadre-bar style="flex:1;padding:6px 12px;border-radius:6px;background:${cuadra?'rgba(46,160,67,.08)':'rgba(248,81,73,.08)'};border:1px solid ${cuadra?'var(--ach)':'var(--err)'};display:flex;gap:16px;font-size:12px;font-weight:600">
           <span>DEBE <span style="font-family:var(--mono)">${fmtC(totD)}</span></span>
           <span>HABER <span style="font-family:var(--mono)">${fmtC(totH)}</span></span>
           <span style="color:${cuadra?'var(--ach)':'var(--err)'};margin-left:auto">${cuadra?'✅ Cuadrado':'⚠️ Diferencia '+fmtC(Math.abs(dif))}</span>
@@ -416,7 +418,9 @@ function renderCmpModalEdit(box,e,o){
 
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
         <button class="btn btn-g" onclick="cmpModalCancelar()">Cancelar</button>
-        <button class="btn btn-p" onclick="cmpModalGuardar()" ${cuadra?'':'disabled title="El asiento debe cuadrar antes de guardar" style="opacity:.4;cursor:not-allowed"'}>💾 Guardar cambios</button>
+        <button data-btn-guardar class="btn ${cuadra?'btn-p':'btn-w'}" onclick="cmpModalGuardar()" title="${cuadra?'Guardar cambios':'Guardar pese al descuadre (aparecerá en el reporte de descuadres)'}">
+          💾 ${cuadra?'Guardar cambios':'Guardar (descuadra)'}
+        </button>
       </div>
     </div>`;
 }
@@ -510,6 +514,68 @@ function setCmpEdCampo(i,campo,v){
     m[campo]=v;
   }
 }
+
+// Setter para inputs con formato de miles: reformatea al vuelo sin perder foco.
+// No re-renderiza el modal completo (para no perder el foco del input); solo
+// actualiza los totales de cuadratura en la barra inferior.
+function setCmpEdMonto(i,campo,inp){
+  if(!CMP_MODAL.edit.movs[i])return;
+  const raw=String(inp.value||'').replace(/[^\d]/g,'');
+  const num=+raw||0;
+  const m=CMP_MODAL.edit.movs[i];
+  m[campo]=num;
+  // Excluyente: si escribe debe, limpia haber (y viceversa)
+  if(campo==='debe'&&num>0)m.haber=0;
+  if(campo==='haber'&&num>0)m.debe=0;
+  // Reformatear con miles conservando el cursor al final si allí está.
+  const formatted=num?new Intl.NumberFormat('es-CL').format(num):'';
+  const posEnd=inp.selectionStart===inp.value.length;
+  if(inp.value!==formatted){
+    inp.value=formatted;
+    if(posEnd)try{inp.setSelectionRange(formatted.length,formatted.length);}catch(e){}
+  }
+  // Actualizar la barra de cuadratura sin re-renderizar todo el modal
+  actualizarBarraCuadre();
+}
+
+function setCmpEdMontoBlur(i,campo,inp){
+  if(!CMP_MODAL.edit.movs[i])return;
+  const num=+CMP_MODAL.edit.movs[i][campo]||0;
+  inp.value=num?new Intl.NumberFormat('es-CL').format(num):'';
+  // Al perder foco es buen momento de re-renderizar para reflejar cualquier
+  // limpieza de la pareja debe/haber en el otro input.
+  renderCmpModal();
+}
+
+// Actualiza solo la barra de cuadratura (Debe / Haber / Diferencia) del modal
+// de edición, sin volver a renderizar toda la vista. Se usa mientras el usuario
+// escribe montos, para no perder el foco del input.
+function actualizarBarraCuadre(){
+  const ed=CMP_MODAL.edit;
+  if(!ed)return;
+  const box=document.getElementById('cmp-modal-body');
+  if(!box)return;
+  const totD=ed.movs.reduce((s,m)=>s+(+m.debe||0),0);
+  const totH=ed.movs.reduce((s,m)=>s+(+m.haber||0),0);
+  const dif=totD-totH;
+  const cuadra=Math.abs(dif)<1;
+  const barra=box.querySelector('[data-cuadre-bar]');
+  if(barra){
+    barra.style.background=cuadra?'rgba(46,160,67,.08)':'rgba(248,81,73,.08)';
+    barra.style.borderColor=cuadra?'var(--ach)':'var(--err)';
+    barra.innerHTML=`
+      <span>DEBE <span style="font-family:var(--mono)">${fmtC(totD)}</span></span>
+      <span>HABER <span style="font-family:var(--mono)">${fmtC(totH)}</span></span>
+      <span style="color:${cuadra?'var(--ach)':'var(--err)'};margin-left:auto">${cuadra?'✅ Cuadrado':'⚠️ Diferencia '+fmtC(Math.abs(dif))}</span>`;
+  }
+  // Actualizar botón guardar
+  const btnG=box.querySelector('[data-btn-guardar]');
+  if(btnG){
+    btnG.className='btn '+(cuadra?'btn-p':'btn-w');
+    btnG.textContent=cuadra?'💾 Guardar cambios':'💾 Guardar (descuadra)';
+    btnG.title=cuadra?'Guardar cambios':'Guardar pese al descuadre';
+  }
+}
 function addCmpEdLinea(){
   CMP_MODAL.edit.movs.push({cd:'',nm:'',desc:'',debe:0,haber:0});
   renderCmpModal();
@@ -526,12 +592,21 @@ async function cmpModalGuardar(){
   const e=CMP_ENTRIES[CMP_MODAL.idx];
   if(!e)return;
 
-  // Validación final de cuadratura (defensiva)
+  // Validación de cuadratura: si descuadra, pedir confirmación en vez de rechazar.
+  // Esto permite guardar en pasos intermedios mientras se corrige la distribución
+  // o los datos DTE, sin perder los cambios hechos.
   const totD=ed.movs.reduce((s,m)=>s+(+m.debe||0),0);
   const totH=ed.movs.reduce((s,m)=>s+(+m.haber||0),0);
-  if(Math.abs(totD-totH)>1){
-    toast('⚠️ El asiento no cuadra — corrige antes de guardar','e');
-    return;
+  const dif=totD-totH;
+  if(Math.abs(dif)>1){
+    const conf=confirm(
+      `⚠️ El asiento no cuadra:\n\n`+
+      `  DEBE:  ${new Intl.NumberFormat('es-CL').format(Math.round(totD))}\n`+
+      `  HABER: ${new Intl.NumberFormat('es-CL').format(Math.round(totH))}\n`+
+      `  DIFERENCIA: ${new Intl.NumberFormat('es-CL').format(Math.abs(Math.round(dif)))}\n\n`+
+      `¿Guardar de todas formas? Aparecerá en el reporte de descuadres del libro diario y podrás corregirlo después.`
+    );
+    if(!conf)return;
   }
   // Requerir cuenta en todas las líneas con monto
   const sinCuenta=ed.movs.filter(m=>(m.debe||m.haber)&&!m.cd);
@@ -776,5 +851,5 @@ function guardarCmpEdDte(){
 
 export {setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
-        setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, addCmpEdLinea, delCmpEdLinea,
+        setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
         abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte};

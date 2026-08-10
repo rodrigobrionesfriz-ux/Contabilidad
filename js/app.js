@@ -85,7 +85,7 @@ import {genDiario, renderDiario, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados, corregirDesdeDiario, editarAsientoRef} from './reportes.js';
 import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
-        setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, addCmpEdLinea, delCmpEdLinea,
+        setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
         abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte} from './comprobantes.js';
 import {renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro, togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago, abrirAsociarNota, cerrarAsociarNota, confirmarAsociar, quitarReferencia} from './pagos.js';
 import {setAuxTab, setAuxView, toggleAux, renderAuxiliares, calcularAging,
@@ -346,7 +346,7 @@ Object.assign(window,{
   abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
   renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
   abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
-  setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, addCmpEdLinea, delCmpEdLinea,
+  setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
   abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte,
   renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro, togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago,
   abrirAsociarNota, cerrarAsociarNota, confirmarAsociar, quitarReferencia,

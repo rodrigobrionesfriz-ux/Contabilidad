@@ -88,7 +88,7 @@ import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editar
         setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
         abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte} from './comprobantes.js';
 import {renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro, togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago, abrirAsociarNota, cerrarAsociarNota, confirmarAsociar, quitarReferencia} from './pagos.js';
-import {setAuxTab, setAuxView, toggleAux, renderAuxiliares, calcularAging,
+import {setAuxTab, setAuxView, setAuxQ, toggleAux, renderAuxiliares, calcularAging,
         toggleAgingDetalle, AUX_TAB,
         abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI} from './auxiliares.js';
 // AUX_TAB también viene de auxiliares.js — se recupera desde window.
@@ -402,7 +402,7 @@ Object.assign(window,{
   generarProvisionIncobrables, generarProvisionFeriado, renderCorreccion, previewCM,
   // reportes
   renderDiario, setDiarioQ, renderMayor, renderBalance, onCmpYear, renderResultados,
-  setAuxTab, setAuxView, toggleAux, renderAuxiliares, toggleAgingDetalle,
+  setAuxTab, setAuxView, setAuxQ, toggleAux, renderAuxiliares, toggleAgingDetalle,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,
   cargarCartola, autoConciliarCartola,

@@ -10,10 +10,13 @@ import {rerender} from './ui.js';
 
 let AUX_TAB='c';       // 'c'=clientes | 'p'=proveedores
 let AUX_VIEW='detalle';// 'detalle' | 'aging'
+let AUX_Q='';          // texto de búsqueda (RUT o razón social)
+let AUX_DATA=null;     // cache de {clientes,proveedores} para re-render al buscar
 
 // ═══ AUXILIARES ═══
 function setAuxTab(t){
   AUX_TAB=t;
+  AUX_Q='';  // al cambiar entre clientes/proveedores, limpiar la búsqueda
   document.getElementById('aux-tab-c').classList.toggle('active',t==='c');
   document.getElementById('aux-tab-p').classList.toggle('active',t==='p');
   renderAuxiliares();
@@ -22,7 +25,12 @@ function setAuxView(v){
   AUX_VIEW=v;
   document.getElementById('aux-view-detalle').classList.toggle('active',v==='detalle');
   document.getElementById('aux-view-aging').classList.toggle('active',v==='aging');
-  renderAuxiliares();
+  // Solo re-renderiza la lista (conserva la búsqueda y el input)
+  renderAuxLista();
+}
+function setAuxQ(v){
+  AUX_Q=v;
+  renderAuxLista();
 }
 function toggleAux(id){
   const el=document.getElementById(id);if(!el)return;
@@ -80,11 +88,67 @@ function renderAuxiliares(){
   document.getElementById('aux-ct-c').textContent=Object.keys(clientes).length;
   document.getElementById('aux-ct-p').textContent=Object.keys(proveedores).length;
 
+  // Cachear para el re-render de la lista al buscar (sin recalcular todo)
+  AUX_DATA={clientes,proveedores};
+
   const el=document.getElementById('aux-content');
+  const tipoLbl=AUX_TAB==='c'?'clientes':'proveedores';
+
+  // Buscador: la lista queda en blanco hasta que se busca/filtra. Solo
+  // re-renderiza la lista (no el input) para no perder foco en móvil.
+  el.innerHTML=`<div class="filter-row" style="margin-bottom:14px">
+      <span class="f-lbl">Buscar:</span>
+      <input type="text" id="aux-search" placeholder="RUT o razón social del ${AUX_TAB==='c'?'cliente':'proveedor'}…" value="${AUX_Q.replace(/"/g,'&quot;')}"
+        oninput="setAuxQ(this.value)" style="min-width:240px">
+      ${AUX_Q?`<button class="btn btn-g" onclick="setAuxQ('')">Limpiar</button>`:''}
+      <span class="doc-count" id="aux-count"></span>
+    </div>
+    <div id="aux-lista"></div>`;
+
+  renderAuxLista();
+}
+
+// Renderiza SOLO la lista de auxiliares (depende de la búsqueda). En blanco
+// hasta que el usuario busca o filtra.
+function renderAuxLista(){
+  const el=document.getElementById('aux-lista');
+  if(!el||!AUX_DATA)return;
+  const {clientes,proveedores}=AUX_DATA;
   const data=AUX_TAB==='c'?clientes:proveedores;
 
-  // Vista Aging
-  if(AUX_VIEW==='aging'){renderAuxAging(data);return;}
+  const q=AUX_Q.toLowerCase().trim();
+  const hayBusqueda=!!q;
+  const tipoLbl=AUX_TAB==='c'?'clientes':'proveedores';
+  const tipoIco=AUX_TAB==='c'?'📇':'🏭';
+  const cnt=document.getElementById('aux-count');
+
+  // Sin búsqueda: listado en blanco con instrucción
+  if(!hayBusqueda){
+    if(cnt)cnt.textContent=`${Object.keys(data).length} ${tipoLbl} en total`;
+    el.innerHTML=`<div class="empty" style="padding:36px 20px"><div class="ei">🔎</div>
+      Busca un ${AUX_TAB==='c'?'cliente':'proveedor'} para ver su detalle<br>
+      <span style="font-size:11px;color:var(--mt)">Escribe un RUT o razón social. Hay <strong>${Object.keys(data).length}</strong> ${tipoLbl} registrados.</span>
+    </div>`;
+    return;
+  }
+
+  // Filtrar por RUT o razón social
+  const filtrado={};
+  Object.keys(data).forEach(k=>{
+    const a=data[k];
+    const txt=((a.rutCodigo||'')+' '+(a.rutDV||'')+' '+(a.razonSocial||'')).toLowerCase();
+    if(txt.includes(q))filtrado[k]=a;
+  });
+  if(cnt)cnt.textContent=`${Object.keys(filtrado).length} de ${Object.keys(data).length} ${tipoLbl}`;
+
+  // Vista Aging (respeta el filtro)
+  if(AUX_VIEW==='aging'){renderAuxAging(filtrado,el);return;}
+
+  renderAuxDetalle(filtrado,el);
+}
+
+// Pinta la vista Detalle a partir de un conjunto ya filtrado.
+function renderAuxDetalle(data,el){
   const keys=Object.keys(data).sort((a,b)=>(data[b].total-data[a].total));
   const tipoLbl=AUX_TAB==='c'?'clientes':'proveedores';
   const tipoIco=AUX_TAB==='c'?'📇':'🏭';
@@ -92,8 +156,8 @@ function renderAuxiliares(){
   const saldoLbl=AUX_TAB==='c'?'Por Cobrar':'Por Pagar';
 
   if(!keys.length){
-    el.innerHTML=`<div class="empty"><div class="ei">${tipoIco}</div>No hay ${tipoLbl} registrados aún.${AUX_TAB==='c'?'<br><br>Los clientes aparecen automáticamente al registrar ventas con forma de pago <strong>Crédito Cliente</strong>, o al hacer un asiento manual que cargue/abone la cuenta <strong>1104001 CLIENTES</strong>.':'<br><br>Los proveedores aparecen automáticamente al registrar documentos en el Libro de Compras, o al hacer un asiento manual que cargue/abone la cuenta <strong>2102001 PROVEEDORES</strong>.'}</div>`;
-  return;
+    el.innerHTML=`<div class="empty"><div class="ei">${tipoIco}</div>No hay ${tipoLbl} que coincidan con la búsqueda.</div>`;
+    return;
   }
 
   const total=keys.reduce((s,k)=>s+data[k].total,0);
@@ -237,14 +301,14 @@ function calcularAging(data){
 function toggleAgingDetalle(id){
   const el=document.getElementById(id);if(el)el.classList.toggle('open');
 }
-function renderAuxAging(data){
-  const el=document.getElementById('aux-content');
+function renderAuxAging(data,elArg){
+  const el=elArg||document.getElementById('aux-lista')||document.getElementById('aux-content');
   const ag=calcularAging(data);
   const tipoLbl=AUX_TAB==='c'?'clientes':'proveedores';
   const saldoLbl=AUX_TAB==='c'?'Por Cobrar':'Por Pagar';
   const hoy=today();
   if(!ag.rows.length){
-    el.innerHTML=`<div class="empty"><div class="ei">📊</div>No hay saldos pendientes de ${tipoLbl}.</div>`;return;
+    el.innerHTML=`<div class="empty"><div class="ei">📊</div>No hay saldos pendientes de ${tipoLbl} que coincidan con la búsqueda.</div>`;return;
   }
   // Cards resumen por bucket
   let cards=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px">`;
@@ -389,5 +453,5 @@ async function guardarFichaAuxUI(){
   rerender();
 }
 
-export {setAuxTab, setAuxView, toggleAux, renderAuxiliares, AGING_BUCKETS, diasEntre, calcularAging, toggleAgingDetalle, renderAuxAging, AUX_TAB,
+export {setAuxTab, setAuxView, setAuxQ, toggleAux, renderAuxiliares, AGING_BUCKETS, diasEntre, calcularAging, toggleAgingDetalle, renderAuxAging, AUX_TAB,
         abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI};

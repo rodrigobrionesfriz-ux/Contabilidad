@@ -464,7 +464,7 @@ function renderImportModalVentas(){
       <div>${d.tipoDTE}</div>
       <div>${d.numero}</div>
       <div>${rutFmt(d.rutCodigo,d.rutDV)}</div>
-      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.razonSocial}</div>
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="${(d.razonSocial||'').replace(/"/g,'&quot;')}" onclick="toast('${(d.razonSocial||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}')">${d.razonSocial}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmtC(d.neto)}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmtC(d.iva)}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmtC(d.otrosImpuestos||0)}</div>
@@ -546,14 +546,18 @@ function confirmarImportacionV(){
 
   window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas)).catch(()=>toast('❌ Error guardando en storage','e'));
 
-  // Guardar cuenta de ingreso como default en la ficha del cliente.
-  // Solo se crea/completa si el usuario no tiene ya configurada una cuenta.
+  // Crear/completar la ficha del cliente para TODOS los documentos importados,
+  // tenga o no cuenta de ingreso asignada. Si el cliente no existe, se crea la
+  // ficha con los datos básicos (RUT, razón social) para editarla luego; si el
+  // documento trae cuenta, se guarda como cuenta por defecto.
   const asignaciones={};  // rut → {cuenta:{cd→count}, dv, razon}
   incluidos.forEach(d=>{
-    if(!d.cuenta)return;
     const key=d.rutCodigo;
+    if(!key)return;
     if(!asignaciones[key])asignaciones[key]={cuenta:{},rutDV:d.rutDV,razonSocial:d.razonSocial};
-    asignaciones[key].cuenta[d.cuenta]=(asignaciones[key].cuenta[d.cuenta]||0)+1;
+    if(d.cuenta)asignaciones[key].cuenta[d.cuenta]=(asignaciones[key].cuenta[d.cuenta]||0)+1;
+    // conservar la razón social si aún no la teníamos
+    if(!asignaciones[key].razonSocial&&d.razonSocial)asignaciones[key].razonSocial=d.razonSocial;
   });
   let fichasCreadas=0, fichasActualizadas=0;
   const clientesF=fichasAux('cliente');
@@ -562,7 +566,7 @@ function confirmarImportacionV(){
     const ficha=clientesF[rut];
     if(!ficha){
       clientesF[rut]={
-        rutCodigo:rut, rutDV:a.rutDV, razonSocial:a.razonSocial,
+        rutCodigo:rut, rutDV:a.rutDV, razonSocial:a.razonSocial||'',
         cuentaDefault:cuentaTop, ccDefault:'',
         giro:'', direccion:'', comuna:'', ciudad:'', email:'', telefono:'', notas:'',
       };
@@ -571,6 +575,7 @@ function confirmarImportacionV(){
       let cambio=false;
       if(!ficha.cuentaDefault&&cuentaTop){ficha.cuentaDefault=cuentaTop;cambio=true;}
       if(!ficha.razonSocial&&a.razonSocial){ficha.razonSocial=a.razonSocial;cambio=true;}
+      if(!ficha.rutDV&&a.rutDV){ficha.rutDV=a.rutDV;cambio=true;}
       if(cambio)fichasActualizadas++;
     }
   });

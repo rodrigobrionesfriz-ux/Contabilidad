@@ -699,7 +699,7 @@ function renderImportModal(){
       <div style="font-family:var(--mono);font-size:10px">${d.tipoDTE}</div>
       <div style="font-family:var(--mono);font-size:10px">${d.numero}</div>
       <div style="font-family:var(--mono);font-size:10px">${rutFmt(d.rutCodigo,d.rutDV)}</div>
-      <div style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.razonSocial}">${d.razonSocial}</div>
+      <div style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" title="${(d.razonSocial||'').replace(/"/g,'&quot;')}" onclick="toast('${(d.razonSocial||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}')">${d.razonSocial}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmt(d.neto)}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmt(d.iva)}</div>
       <div style="text-align:right;font-family:var(--mono)">${fmt(d.otrosImpuestos)}</div>
@@ -825,11 +825,12 @@ function confirmarImportacion(){
   //    batch, se usa la más frecuente.
   const asignaciones={};  // rut → { cuenta:{cd→count}, cc:{cd→count}, dv, razon }
   incluidos.forEach(d=>{
-    if(!d.cuenta)return;
     const key=d.rutCodigo;
+    if(!key)return;
     if(!asignaciones[key])asignaciones[key]={cuenta:{},cc:{},rutDV:d.rutDV,razonSocial:d.razonSocial};
-    asignaciones[key].cuenta[d.cuenta]=(asignaciones[key].cuenta[d.cuenta]||0)+1;
+    if(d.cuenta)asignaciones[key].cuenta[d.cuenta]=(asignaciones[key].cuenta[d.cuenta]||0)+1;
     if(d.cc)asignaciones[key].cc[d.cc]=(asignaciones[key].cc[d.cc]||0)+1;
+    if(!asignaciones[key].razonSocial&&d.razonSocial)asignaciones[key].razonSocial=d.razonSocial;
   });
   let fichasCreadas=0, fichasActualizadas=0;
   const proveedoresF=fichasAux('proveedor');
@@ -838,9 +839,9 @@ function confirmarImportacion(){
     const ccTop=Object.entries(a.cc).sort((x,y)=>y[1]-x[1])[0]?.[0]||'';
     const ficha=proveedoresF[rut];
     if(!ficha){
-      // Ficha nueva
+      // Ficha nueva con datos básicos (se completa el resto luego)
       proveedoresF[rut]={
-        rutCodigo:rut, rutDV:a.rutDV, razonSocial:a.razonSocial,
+        rutCodigo:rut, rutDV:a.rutDV, razonSocial:a.razonSocial||'',
         cuentaDefault:cuentaTop, ccDefault:ccTop,
         giro:'', direccion:'', comuna:'', ciudad:'', email:'', telefono:'', notas:'',
       };
@@ -852,6 +853,7 @@ function confirmarImportacion(){
       if(!ficha.cuentaDefault&&cuentaTop){ficha.cuentaDefault=cuentaTop;cambio=true;}
       if(!ficha.ccDefault&&ccTop){ficha.ccDefault=ccTop;cambio=true;}
       if(!ficha.razonSocial&&a.razonSocial){ficha.razonSocial=a.razonSocial;cambio=true;}
+      if(!ficha.rutDV&&a.rutDV){ficha.rutDV=a.rutDV;cambio=true;}
       if(cambio)fichasActualizadas++;
     }
   });

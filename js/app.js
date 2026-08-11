@@ -338,6 +338,8 @@ setOnAuthReady(initApp);
 Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec});
 
 Object.assign(window,{
+  // utilidades
+  toast,
   // navegación y arranque
   nav, rerender, renderSec, toggleNav, cerrarNavMovil, changeYear, saveAll, init, initApp,
   // auth / usuarios

@@ -375,8 +375,15 @@ function mostrarVentasImportadas(res,nombreArchivo){
     d.fp='banco';
   });
 
-  IMV={docs:res.docs,descartados:res.descartados||0,archivo:nombreArchivo,
-       periodoMes:+mesTop,periodoAnio:+anioTop};
+  // Mutar IMV in-place (NO reasignar): window.IMV apunta a este mismo objeto y
+  // los onPick de los buscadores de cuenta escriben vía window.IMV. Si se
+  // reasignara, esas escrituras irían al objeto viejo y la cuenta no se
+  // guardaría (bug: "documentos sin cuenta" pese a asignarla).
+  IMV.docs=res.docs;
+  IMV.descartados=res.descartados||0;
+  IMV.archivo=nombreArchivo;
+  IMV.periodoMes=+mesTop;
+  IMV.periodoAnio=+anioTop;
   abrirImportModalVentas();
 }
 

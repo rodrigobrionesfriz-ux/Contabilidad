@@ -291,7 +291,7 @@ function procesarBalanceXLSX(rows){
   }).filter(x=>x&&(x.debe>0||x.haber>0));
 
   if(!lineas.length){toast('⚠️ No hay líneas con saldo válido','e');return;}
-  IMB={lineas};
+  IMB.lineas=lineas;  // mutar in-place (no reasignar; window.IMB debe seguir apuntando aquí)
   abrirImpBalModal();
 }
 
@@ -302,7 +302,7 @@ function abrirImpBalModal(){
 
 function cerrarImpBalModal(){
   document.getElementById('impbal-modal').classList.remove('open');
-  IMB={lineas:[]};
+  IMB.lineas=[];  // limpiar in-place (no reasignar)
 }
 
 function renderImpBalModal(){

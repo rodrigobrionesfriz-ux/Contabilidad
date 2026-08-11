@@ -571,8 +571,14 @@ function mostrarDocsImportados(res,nombreArchivo){
     d.fechaOriginal=d.fecha;
   });
 
-  IM={docs:res.docs,descartados:res.descartados||0,archivo:nombreArchivo,
-      periodoMes:+mesTop,periodoAnio:+anioTop,periodos};
+  // Mutar IM in-place (NO reasignar): window.IM debe seguir apuntando a este
+  // objeto para que los onPick de los buscadores de cuenta escriban aquí.
+  IM.docs=res.docs;
+  IM.descartados=res.descartados||0;
+  IM.archivo=nombreArchivo;
+  IM.periodoMes=+mesTop;
+  IM.periodoAnio=+anioTop;
+  IM.periodos=periodos;
   abrirImportModal();
 }
 
@@ -614,7 +620,7 @@ function cambiarPeriodoImport(){
 
 function cerrarImportModal(){
   document.getElementById('imp-modal').classList.remove('open');
-  IM={docs:[]};
+  IM.docs=[];  // limpiar in-place (no reasignar; ver nota en cargarArchivoSII)
 }
 
 // Devuelve la fecha efectiva que se guardará: si "forzar" está activo y el doc está fuera del

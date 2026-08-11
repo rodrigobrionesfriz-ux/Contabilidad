@@ -82,6 +82,24 @@ function renderVentas(){
   });
 
   const cntMan=todos.filter(d=>d.origen==='asiento').length;
+
+  // Sin ningún filtro activo no cargamos las filas. El usuario debe aplicar un
+  // filtro de búsqueda para ver documentos.
+  const hayFiltroV=!!(fDesde||fHasta||fDte||fQ);
+  const tb=document.getElementById('v-tbody');
+  const tf=document.getElementById('v-tfoot');
+  if(!hayFiltroV){
+    document.getElementById('vf-count').textContent=`${todos.length} documentos en total`;
+    tb.innerHTML=`<tr><td colspan="15" class="empty" style="padding:36px 20px">
+      <div class="ei">🔎</div>
+      Aplica un filtro para ver documentos<br>
+      <span style="font-size:11px;color:var(--mt)">Elige un mes, un rango de fechas, un tipo de DTE, o busca por RUT / razón social / N°.${todos.length?` Hay <strong>${todos.length}</strong> documentos registrados.`:''}</span>
+    </td></tr>`;
+    if(tf)tf.innerHTML='';
+    renderVResumen();
+    return;
+  }
+
   document.getElementById('vf-count').textContent=`${fDocs.length} de ${todos.length} documentos${cntMan?` (${cntMan} desde asientos)`:''}`;
 
   // Barra de acciones masivas (solo si hay seleccionados)
@@ -98,9 +116,8 @@ function renderVentas(){
     }
   }
 
-  const tb=document.getElementById('v-tbody');
   if(!fDocs.length){
-    tb.innerHTML=`<tr><td colspan="15" class="empty"><div class="ei">🛒</div>${todos.length?'No hay documentos con ese filtro':'No hay documentos de venta. Usa <strong>+ Nuevo Documento</strong> para agregar el primero.'}</td></tr>`;
+    tb.innerHTML=`<tr><td colspan="15" class="empty"><div class="ei">🛒</div>No hay documentos con ese filtro</td></tr>`;
     document.getElementById('v-tfoot').innerHTML='';
   }else{
     let tN=0,tE=0,tI=0,tO=0,tT=0;

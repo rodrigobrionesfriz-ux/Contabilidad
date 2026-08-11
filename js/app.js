@@ -81,7 +81,7 @@ import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
         renderCorreccion, previewCM} from './cierre.js';
 
 // Reportes
-import {genDiario, renderDiario, buildMayor, renderMayor, renderBalance,
+import {genDiario, renderDiario, setDiarioQ, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados, corregirDesdeDiario, editarAsientoRef} from './reportes.js';
 import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
@@ -401,7 +401,7 @@ Object.assign(window,{
   renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc, previewProvFer,
   generarProvisionIncobrables, generarProvisionFeriado, renderCorreccion, previewCM,
   // reportes
-  renderDiario, renderMayor, renderBalance, onCmpYear, renderResultados,
+  renderDiario, setDiarioQ, renderMayor, renderBalance, onCmpYear, renderResultados,
   setAuxTab, setAuxView, toggleAux, renderAuxiliares, toggleAgingDetalle,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,

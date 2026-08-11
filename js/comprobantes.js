@@ -92,6 +92,7 @@ export function renderComprobantes(){
   const cntAuto=entries.filter(e=>e.origen==='auto').length;
   const cntMan=entries.filter(e=>e.origen==='manual').length;
   const cntAp=entries.filter(e=>e.origen==='apertura').length;
+  const totalFiltrado=entries.length;
 
   // Panel de alerta cuando hay descuadres (y no estamos ya filtrando solo por ellos)
   let alerta='';
@@ -139,6 +140,22 @@ export function renderComprobantes(){
     </div>`;
     cont.innerHTML=h;
     return;
+  }
+
+  // Sin filtro activo: mostrar solo los últimos 5 (los más recientes) para no
+  // cargar cientos de filas. Al buscar/filtrar se muestran todos los que
+  // coincidan. genDiario viene ordenado ascendente, así que "últimos" = final.
+  const hayFiltro=!!(CMP_FILTRO.mes||CMP_FILTRO.origen||CMP_FILTRO.texto||CMP_FILTRO.numero);
+  const LIMITE_CMP=5;
+  let ocultosCmp=0;
+  if(!hayFiltro&&entries.length>LIMITE_CMP){
+    ocultosCmp=entries.length-LIMITE_CMP;
+    entries=entries.slice(-LIMITE_CMP);
+  }
+  if(ocultosCmp){
+    h+=`<div style="background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.25);color:var(--info);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">
+      📄 Mostrando los <strong>${LIMITE_CMP} más recientes</strong> de ${totalFiltrado}. Usa el buscador o los filtros para ver el resto.
+    </div>`;
   }
 
   // Tabla de comprobantes

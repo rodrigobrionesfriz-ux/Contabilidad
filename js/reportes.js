@@ -8,6 +8,7 @@ import {S} from './state.js';
 import './storage.js';
 
 // ═══ LIBRO DIARIO (auto + manuales) ═══
+let DIARIO_Q='';   // texto de búsqueda del libro diario
 function genDiario(){
   const entries=[];let n=1;const anio=S.empresa.anio;
 
@@ -174,13 +175,12 @@ function genDiario(){
 }
 
 function renderDiario(){
-  const entries=genDiario(),el=document.getElementById('diario-content');
-  if(!entries.length){el.innerHTML=`<div class="empty"><div class="ei">📖</div>No hay asientos registrados.</div>`;return;}
+  const todas=genDiario(),el=document.getElementById('diario-content');
+  if(!todas.length){el.innerHTML=`<div class="empty"><div class="ei">📖</div>No hay asientos registrados.</div>`;return;}
 
-  // Detectar descuadres. Cada entrada trae fuente/origen que nos permite
-  // ofrecer un link directo para corregirla.
+  // Detectar descuadres sobre TODOS los asientos (no solo los visibles).
   const descuadres=[];
-  entries.forEach(e=>{
+  todas.forEach(e=>{
     const eD=e.movs.reduce((s,m)=>s+m.debe,0);
     const eH=e.movs.reduce((s,m)=>s+m.haber,0);
     const dif=Math.round(eD-eH);
@@ -237,17 +237,71 @@ function renderDiario(){
     </div>`;
   }
 
+  // Buscador (por N°, glosa o cuenta). Solo re-renderiza la lista, no el input.
+  const buscador=`<div class="filter-row" style="margin-bottom:12px">
+    <span class="f-lbl">Buscar:</span>
+    <input type="text" id="diario-search" placeholder="N° comprobante, glosa o cuenta…" value="${DIARIO_Q.replace(/"/g,'&quot;')}"
+      oninput="setDiarioQ(this.value)" style="min-width:240px">
+    ${DIARIO_Q?`<button class="btn btn-g" onclick="setDiarioQ('')">Limpiar</button>`:''}
+    <span class="doc-count" id="diario-count"></span>
+  </div>`;
+
+  el.innerHTML=alerta+buscador+`<div id="diario-tabla"></div>`;
+  renderDiarioTabla();
+}
+
+// Renderiza SOLO la tabla del diario (depende de la búsqueda). Separado para
+// no destruir el input de búsqueda al teclear (evita perder foco en móvil).
+function renderDiarioTabla(){
+  const box=document.getElementById('diario-tabla');
+  if(!box)return;
+  let entries=genDiario();
+
+  const q=DIARIO_Q.toLowerCase().trim();
+  const hayBusqueda=!!q;
+  if(hayBusqueda){
+    entries=entries.filter(e=>{
+      if(String(e.n||'').includes(q))return true;
+      if((e.glosa||'').toLowerCase().includes(q))return true;
+      return e.movs.some(m=>String(m.cd).includes(q)||(m.nm||pdcNm(m.cd)||'').toLowerCase().includes(q));
+    });
+  }
+
+  const totalDisp=entries.length;
+  // Sin búsqueda: solo los últimos 5 (más recientes). genDiario viene ascendente.
+  const LIMITE_DIA=5;
+  let ocultos=0;
+  if(!hayBusqueda&&entries.length>LIMITE_DIA){
+    ocultos=entries.length-LIMITE_DIA;
+    entries=entries.slice(-LIMITE_DIA);
+  }
+
+  const cnt=document.getElementById('diario-count');
+  if(cnt)cnt.textContent=hayBusqueda?`${totalDisp} resultado${totalDisp===1?'':'s'}`:'';
+
+  if(!entries.length){
+    box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--mt)">No hay asientos que coincidan con la búsqueda.</div>`;
+    return;
+  }
+
+  let aviso='';
+  if(ocultos){
+    aviso=`<div style="background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.25);color:var(--info);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px">
+      📖 Mostrando los <strong>${LIMITE_DIA} asientos más recientes</strong> de ${totalDisp}. Usa el buscador para ver el resto.
+    </div>`;
+  }
+
+  // Totales SIEMPRE sobre todo el diario (no solo lo visible).
   let tD=0,tH=0;
-  let h=alerta+`<div class="card-np"><div class="tw"><table>
+  genDiario().forEach(e=>{tD+=e.movs.reduce((s,m)=>s+m.debe,0);tH+=e.movs.reduce((s,m)=>s+m.haber,0);});
+
+  let h=aviso+`<div class="card-np"><div class="tw"><table>
     <thead><tr><th class="tl" style="width:38px">N°</th><th class="tl" style="width:92px">FECHA</th><th class="tl">GLOSA / CUENTA</th><th class="tl" style="width:82px">CÓD.</th><th style="min-width:110px">DEBE</th><th style="min-width:110px">HABER</th><th class="tl" style="width:65px">ORIGEN</th></tr></thead><tbody>`;
   entries.forEach(e=>{
     const eD=e.movs.reduce((s,m)=>s+m.debe,0),eH=e.movs.reduce((s,m)=>s+m.haber,0);
-    tD+=eD;tH+=eH;
-    // ¿Este asiento cuadra?
     const asDescuadrado=Math.abs(eD-eH)>1;
     const estiloTotal=asDescuadrado?'color:var(--err);font-weight:700':'';
     const ob=e.origen==='manual'?`<span class="badge bb">Manual</span>`:`<span class="badge" style="background:rgba(130,130,130,.12);color:var(--mt)">Auto</span>`;
-    // Fila del encabezado con marca roja si descuadra
     const trStyle=asDescuadrado?' style="background:rgba(248,81,73,.05)"':'';
     const badgeDescuadre=asDescuadrado?' <span style="background:rgba(248,81,73,.15);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">⚠ DESCUADRE</span>':'';
     h+=`<tr class="rth"${trStyle}><td class="tl">${e.n}</td><td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td><td class="tl" colspan="2">${e.glosa}${badgeDescuadre}</td><td style="${estiloTotal}">${fmtC(eD)}</td><td style="${estiloTotal}">${fmtC(eH)}</td><td>${ob}</td></tr>`;
@@ -257,10 +311,15 @@ function renderDiario(){
     });
   });
   const ok=Math.abs(tD-tH)<1;
-  h+=`</tbody><tfoot><tr><td class="tl" colspan="4">TOTALES</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tD)}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tH)}</td><td></td></tr></tfoot></table></div></div>`;
+  h+=`</tbody><tfoot><tr><td class="tl" colspan="4">TOTALES${!hayBusqueda&&ocultos?' (todo el diario)':''}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tD)}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tH)}</td><td></td></tr></tfoot></table></div></div>`;
   h+=`<div style="margin-top:10px;font-size:12px;color:${ok?'var(--ach)':'var(--err)'}">
     ${ok?'✅ Partida doble cuadrada — Debe = Haber = '+fmtC(tD):'⚠️ Descuadre global: Debe '+fmtC(tD)+' | Haber '+fmtC(tH)+' | Diferencia '+fmtC(Math.abs(tD-tH))}</div>`;
-  el.innerHTML=h;
+  box.innerHTML=h;
+}
+
+function setDiarioQ(v){
+  DIARIO_Q=v;
+  renderDiarioTabla();
 }
 
 // Puentes usados desde el reporte de descuadres del libro diario y desde Comprobantes.
@@ -605,4 +664,4 @@ async function renderResultados(){
 }
 
 
-export {genDiario, renderDiario, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados, corregirDesdeDiario, editarAsientoRef};
+export {genDiario, renderDiario, setDiarioQ, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados, corregirDesdeDiario, editarAsientoRef};

@@ -3,7 +3,7 @@ import {toast, fmt, pn, today, MESES, IVA, DTE_COMPRAS, dteC, rutParse, rutFmt, 
 import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
-import {mesOpts, foliosMensuales, mesRango} from './helpers.js';
+import {mesOpts, mesRango} from './helpers.js';
 import {todosDocsCompras, abrirAsientoDesde, proxFolioComprobante} from './asientos.js';
 import {ccOpts} from './centroscosto.js';
 import {inputCuenta} from './buscadorcuentas.js';
@@ -13,6 +13,47 @@ import './storage.js';
 
 // Estado del formulario de compras (interno del módulo)
 let CF={editId:null,dist:[]};
+
+// ═══ CORRELATIVO MENSUAL PERSISTENTE ═══
+// Cada documento de compra lleva un `corrMes` fijo: el correlativo que se le
+// asignó al guardarlo. Reinicia en 1 cada mes y NO se recalcula al editar o
+// eliminar otros documentos (a diferencia del folio dinámico por fecha).
+
+// Devuelve el próximo correlativo libre para el mes de `fecha` (YYYY-MM-DD),
+// mirando el máximo corrMes ya asignado en ese mes. Excluye un id opcional.
+function proxCorrMesCompra(fecha,excluirId=null){
+  const m=(fecha||'').slice(0,7);
+  if(!m)return 1;
+  let max=0;
+  S.compras.forEach(d=>{
+    if(d.id===excluirId)return;
+    if((d.fecha||'').slice(0,7)!==m)return;
+    if(typeof d.corrMes==='number'&&d.corrMes>max)max=d.corrMes;
+  });
+  return max+1;
+}
+
+// Asigna corrMes a los documentos que aún no lo tienen, respetando los ya
+// asignados. Ordena por fecha y N° para dar números estables a los antiguos.
+// Retorna true si hubo cambios (para persistir).
+function migrarCorrelativosCompras(){
+  const porMes={};
+  S.compras.forEach(d=>{
+    const m=(d.fecha||'').slice(0,7);if(!m)return;
+    (porMes[m]||(porMes[m]=[])).push(d);
+  });
+  let cambios=false;
+  Object.keys(porMes).forEach(m=>{
+    const arr=porMes[m];
+    // Correlativo máximo ya usado en el mes
+    let max=arr.reduce((mx,d)=>typeof d.corrMes==='number'&&d.corrMes>mx?d.corrMes:mx,0);
+    // Los que no tienen corrMes se ordenan por fecha+número y toman los siguientes
+    arr.filter(d=>typeof d.corrMes!=='number')
+      .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.numero||'').localeCompare(b.numero||''))
+      .forEach(d=>{d.corrMes=++max;cambios=true;});
+  });
+  return cambios;
+}
 
 
 function onMesChangeC(){
@@ -68,6 +109,10 @@ async function eliminarCSel(){
 }
 
 function renderCompras(){
+  // Asegurar que todos los documentos del libro tengan correlativo mensual fijo
+  if(migrarCorrelativosCompras())
+    window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>{});
+
   const selMes=document.getElementById('cf-mes');
   if(selMes&&selMes.options.length<=1)selMes.innerHTML=mesOpts(selMes.value);
   const selDteFlt=document.getElementById('cf-dte-flt');
@@ -79,7 +124,14 @@ function renderCompras(){
   const fQ=(document.getElementById('cf-search')?.value||'').toLowerCase().trim();
   const todos=todosDocsCompras();
   const docs=[...todos].sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.numero||'').localeCompare(b.numero||''));
-  const folios=foliosMensuales(todos);
+  // Correlativo mensual: los del libro traen su corrMes fijo; los que vienen de
+  // asientos manuales continúan la secuencia del mes (máximo del libro + N).
+  const corr={};
+  const maxMes={};
+  todos.forEach(d=>{if(d.origen==='libro'&&typeof d.corrMes==='number'){corr[d.id]=d.corrMes;const m=(d.fecha||'').slice(0,7);if(!maxMes[m]||d.corrMes>maxMes[m])maxMes[m]=d.corrMes;}});
+  [...todos].filter(d=>d.origen!=='libro')
+    .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.numero||'').localeCompare(b.numero||''))
+    .forEach(d=>{const m=(d.fecha||'').slice(0,7);maxMes[m]=(maxMes[m]||0)+1;corr[d.id]=maxMes[m];});
   const fDocs=docs.filter(d=>{
     if(fDesde&&d.fecha<fDesde)return false;
     if(fHasta&&d.fecha>fHasta)return false;
@@ -116,7 +168,7 @@ function renderCompras(){
       tN+=(d.neto||0)*signo;tE+=(d.exento||0)*signo;tI+=(d.iva||0)*signo;tO+=(d.otrosImpuestos||0)*signo;tT+=(d.total||0)*signo;
       const dte=dteC(d.tipoDTE);
       const mesSl=(d.fecha||'').slice(5,7);
-      const folioNum=folios[d.id]||'';
+      const folioNum=corr[d.id]||'';
       const esManual=d.origen==='asiento';
       const rowStyle=esManual?' style="background:rgba(88,166,255,.04)"':'';
       const origenBadge=esManual?`<div style="font-size:9px;color:var(--info);margin-top:2px">✏ Asiento N°${d.asientoN}</div>`:'';
@@ -129,7 +181,7 @@ function renderCompras(){
         :`<input type="checkbox" class="c-chk" data-id="${d.id}" ${CF_SEL.has(d.id)?'checked':''} onchange="toggleCSel('${d.id}')">`;
       return `<tr${rowStyle}>
         <td style="text-align:center;width:26px">${chk}</td>
-        <td class="tl"><span class="doc-folio">${mesSl}-${String(folioNum).padStart(3,'0')}</span></td>
+        <td class="tl"><span class="doc-folio">${String(folioNum).padStart(3,'0')}</span></td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}${origenBadge}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px;color:${d.fechaVencimiento?'var(--tx)':'var(--mt)'}">${d.fechaVencimiento||'—'}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.tipoDTE}${dte?`<div style="font-size:9px;color:var(--mt);font-family:var(--sans);line-height:1.1;margin-top:1px">${dte.nm.slice(0,18)}</div>`:''}</td>
@@ -244,11 +296,9 @@ function cfCheckDup(){
   if(!tipoDTE||!numero||!r.codigo){warn.style.display='none';return;}
   const dup=S.compras.find(v=>v.rutCodigo===r.codigo&&+v.tipoDTE===tipoDTE&&v.numero===numero&&v.id!==CF.editId);
   if(dup){
-    const folios=foliosMensuales(S.compras);
-    const f=folios[dup.id]||'?';
-    const mesSl=dup.fecha.slice(5,7);
+    const f=(typeof dup.corrMes==='number')?dup.corrMes:'?';
     warn.className='doc-dup-warn';warn.style.display='';
-    warn.innerHTML=`⚠️ <span>DOCUMENTO DUPLICADO</span><span style="font-weight:400;margin-left:auto;font-size:11px">Ya existe: Folio ${mesSl}-${String(f).padStart(3,'0')} · ${dup.fecha} · ${rutFmt(dup.rutCodigo,dup.rutDV)} · DTE ${dup.tipoDTE} N°${dup.numero} · ${fmtC(dup.total)}</span>`;
+    warn.innerHTML=`⚠️ <span>DOCUMENTO DUPLICADO</span><span style="font-weight:400;margin-left:auto;font-size:11px">Ya existe: N° ${String(f).padStart(3,'0')} · ${dup.fecha} · ${rutFmt(dup.rutCodigo,dup.rutDV)} · DTE ${dup.tipoDTE} N°${dup.numero} · ${fmtC(dup.total)}</span>`;
   }else{warn.style.display='none';}
 }
 
@@ -338,16 +388,23 @@ function guardarCompra(){
 
   const dup=S.compras.find(v=>v.rutCodigo===r.codigo&&+v.tipoDTE===tipoDTE&&v.numero===numero&&v.id!==CF.editId);
   if(dup){
-    const folios=foliosMensuales(S.compras);
-    const f=folios[dup.id]||'?';
-    const mesSl=dup.fecha.slice(5,7);
-    toast(`⚠️ Documento duplicado — ya existe Folio ${mesSl}-${String(f).padStart(3,'0')} (${dup.fecha}, ${fmtC(dup.total)})`,'e');
+    const f=(typeof dup.corrMes==='number')?dup.corrMes:'?';
+    toast(`⚠️ Documento duplicado — ya existe N° ${String(f).padStart(3,'0')} (${dup.fecha}, ${fmtC(dup.total)})`,'e');
     return;
   }
 
   const doc={id:CF.editId||'c_'+Date.now(),fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,neto,exento,iva,otrosImpuestos,total,dist};
-  if(CF.editId){const i=S.compras.findIndex(x=>x.id===CF.editId);if(i>=0)S.compras[i]=doc;toast('✅ Documento actualizado');logAccion('Editó compra',`DTE ${doc.tipoDTE} N°${doc.numero} · ${fmtC(doc.total)}`);}
-  else{S.compras.push(doc);toast('✅ Documento registrado');logAccion('Registró compra',`DTE ${doc.tipoDTE} N°${doc.numero} · ${doc.razonSocial} · ${fmtC(doc.total)}`);}
+  if(CF.editId){
+    const i=S.compras.findIndex(x=>x.id===CF.editId);
+    const prev=i>=0?S.compras[i]:null;
+    // Conservar el correlativo si el mes no cambió; reasignar si cambió de mes
+    if(prev&&typeof prev.corrMes==='number'&&(prev.fecha||'').slice(0,7)===fecha.slice(0,7))
+      doc.corrMes=prev.corrMes;
+    else
+      doc.corrMes=proxCorrMesCompra(fecha,CF.editId);
+    if(i>=0)S.compras[i]=doc;toast('✅ Documento actualizado');logAccion('Editó compra',`DTE ${doc.tipoDTE} N°${doc.numero} · ${fmtC(doc.total)}`);
+  }
+  else{doc.corrMes=proxCorrMesCompra(fecha);S.compras.push(doc);toast('✅ Documento registrado');logAccion('Registró compra',`DTE ${doc.tipoDTE} N°${doc.numero} · ${doc.razonSocial} · ${fmtC(doc.total)}`);}
   window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>{});
   cerrarCF();rerender();
 }

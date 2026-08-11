@@ -354,7 +354,8 @@ function renderCmpModalView(box,e,o){
       </div>
       <div style="font-size:14px;font-weight:600;margin-bottom:14px">${e.glosa||'(sin glosa)'}</div>
 
-      <table style="width:100%;font-size:12px">
+      <table style="width:100%;font-size:12px;table-layout:fixed">
+        <colgroup><col style="width:72px"><col style="width:26%"><col><col style="width:88px"><col style="width:88px"></colgroup>
         <thead><tr style="border-bottom:1px solid var(--bd);color:var(--mt);text-transform:uppercase;font-size:10px">
           <th class="tl" style="padding:6px 8px">CÓDIGO</th>
           <th class="tl" style="padding:6px 8px">CUENTA</th>
@@ -363,11 +364,11 @@ function renderCmpModalView(box,e,o){
           <th style="text-align:right;padding:6px 8px">HABER</th>
         </tr></thead>
         <tbody>${e.movs.map(m=>`<tr style="border-bottom:1px solid rgba(48,54,61,.5)">
-          <td class="tl" style="padding:6px 8px;font-family:var(--mono);color:var(--mt)">${m.cd}</td>
-          <td class="tl" style="padding:6px 8px">${m.nm||pdcNm(m.cd)}</td>
-          <td class="tl" style="padding:6px 8px;color:var(--mt);font-size:11px">${m.desc||''}</td>
-          <td style="text-align:right;padding:6px 8px;font-family:var(--mono)">${m.debe?fmtC(m.debe):'—'}</td>
-          <td style="text-align:right;padding:6px 8px;font-family:var(--mono)">${m.haber?fmtC(m.haber):'—'}</td>
+          <td class="tl" style="padding:6px 8px;font-family:var(--mono);color:var(--mt);word-break:break-all">${m.cd}</td>
+          <td class="tl" style="padding:6px 8px;word-break:break-word">${m.nm||pdcNm(m.cd)}</td>
+          <td class="tl" style="padding:6px 8px;color:var(--mt);font-size:11px;word-break:break-word">${m.desc||''}</td>
+          <td style="text-align:right;padding:6px 8px;font-family:var(--mono);white-space:nowrap">${m.debe?fmtC(m.debe):'—'}</td>
+          <td style="text-align:right;padding:6px 8px;font-family:var(--mono);white-space:nowrap">${m.haber?fmtC(m.haber):'—'}</td>
         </tr>`).join('')}</tbody>
         <tfoot><tr style="background:var(--sf2);font-weight:700">
           <td colspan="3" class="tl" style="padding:8px">TOTALES</td>
@@ -416,7 +417,7 @@ function renderCmpModalEdit(box,e,o){
       </div>`;
     }
     return `<tr>
-      <td style="padding:4px 6px;min-width:220px">${busc}${dteBloque}</td>
+      <td style="padding:4px 6px">${busc}${dteBloque}</td>
       <td style="padding:4px 6px"><input type="text" class="linea-inp" placeholder="Descripción"
         value="${(m.desc||'').replace(/"/g,'&quot;')}" oninput="setCmpEdCampo(${i},'desc',this.value)"></td>
       <td style="padding:4px 6px"><input type="text" class="linea-num-inp" inputmode="numeric" placeholder="0"
@@ -459,13 +460,14 @@ function renderCmpModalEdit(box,e,o){
         </div>
       </div>
 
-      <table style="width:100%;font-size:12px">
+      <table style="width:100%;font-size:12px;table-layout:fixed">
+        <colgroup><col style="width:30%"><col><col style="width:84px"><col style="width:84px"><col style="width:30px"></colgroup>
         <thead><tr style="border-bottom:1px solid var(--bd);color:var(--mt);text-transform:uppercase;font-size:10px">
           <th class="tl" style="padding:6px">CUENTA</th>
           <th class="tl" style="padding:6px">DESCRIPCIÓN</th>
-          <th class="tl" style="padding:6px;width:110px">DEBE</th>
-          <th class="tl" style="padding:6px;width:110px">HABER</th>
-          <th style="width:36px"></th>
+          <th class="tl" style="padding:6px">DEBE</th>
+          <th class="tl" style="padding:6px">HABER</th>
+          <th></th>
         </tr></thead>
         <tbody>${filas}</tbody>
       </table>

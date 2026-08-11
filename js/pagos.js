@@ -138,16 +138,7 @@ function renderPagos(){
     );
   }
 
-  // Agregado por auxiliar (proveedor/cliente)
-  const porRut={};
-  filtrados.forEach(d=>{
-    const k=d.rutCodigo||'sinRut';
-    if(!porRut[k])porRut[k]={rutCodigo:d.rutCodigo,rutDV:d.rutDV,razonSocial:d.razonSocial,docs:[],total:0};
-    porRut[k].docs.push(d);
-    porRut[k].total+=d.saldo;
-  });
-
-  // Totales de selección
+  // Totales de selección (para el panel superior)
   let totSel=0, cntSel=0;
   PAG.seleccionados.forEach(id=>{
     const d=filtrados.find(x=>x.id===id);
@@ -156,7 +147,6 @@ function renderPagos(){
     totSel+=monto; cntSel++;
   });
 
-  const tipoLbl=PAG.tipo==='proveedor'?'a Proveedores':'de Clientes';
   const accionLbl=PAG.tipo==='proveedor'?'Pagar':'Cobrar';
   const sustantivo=PAG.tipo==='proveedor'?'pago':'cobro';   // "fecha del pago" / "datos del cobro"
 
@@ -193,24 +183,63 @@ function renderPagos(){
         <option value="">Todos los meses</option>
         ${MESES.map((m,i)=>`<option value="${i+1}" ${+PAG.filtro.mes===i+1?'selected':''}>${m}</option>`).join('')}
       </select>
-      <input type="text" placeholder="Buscar por RUT, razón social o folio…" value="${PAG.filtro.texto.replace(/"/g,'&quot;')}"
+      <input type="text" id="pag-search" placeholder="Buscar por RUT, razón social o folio…" value="${PAG.filtro.texto.replace(/"/g,'&quot;')}"
         oninput="setPagFiltro('texto',this.value)" style="min-width:220px">
       <button class="btn btn-g" onclick="limpiarPagFiltro()">Limpiar</button>
-      <span class="doc-count">${filtrados.length} documentos pendientes · ${Object.keys(porRut).length} auxiliares</span>
+      <span class="doc-count" id="pag-count"></span>
     </div>
+    <div id="pagos-tabla"></div>
   `;
 
+  cont.innerHTML=h;
+  renderPagosTabla();
+}
+
+// Renderiza SOLO la tabla + contador (depende de los filtros). Se separa del
+// render principal para poder filtrar por texto sin destruir el input de
+// búsqueda (que perdería el foco y cerraría el teclado en móvil).
+function renderPagosTabla(){
+  const box=document.getElementById('pagos-tabla');
+  if(!box)return;
+
+  const accionLbl=PAG.tipo==='proveedor'?'Pagar':'Cobrar';
+  const sustantivo=PAG.tipo==='proveedor'?'pago':'cobro';
+
+  const docs=docsPendientes(PAG.tipo);
+  let filtrados=docs;
+  if(PAG.filtro.mes){
+    filtrados=filtrados.filter(d=>+d.fecha.slice(5,7)===+PAG.filtro.mes);
+  }
+  if(PAG.filtro.texto){
+    const t=PAG.filtro.texto.toLowerCase();
+    filtrados=filtrados.filter(d=>
+      (d.razonSocial||'').toLowerCase().includes(t)||
+      (d.rutCodigo||'').includes(t)||
+      String(d.numero||'').includes(t)
+    );
+  }
+
+  const porRut={};
+  filtrados.forEach(d=>{
+    const k=d.rutCodigo||'sinRut';
+    if(!porRut[k])porRut[k]={rutCodigo:d.rutCodigo,rutDV:d.rutDV,razonSocial:d.razonSocial,docs:[],total:0};
+    porRut[k].docs.push(d);
+    porRut[k].total+=d.saldo;
+  });
+
+  const cnt=document.getElementById('pag-count');
+  if(cnt)cnt.textContent=`${filtrados.length} documentos pendientes · ${Object.keys(porRut).length} auxiliares`;
+
   if(!filtrados.length){
-    h+=`<div style="text-align:center;padding:40px;color:var(--mt)">
+    box.innerHTML=`<div style="text-align:center;padding:40px;color:var(--mt)">
       <div style="font-size:36px;margin-bottom:8px">${PAG.tipo==='proveedor'?'💰':'📥'}</div>
       No hay documentos pendientes de ${sustantivo}
     </div>`;
-    cont.innerHTML=h;
     return;
   }
 
   // Tabla agrupada por auxiliar
-  h+='<div class="card-np"><div class="tw"><table style="font-size:12px">';
+  let h='<div class="card-np"><div class="tw"><table style="font-size:12px">';
   h+=`<thead><tr>
     <th style="width:30px;text-align:center"><input type="checkbox" onchange="togglePagAll(this.checked)"></th>
     <th class="tl" style="width:90px">FECHA</th>
@@ -282,7 +311,7 @@ function renderPagos(){
   });
   h+='</tbody></table></div></div>';
 
-  cont.innerHTML=h;
+  box.innerHTML=h;
 }
 
 // ═══ ACCIONES ═══
@@ -300,7 +329,9 @@ function setPagCampo(campo,valor){
 }
 function setPagFiltro(campo,valor){
   PAG.filtro[campo]=valor;
-  renderPagos();
+  // Solo re-renderiza la tabla (no el contenedor completo), así el input de
+  // búsqueda conserva el foco y no se cierra el teclado en móvil.
+  renderPagosTabla();
 }
 function limpiarPagFiltro(){
   PAG.filtro={texto:'',mes:''};

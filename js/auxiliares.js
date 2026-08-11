@@ -1,5 +1,5 @@
 // auxiliares.js — Auxiliares por cliente/proveedor + aging
-import {toast, fmtC, fmt, MESES, pdcNm, rutFmt, dteV, dteC, rutDV, today} from './core.js';
+import {toast, fmtC, fmt, MESES, pdcNm, rutFmt, dteV, dteC, rutDV, rutParse, today} from './core.js';
 import {S} from './state.js';
 import {todosDocsVentas, todosDocsCompras, CUENTAS_AUX, esAux, abrirAsientoDesde} from './asientos.js';
 import {fichaAux, fichasAux, guardarFichasAux} from './importadoraux.js';
@@ -81,6 +81,18 @@ function renderAuxiliares(){
       bucket[k].docs.push({tipo:'manual',fecha:a.fecha,glosa:a.glosa,asientoId:a.id,asientoN:a.n,desc:m.desc||'',debe:m.debe||0,haber:m.haber||0,montoSigno:mov});
       bucket[k].total+=mov;
       if(m.razonSocial)bucket[k].razonSocial=m.razonSocial;
+    });
+  });
+
+  // 4) Fichas registradas manualmente (o creadas al importar) que aún no tienen
+  //    movimientos: deben aparecer igual en el listado, con saldo 0.
+  [['cliente',clientes],['proveedor',proveedores]].forEach(([tipo,bucket])=>{
+    const fichas=fichasAux(tipo);
+    Object.keys(fichas).forEach(k=>{
+      if(!bucket[k]){
+        const f=fichas[k];
+        bucket[k]={rutCodigo:k,rutDV:f.rutDV||'',razonSocial:f.razonSocial||'',docs:[],total:0};
+      }
     });
   });
 
@@ -366,24 +378,50 @@ function renderAuxAging(data,elArg){
 // ═══ EDITOR DE FICHA AUXILIAR ═══
 // Permite editar la ficha de un cliente/proveedor desde el mismo listado,
 // para asignar cuenta y CC por defecto sin salir a Excel.
-let FICHA_EDIT={rutCodigo:'',rutDV:'',razonSocial:'',tipo:''};
+let FICHA_EDIT={rutCodigo:'',rutDV:'',razonSocial:'',tipo:'',esNueva:false};
+
+// Abre el editor para crear un auxiliar manualmente desde cero (RUT editable).
+function abrirFichaAuxNueva(){
+  const tipo=AUX_TAB==='c'?'cliente':'proveedor';
+  FICHA_EDIT={rutCodigo:'',rutDV:'',razonSocial:'',tipo,esNueva:true};
+  renderFichaModal({},tipo,true);
+}
 
 function abrirFichaAux(rutCodigo,rutDV,razonSocial){
-  FICHA_EDIT={rutCodigo,rutDV,razonSocial,tipo:AUX_TAB==='c'?'cliente':'proveedor'};
+  FICHA_EDIT={rutCodigo,rutDV,razonSocial,tipo:AUX_TAB==='c'?'cliente':'proveedor',esNueva:false};
+  const ficha=fichaAux(FICHA_EDIT.tipo,rutCodigo)||{};
+  renderFichaModal(ficha,FICHA_EDIT.tipo,false);
+}
+
+function renderFichaModal(ficha,tipo,esNueva){
   const modal=document.getElementById('ficha-modal');
   const cont=document.getElementById('ficha-modal-body');
   if(!modal||!cont)return;
-  const ficha=fichaAux(FICHA_EDIT.tipo,rutCodigo)||{};
-  const tipoLbl=FICHA_EDIT.tipo==='cliente'?'cliente':'proveedor';
-  const filtroCta=FICHA_EDIT.tipo==='cliente'?'ingreso':'compra';
+  const tipoLbl=tipo==='cliente'?'cliente':'proveedor';
+  const filtroCta=tipo==='cliente'?'ingreso':'compra';
+
+  // Bloque de identificación: editable si es nueva, fijo si se está editando.
+  const identBlock=esNueva
+    ? `<div style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:8px">Nuevo ${tipoLbl}</div>
+        <div class="fg">
+          <div class="grp rut-wrap"><label>RUT</label>
+            <input type="text" id="ficha-rut" placeholder="Ej: 76.543.210-8" value="" oninput="fichaRutInput(this.value)">
+            <span class="rut-dv" id="ficha-rut-dv"></span>
+          </div>
+          <div class="grp full"><label>Razón social</label><input type="text" id="ficha-rs" placeholder="Nombre del ${tipoLbl}" value=""></div>
+        </div>
+        <div id="ficha-rut-warn" style="font-size:11px;color:var(--err);margin-top:2px;display:none"></div>
+      </div>`
+    : `<div style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:10px 14px;margin-bottom:14px">
+        <div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:4px">${tipoLbl}</div>
+        <div style="font-family:var(--mono);font-size:12px">${rutFmt(FICHA_EDIT.rutCodigo,FICHA_EDIT.rutDV)}</div>
+        <div style="font-weight:600;font-size:14px;margin-top:2px">${FICHA_EDIT.razonSocial}</div>
+      </div>`;
 
   cont.innerHTML=`
     <div style="padding:16px">
-      <div style="background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:10px 14px;margin-bottom:14px">
-        <div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:4px">${tipoLbl}</div>
-        <div style="font-family:var(--mono);font-size:12px">${rutFmt(rutCodigo,rutDV)}</div>
-        <div style="font-weight:600;font-size:14px;margin-top:2px">${razonSocial}</div>
-      </div>
+      ${identBlock}
       <div class="fg">
         <div class="grp"><label>Giro</label><input type="text" id="ficha-giro" value="${(ficha.giro||'').replace(/"/g,'&quot;')}"></div>
         <div class="grp"><label>Email</label><input type="email" id="ficha-email" value="${(ficha.email||'').replace(/"/g,'&quot;')}"></div>
@@ -399,12 +437,12 @@ function abrirFichaAux(rutCodigo,rutDV,razonSocial){
         <div style="font-size:11px;color:var(--mt);margin-bottom:10px">Al importar desde el SII, estos valores se aplican automáticamente a los documentos de este ${tipoLbl}.</div>
         <div class="fg">
           <div class="grp full">
-            <label>Cuenta ${FICHA_EDIT.tipo==='cliente'?'de ingreso':'de gasto o activo'} por defecto</label>
+            <label>Cuenta ${tipo==='cliente'?'de ingreso':'de gasto o activo'} por defecto</label>
             ${inputCuenta({id:'ficha-cuenta',value:ficha.cuentaDefault||'',
               onPick:"setFichaCuenta('%CD%')",
               placeholder:'Buscar por código o nombre…',filtro:filtroCta})}
           </div>
-          ${FICHA_EDIT.tipo==='proveedor'?`<div class="grp full">
+          ${tipo==='proveedor'?`<div class="grp full">
             <label>Centro de costo por defecto</label>
             <select id="ficha-cc">${ccOpts(ficha.ccDefault||'')}</select>
           </div>`:''}
@@ -413,10 +451,22 @@ function abrirFichaAux(rutCodigo,rutDV,razonSocial){
 
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
         <button class="btn btn-g" onclick="cerrarFichaAux()">Cancelar</button>
-        <button class="btn btn-p" onclick="guardarFichaAuxUI()">💾 Guardar ficha</button>
+        <button class="btn btn-p" onclick="guardarFichaAuxUI()">💾 ${esNueva?'Crear ficha':'Guardar ficha'}</button>
       </div>
     </div>`;
   modal.classList.add('open');
+}
+
+// Formatea el RUT en el input de nueva ficha y muestra el DV / validación.
+function fichaRutInput(val){
+  const r=rutParse(val);
+  const dvEl=document.getElementById('ficha-rut-dv');
+  const warn=document.getElementById('ficha-rut-warn');
+  if(dvEl)dvEl.textContent=r.codigo?`-${r.dv}`:'';
+  if(warn){
+    if(r.codigo&&!r.valido){warn.textContent='⚠️ El dígito verificador no corresponde al RUT';warn.style.display='';}
+    else warn.style.display='none';
+  }
 }
 
 function cerrarFichaAux(){
@@ -428,8 +478,23 @@ let _fichaCuentaSel='';
 function setFichaCuenta(cd){_fichaCuentaSel=cd;}
 
 async function guardarFichaAuxUI(){
-  const {rutCodigo,rutDV,razonSocial,tipo}=FICHA_EDIT;
+  let {rutCodigo,rutDV,razonSocial,tipo,esNueva}=FICHA_EDIT;
+
+  // Modo creación: leer y validar RUT + razón social de los inputs editables
+  if(esNueva){
+    const r=rutParse(document.getElementById('ficha-rut')?.value||'');
+    const rs=(document.getElementById('ficha-rs')?.value||'').trim();
+    if(!r.codigo){toast('⚠️ Ingresa un RUT válido','e');return;}
+    if(!r.valido){toast('⚠️ El dígito verificador del RUT no es correcto','e');return;}
+    if(!rs){toast('⚠️ Ingresa la razón social','e');return;}
+    // Evitar duplicar una ficha existente
+    if(fichasAux(tipo)[r.codigo]){
+      toast(`⚠️ Ya existe una ficha de ${tipo} con ese RUT`,'e');return;
+    }
+    rutCodigo=r.codigo; rutDV=r.dv; razonSocial=rs;
+  }
   if(!rutCodigo)return;
+
   const inp=document.getElementById('ficha-cuenta');
   const cuentaDefault=_fichaCuentaSel||(inp?inp.dataset.cd:'')||'';
   const ficha={
@@ -448,10 +513,12 @@ async function guardarFichaAuxUI(){
   await guardarFichasAux();
   _fichaCuentaSel='';
   cerrarFichaAux();
-  toast(`✅ Ficha de ${razonSocial} actualizada`);
-  logAccion(`Editó ficha de ${tipo}`,`${razonSocial} (${rutFmt(rutCodigo,rutDV)})`);
+  toast(`✅ Ficha de ${razonSocial} ${esNueva?'creada':'actualizada'}`);
+  logAccion(`${esNueva?'Creó':'Editó'} ficha de ${tipo}`,`${razonSocial} (${rutFmt(rutCodigo,rutDV)})`);
+  // Si es nueva, dejarla visible buscándola por su RUT
+  if(esNueva)AUX_Q=rutCodigo;
   rerender();
 }
 
 export {setAuxTab, setAuxView, setAuxQ, toggleAux, renderAuxiliares, AGING_BUCKETS, diasEntre, calcularAging, toggleAgingDetalle, renderAuxAging, AUX_TAB,
-        abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI};
+        abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI};

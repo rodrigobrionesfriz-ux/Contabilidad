@@ -90,7 +90,7 @@ import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editar
 import {renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro, togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago, abrirAsociarNota, cerrarAsociarNota, confirmarAsociar, quitarReferencia} from './pagos.js';
 import {setAuxTab, setAuxView, setAuxQ, toggleAux, renderAuxiliares, calcularAging,
         toggleAgingDetalle, AUX_TAB,
-        abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI} from './auxiliares.js';
+        abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI} from './auxiliares.js';
 // AUX_TAB también viene de auxiliares.js — se recupera desde window.
 import {renderF29, renderPPM} from './tributario.js';
 import {setFCView, renderFlujoCaja} from './flujocaja.js';
@@ -358,7 +358,7 @@ Object.assign(window,{
   marcarGuardado, marcarSucio, haySinGuardar,
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel,
-  abrirFichaAux, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
+  abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
   renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
   abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
   setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,

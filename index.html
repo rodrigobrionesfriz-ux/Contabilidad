@@ -58,7 +58,7 @@
 
 <header>
   <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
-  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.12-1332</span></div>
+  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.12-2003</span></div>
   <div class="hdr-empresa" id="hdr-empresa">Configure los datos de empresa</div>
   <span id="save-indicator" style="font-size:10px;color:var(--mt);white-space:nowrap"></span>
   <button id="btn-tema" onclick="cambiarTema()" title="Cambiar tema" style="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mt);font-size:13px;cursor:pointer;padding:5px 10px;line-height:1">🌙</button>
@@ -530,6 +530,8 @@
     <span class="doc-count" id="cf-count"></span>
   </div>
 
+  <div id="c-dup-alert" style="display:none"></div>
+
   <div id="c-bulk-bar" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:rgba(46,160,67,.08);border:1px solid rgba(46,160,67,.3);border-radius:8px;margin-bottom:10px;font-size:12px"></div>
 
   <div class="card-np"><div class="tw"><table>
@@ -958,6 +960,13 @@
           <select id="imp-periodo-anio" onchange="cambiarPeriodoImport()" style="background:var(--sf);border:1px solid var(--bd);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600"></select>
         </div>
       </div>
+      <div>
+        <div style="font-size:10px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:3px">🔁 Modo de carga</div>
+        <select id="imp-modo" onchange="cambiarModoImport()" style="background:var(--sf);border:1px solid var(--bd);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:13px;font-weight:600;max-width:320px">
+          <option value="agregar">➕ Agregar solo los documentos nuevos</option>
+          <option value="sobrescribir">♻️ Sobrescribir el periodo (reutiliza correlativos)</option>
+        </select>
+      </div>
       <div style="font-size:11px;color:var(--mt);flex:1" id="imp-periodo-info"></div>
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;user-select:none">
         <input type="checkbox" id="imp-forzar-periodo" checked onchange="renderImportModal()">
@@ -1148,6 +1157,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=1786541571"></script>
+<script type="module" src="js/app.js?v=1786565025"></script>
 </body>
 </html>

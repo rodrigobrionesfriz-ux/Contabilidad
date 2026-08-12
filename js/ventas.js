@@ -45,6 +45,25 @@ function toggleVSelAll(marcados){
   renderVentas();
 }
 function limpiarVSel(){VF_SEL.clear();renderVentas();}
+async function cambiarFPVSel(nuevaFP){
+  if(!VF_SEL.size){toast('⚠️ No hay documentos seleccionados','e');return;}
+  const fpLbl=nuevaFP==='clientes'?'a crédito (Cliente)':nuevaFP==='banco'?'al contado (Banco)':nuevaFP;
+  // Solo se pueden modificar los documentos del libro (no los que vienen de un
+  // asiento manual, que se editan desde el asiento).
+  let cambiados=0, omitidos=0;
+  S.ventas.forEach(d=>{
+    if(!VF_SEL.has(d.id))return;
+    if(d.formaPago!==nuevaFP){d.formaPago=nuevaFP;cambiados++;}
+  });
+  // ¿Había seleccionados que no están en el libro (vienen de asientos)?
+  omitidos=VF_SEL.size-S.ventas.filter(d=>VF_SEL.has(d.id)).length;
+  if(!cambiados&&!omitidos){toast('Los documentos ya tenían esa forma de pago');return;}
+  VF_SEL.clear();
+  try{await window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas));}catch(e){}
+  toast(`✅ ${cambiados} documento${cambiados===1?'':'s'} marcado${cambiados===1?'':'s'} ${fpLbl}${omitidos?` · ${omitidos} omitido${omitidos===1?'':'s'} (vienen de asientos)`:''}`);
+  logAccion('Cambió forma de pago masivamente',`${cambiados} ventas → ${nuevaFP}`);
+  rerender();
+}
 async function eliminarVSel(){
   if(!VF_SEL.size){toast('⚠️ No hay documentos seleccionados','e');return;}
   const n=VF_SEL.size;
@@ -108,6 +127,8 @@ function renderVentas(){
     if(VF_SEL.size){
       barraSel.style.display='flex';
       barraSel.innerHTML=`<span style="font-weight:600;color:var(--ac)">${VF_SEL.size} seleccionado${VF_SEL.size===1?'':'s'}</span>
+        <button class="btn btn-i" style="font-size:11px" onclick="cambiarFPVSel('clientes')" title="Marcar como venta a crédito (genera cuenta por cobrar en el auxiliar del cliente)">📇 A crédito (Cliente)</button>
+        <button class="btn btn-i" style="font-size:11px" onclick="cambiarFPVSel('banco')" title="Marcar como venta al contado (cobrada, sin saldo en el auxiliar)">💵 A contado (Banco)</button>
         <button class="btn btn-d" style="font-size:11px" onclick="eliminarVSel()">🗑 Eliminar seleccionados</button>
         <button class="btn btn-g" style="font-size:11px" onclick="limpiarVSel()">✕ Limpiar selección</button>`;
     }else{
@@ -450,9 +471,9 @@ function renderImportModalVentas(){
     const estado=d.dup
       ? '<span style="color:var(--warn);font-size:10px">⚠️ duplicado</span>'
       : (d.incluir?'<span style="color:var(--ach);font-size:10px">✓ nuevo</span>':'<span style="color:var(--mt);font-size:10px">omitido</span>');
-    // Por defecto, NC (61) van a clientes (para descontar del auxiliar).
-    // Facturas y boletas quedan como banco (contado) por defecto.
-    if(!d.fp)d.fp=(+d.tipoDTE===61)?'clientes':'banco';
+    // Por defecto todas las ventas van al auxiliar de clientes (cuenta por
+    // cobrar). El usuario cambia a "Banco" las que sean realmente al contado.
+    if(!d.fp)d.fp='clientes';
     const fpSel=`<select onchange="IMV.docs[${i}].fp=this.value" style="width:100%;font-size:11px;padding:3px">
       <option value="banco" ${d.fp==='banco'?'selected':''}>💵 Banco</option>
       <option value="clientes" ${d.fp==='clientes'?'selected':''}>📇 Cliente</option>
@@ -596,4 +617,4 @@ export {onMesChangeV, abrirImportSIIVentas, handleFileImportVentas,
         cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV,
         renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas, initImportListenerV,
         IMV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta,
-        toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, VF};
+        toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, cambiarFPVSel, VF};

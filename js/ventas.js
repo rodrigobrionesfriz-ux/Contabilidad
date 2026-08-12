@@ -217,6 +217,9 @@ function abrirVF(){
   document.getElementById('vf-fp').value='banco';
   document.getElementById('vf-dv').textContent='';
   document.getElementById('vf-dup-warn').style.display='none';
+  _vfCuentaSel='';
+  const wrap=document.getElementById('vf-cuenta-wrap');
+  if(wrap)wrap.innerHTML=inputCuenta({id:'vf-cuenta',value:'',onPick:"setVfCuenta('%CD%')",placeholder:'Cuenta de ingreso (opcional)…',filtro:'ingreso'});
   f.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function editarVenta(id){
@@ -237,9 +240,14 @@ function editarVenta(id){
   document.getElementById('vf-total').value=d.total||'';
   document.getElementById('vf-fp').value=d.formaPago||'banco';
   document.getElementById('vf-dup-warn').style.display='none';
+  _vfCuentaSel=d.cuentaIngreso||'';
+  const wrap=document.getElementById('vf-cuenta-wrap');
+  if(wrap)wrap.innerHTML=inputCuenta({id:'vf-cuenta',value:d.cuentaIngreso||'',onPick:"setVfCuenta('%CD%')",placeholder:'Cuenta de ingreso (opcional)…',filtro:'ingreso'});
   vfRutInput(document.getElementById('vf-rut').value);
   f.scrollIntoView({behavior:'smooth',block:'start'});
 }
+let _vfCuentaSel='';
+function setVfCuenta(cd){_vfCuentaSel=cd;}
 function cerrarVF(){document.getElementById('vf-form').style.display='none';VF={editId:null};}
 
 function vfRutInput(val){
@@ -329,7 +337,8 @@ function guardarVenta(){
     return;
   }
 
-  const doc={id:VF.editId||'v_'+Date.now(),fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,neto,exento,iva,otrosImpuestos,total,formaPago};
+  const cuentaIngreso=_vfCuentaSel||(document.getElementById('vf-cuenta')?.dataset.cd)||'';
+  const doc={id:VF.editId||'v_'+Date.now(),fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,neto,exento,iva,otrosImpuestos,total,formaPago,cuentaIngreso};
   if(VF.editId){const i=S.ventas.findIndex(x=>x.id===VF.editId);if(i>=0)S.ventas[i]=doc;toast('✅ Documento actualizado');logAccion('Editó venta',`DTE ${doc.tipoDTE} N°${doc.numero} · ${fmtC(doc.total)}`);}
   else{S.ventas.push(doc);toast('✅ Documento registrado');logAccion('Registró venta',`DTE ${doc.tipoDTE} N°${doc.numero} · ${doc.razonSocial} · ${fmtC(doc.total)}`);}
   window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas)).catch(()=>{});
@@ -616,5 +625,5 @@ function confirmarImportacionV(){
 export {onMesChangeV, abrirImportSIIVentas, handleFileImportVentas,
         cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV,
         renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas, initImportListenerV,
-        IMV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta,
+        IMV, limpiarFiltrosV, renderVentas, renderVResumen, abrirVF, editarVenta, cerrarVF, vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, setVfCuenta, eliminarVenta,
         toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, cambiarFPVSel, VF};

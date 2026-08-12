@@ -68,8 +68,10 @@ function genDiario(){
             else movs.push({cd:cuentaDeb,nm:pdcNm(cuentaDeb),debe:0,haber:-totSig});
           }
         }
-        // HABER: ingreso por venta según DTE
-        const cuentaIng=dteInfo?dteInfo.cuenta:'4101002';
+        // HABER: ingreso por venta. Se usa la cuenta de ingreso elegida en el
+        // documento (cuentaIngreso); si no hay, se cae a la cuenta por defecto
+        // del tipo de DTE.
+        const cuentaIng=d.cuentaIngreso||(dteInfo?dteInfo.cuenta:'4101002');
         if(ingSig){
           if(ingSig>0)movs.push({cd:cuentaIng,nm:pdcNm(cuentaIng),debe:0,haber:ingSig});
           else movs.push({cd:cuentaIng,nm:pdcNm(cuentaIng),debe:-ingSig,haber:0});

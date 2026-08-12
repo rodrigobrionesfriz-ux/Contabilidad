@@ -50,7 +50,7 @@ import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, ap
         eliminarApertura, initBalanceImportListener, abrirImpBalModal, cerrarImpBalModal,
         toggleAllBal, confirmarImportBalance, renderImpBalModal, APF, IMB} from './apertura.js';
 import {onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerrarVF,
-        vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta,
+        vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, setVfCuenta,
         eliminarVenta, VF, abrirImportSIIVentas, handleFileImportVentas,
         cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV,
         renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
@@ -377,7 +377,7 @@ Object.assign(window,{
   abrirImpBalModal, cerrarImpBalModal, toggleAllBal, confirmarImportBalance, renderImpBalModal,
   // ventas
   onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerrarVF,
-  vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, eliminarVenta,
+  vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, setVfCuenta, eliminarVenta,
   // compras
   onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cerrarCF,
   cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck,

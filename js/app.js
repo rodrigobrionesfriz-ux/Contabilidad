@@ -62,6 +62,7 @@ import {onMesChangeC, limpiarFiltrosC, renderCompras, abrirCF, editarCompra, cer
         cambiarPeriodoImport, cerrarImportModal, toggleImportDoc, toggleAllImport,
         setImportCuenta, aplicarCuentaATodos, confirmarImportacion,
         initImportListener, renderImportModal, setBulkCuentaImp, setImportCC, aplicarCCATodos,
+        cambiarModoImport, verDuplicadoC, renderCDupAlert,
         toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, CF, IM} from './compras.js';
 import {renderHon, uhon, addHon, delHon, saveHon} from './honorarios.js';
 import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
@@ -384,6 +385,7 @@ Object.assign(window,{
   guardarCompra, eliminarCompra, abrirImportSII, abrirImportModal, cambiarPeriodoImport,
   cerrarImportModal, toggleImportDoc, toggleAllImport, setImportCuenta,
   aplicarCuentaATodos, confirmarImportacion, renderImportModal, pn,
+  cambiarModoImport, verDuplicadoC, renderCDupAlert,
   // honorarios
   renderHon, uhon, addHon, delHon, saveHon,
   // asientos

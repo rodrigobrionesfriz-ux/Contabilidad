@@ -152,6 +152,12 @@ function renderVentas(){
       const esManual=d.origen==='asiento';
       const rowStyle=esManual?' style="background:rgba(88,166,255,.04)"':'';
       const origenBadge=esManual?`<div style="font-size:9px;color:var(--info);margin-top:2px">✏ Asiento N°${d.asientoN}</div>`:'';
+      // Las notas de crédito RESTAN: se muestran en negativo y en rojo, igual
+      // que como se computan en los totales, el F29 y el libro diario.
+      const esNC=signo<0;
+      const sg=v=>fmt((v||0)*signo);
+      const cNC=esNC?' style="color:var(--err)"':'';
+      const cNCb=esNC?' style="color:var(--err);font-weight:600"':' style="font-weight:600"';
       const acciones=esManual
         ?`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="abrirAsientoDesde('${d.asientoId}')">📝 Abrir</button>`
         :`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="editarVenta('${d.id}')">✏️</button> <button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="eliminarVenta('${d.id}')">🗑</button>`;
@@ -165,15 +171,15 @@ function renderVentas(){
         <td class="tl"><span class="doc-folio">${mesSl}-${String(folioNum).padStart(3,'0')}</span></td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}${origenBadge}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px;color:${d.fechaVencimiento?'var(--tx)':'var(--mt)'}">${d.fechaVencimiento||'—'}</td>
-        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.tipoDTE}${dte?`<div style="font-size:9px;color:var(--mt);font-family:var(--sans);line-height:1.1;margin-top:1px">${dte.nm.slice(0,18)}</div>`:''}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.tipoDTE}${esNC?' <span style="font-family:var(--sans);font-size:8px;font-weight:700;color:var(--err);border:1px solid var(--err);border-radius:3px;padding:0 3px;vertical-align:middle">NC</span>':''}${dte?`<div style="font-size:9px;color:var(--mt);font-family:var(--sans);line-height:1.1;margin-top:1px">${dte.nm.slice(0,18)}</div>`:''}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.numero||''}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${rutFmt(d.rutCodigo,d.rutDV)}</td>
         <td class="tnm">${d.razonSocial||''}</td>
-        <td>${fmt(d.neto)}</td>
-        <td>${fmt(d.exento)}</td>
-        <td>${fmt(d.iva)}</td>
-        <td>${fmt(d.otrosImpuestos)}</td>
-        <td style="font-weight:600">${fmt(d.total)}</td>
+        <td${cNC}>${sg(d.neto)}</td>
+        <td${cNC}>${sg(d.exento)}</td>
+        <td${cNC}>${sg(d.iva)}</td>
+        <td${cNC}>${sg(d.otrosImpuestos)}</td>
+        <td${cNCb}>${sg(d.total)}</td>
         <td class="tl" style="font-size:11px">${esManual?'—':(fpMap[d.formaPago]||d.formaPago||'')}</td>
         <td style="text-align:center">${acciones}</td>
       </tr>`;
@@ -187,9 +193,11 @@ function renderVResumen(){
   const el=document.getElementById('v-resumen');if(!el)return;
   if(!S.ventas.length){el.innerHTML='';return;}
   const porMes=Array.from({length:12},()=>({neto:0,exento:0,iva:0,otros:0,total:0,cant:0}));
-  S.ventas.forEach(d=>{
-    const m=+d.fecha.slice(5,7)-1;if(m<0||m>11)return;
-    porMes[m].neto+=d.neto||0;porMes[m].exento+=d.exento||0;porMes[m].iva+=d.iva||0;porMes[m].otros+=d.otrosImpuestos||0;porMes[m].total+=d.total||0;porMes[m].cant++;
+  // Mismo universo y mismo signo que el libro y el F29: las notas de crédito restan.
+  todosDocsVentas().forEach(d=>{
+    const m=+((d.fecha||'').slice(5,7))-1;if(m<0||m>11)return;
+    const sg=(dteV(d.tipoDTE)?.signo)||1;
+    porMes[m].neto+=(d.neto||0)*sg;porMes[m].exento+=(d.exento||0)*sg;porMes[m].iva+=(d.iva||0)*sg;porMes[m].otros+=(d.otrosImpuestos||0)*sg;porMes[m].total+=(d.total||0)*sg;porMes[m].cant++;
   });
   let tN=0,tE=0,tI=0,tO=0,tT=0,tC=0;
   let rows=porMes.map((p,i)=>{

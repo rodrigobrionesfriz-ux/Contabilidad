@@ -56,6 +56,74 @@ function migrarCorrelativosCompras(){
 }
 
 
+// ═══ DUPLICADOS ═══
+// Un documento tributario es único por RUT emisor + tipo DTE + folio.
+// Si aparece más de una vez (por ejemplo, cargado en el libro y además a través
+// de un asiento manual) se duplica el gasto y el crédito fiscal.
+function claveDocCompra(d){
+  return `${d.rutCodigo}|${+d.tipoDTE}|${String(d.numero||'').trim()}`;
+}
+function gruposDuplicadosCompras(){
+  const map=new Map();
+  todosDocsCompras().forEach(d=>{
+    const k=claveDocCompra(d);
+    if(!map.has(k))map.set(k,[]);
+    map.get(k).push(d);
+  });
+  return [...map.values()].filter(g=>g.length>1)
+    .sort((a,b)=>(a[0].fecha||'').localeCompare(b[0].fecha||''));
+}
+// Filtra el libro para dejar a la vista un documento concreto
+function verDuplicadoC(numero){
+  ['cf-desde','cf-hasta'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const sm=document.getElementById('cf-mes');if(sm)sm.value='';
+  const sd=document.getElementById('cf-dte-flt');if(sd)sd.value='';
+  const q=document.getElementById('cf-search');if(q)q.value=numero;
+  renderCompras();
+  document.getElementById('c-tbody')?.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function renderCDupAlert(){
+  const el=document.getElementById('c-dup-alert');if(!el)return;
+  const grupos=gruposDuplicadosCompras();
+  if(!grupos.length){el.style.display='none';el.innerHTML='';return;}
+  const montoDup=grupos.reduce((s,g)=>{
+    const sg=(dteC(g[0].tipoDTE)?.signo)||1;
+    return s+(g.length-1)*(g[0].total||0)*sg;
+  },0);
+  const ivaDup=grupos.reduce((s,g)=>{
+    const sg=(dteC(g[0].tipoDTE)?.signo)||1;
+    return s+(g.length-1)*(g[0].iva||0)*sg;
+  },0);
+  const filas=grupos.slice(0,25).map(g=>{
+    const d=g[0];
+    const origenes=g.map(x=>x.origen==='asiento'?`✏ Asiento N°${x.asientoN}`:'📗 Libro').join(' + ');
+    return `<tr>
+      <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}</td>
+      <td class="tl" style="font-family:var(--mono);font-size:11px">${d.tipoDTE} N°${d.numero}</td>
+      <td class="tl" style="font-family:var(--mono);font-size:11px">${rutFmt(d.rutCodigo,d.rutDV)}</td>
+      <td class="tnm" style="font-size:11px">${d.razonSocial||''}</td>
+      <td style="font-size:11px;font-weight:600">${fmt(d.total)}</td>
+      <td class="tl" style="font-size:10px;color:var(--mt)">${g.length}× · ${origenes}</td>
+      <td style="text-align:center"><button class="btn btn-g" style="padding:3px 8px;font-size:10px" onclick="verDuplicadoC('${String(d.numero).replace(/'/g,'')}')">🔎 Ver</button></td>
+    </tr>`;
+  }).join('');
+  el.style.display='block';
+  el.innerHTML=`<div style="background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.35);border-radius:8px;padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--err);margin-bottom:4px">⚠️ ${grupos.length} documento${grupos.length===1?'':'s'} duplicado${grupos.length===1?'':'s'} en el libro de compras</div>
+    <div style="font-size:11px;color:var(--mt);margin-bottom:10px">
+      Mismo RUT + tipo de DTE + folio registrado más de una vez. Están inflando el libro en
+      <strong style="color:var(--err)">${fmtC(montoDup)}</strong> de total y
+      <strong style="color:var(--err)">${fmtC(ivaDup)}</strong> de crédito fiscal.
+      Elimina la copia sobrante (si viene de un asiento manual, bórrala desde el asiento).
+    </div>
+    <div class="tw" style="max-height:260px;overflow:auto"><table>
+      <thead><tr><th class="tl">FECHA</th><th class="tl">DOC</th><th class="tl">RUT</th><th class="tl">RAZÓN SOCIAL</th><th>TOTAL</th><th class="tl">ORIGEN</th><th></th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table></div>
+    ${grupos.length>25?`<div style="font-size:10px;color:var(--mt);margin-top:6px">Mostrando los primeros 25 de ${grupos.length}.</div>`:''}
+  </div>`;
+}
+
 function onMesChangeC(){
   const m=+(document.getElementById('cf-mes')?.value||0);
   if(m){const r=mesRango(m);document.getElementById('cf-desde').value=r.desde;document.getElementById('cf-hasta').value=r.hasta;}
@@ -117,6 +185,9 @@ function renderCompras(){
   if(selMes&&selMes.options.length<=1)selMes.innerHTML=mesOpts(selMes.value);
   const selDteFlt=document.getElementById('cf-dte-flt');
   if(selDteFlt&&selDteFlt.options.length<=1)selDteFlt.innerHTML='<option value="">Todos los DTE</option>'+DTE_COMPRAS.map(d=>`<option value="${d.cod}">${d.cod} — ${d.nm}</option>`).join('');
+
+  // Aviso de documentos duplicados (se calcula sobre todo el libro, con o sin filtro)
+  renderCDupAlert();
 
   const fDesde=(document.getElementById('cf-desde')?.value||'');
   const fHasta=(document.getElementById('cf-hasta')?.value||'');
@@ -191,6 +262,12 @@ function renderCompras(){
       const rowStyle=esManual?' style="background:rgba(88,166,255,.04)"':'';
       const origenBadge=esManual?`<div style="font-size:9px;color:var(--info);margin-top:2px">✏ Asiento N°${d.asientoN}</div>`:'';
       const distTxt=d.dist&&d.dist.length>1?`📊 ${d.dist.length} categorías`:(d.dist&&d.dist[0]?pdcNm(d.dist[0].cuenta):'');
+      // Las notas de crédito RESTAN: se muestran en negativo y en rojo, igual
+      // que como se computan en los totales, el F29 y el libro diario.
+      const esNC=signo<0;
+      const sg=v=>fmt((v||0)*signo);
+      const cNC=esNC?' style="color:var(--err)"':'';
+      const cNCb=esNC?' style="color:var(--err);font-weight:600"':' style="font-weight:600"';
       const acciones=esManual
         ?`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="abrirAsientoDesde('${d.asientoId}')">📝 Abrir</button>`
         :`<button class="btn btn-i" style="padding:3px 7px;font-size:10px" onclick="editarCompra('${d.id}')">✏️</button> <button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="eliminarCompra('${d.id}')">🗑</button>`;
@@ -202,15 +279,15 @@ function renderCompras(){
         <td class="tl"><span class="doc-folio">${String(folioNum).padStart(3,'0')}</span></td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}${origenBadge}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px;color:${d.fechaVencimiento?'var(--tx)':'var(--mt)'}">${d.fechaVencimiento||'—'}</td>
-        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.tipoDTE}${dte?`<div style="font-size:9px;color:var(--mt);font-family:var(--sans);line-height:1.1;margin-top:1px">${dte.nm.slice(0,18)}</div>`:''}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.tipoDTE}${esNC?' <span style="font-family:var(--sans);font-size:8px;font-weight:700;color:var(--err);border:1px solid var(--err);border-radius:3px;padding:0 3px;vertical-align:middle">NC</span>':''}${dte?`<div style="font-size:9px;color:var(--mt);font-family:var(--sans);line-height:1.1;margin-top:1px">${dte.nm.slice(0,18)}</div>`:''}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.numero||''}</td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${rutFmt(d.rutCodigo,d.rutDV)}</td>
         <td class="tnm">${d.razonSocial||''}${distTxt?`<div style="font-size:10px;color:var(--mt);margin-top:2px">${distTxt}</div>`:''}</td>
-        <td>${fmt(d.neto)}</td>
-        <td>${fmt(d.exento)}</td>
-        <td>${fmt(d.iva)}</td>
-        <td>${fmt(d.otrosImpuestos)}</td>
-        <td style="font-weight:600">${fmt(d.total)}</td>
+        <td${cNC}>${sg(d.neto)}</td>
+        <td${cNC}>${sg(d.exento)}</td>
+        <td${cNC}>${sg(d.iva)}</td>
+        <td${cNC}>${sg(d.otrosImpuestos)}</td>
+        <td${cNCb}>${sg(d.total)}</td>
         <td style="text-align:center">${acciones}</td>
       </tr>`;
     }).join('');
@@ -223,12 +300,16 @@ function renderCResumen(){
   const el=document.getElementById('c-resumen');if(!el)return;
   if(!S.compras.length){el.innerHTML='';return;}
   const porMes=Array.from({length:12},()=>({neto:0,exento:0,iva:0,otros:0,total:0,cant:0}));
-  S.compras.forEach(d=>{
-    const m=+d.fecha.slice(5,7)-1;if(m<0||m>11)return;
-    porMes[m].neto+=d.neto||0;porMes[m].exento+=d.exento||0;porMes[m].iva+=d.iva||0;porMes[m].otros+=d.otrosImpuestos||0;porMes[m].total+=d.total||0;porMes[m].cant++;
+  // El resumen usa el mismo universo y el mismo signo que el libro y el F29:
+  // documentos del libro + los que vienen de asientos manuales, y las notas de
+  // crédito restando.
+  todosDocsCompras().forEach(d=>{
+    const m=+((d.fecha||'').slice(5,7))-1;if(m<0||m>11)return;
+    const sg=(dteC(d.tipoDTE)?.signo)||1;
+    porMes[m].neto+=(d.neto||0)*sg;porMes[m].exento+=(d.exento||0)*sg;porMes[m].iva+=(d.iva||0)*sg;porMes[m].otros+=(d.otrosImpuestos||0)*sg;porMes[m].total+=(d.total||0)*sg;porMes[m].cant++;
   });
   const porCta={};
-  S.compras.forEach(d=>{(d.dist||[]).forEach(l=>{if(!porCta[l.cuenta])porCta[l.cuenta]={nm:pdcNm(l.cuenta),monto:0};porCta[l.cuenta].monto+=l.monto||0;});});
+  S.compras.forEach(d=>{const sg=(dteC(d.tipoDTE)?.signo)||1;(d.dist||[]).forEach(l=>{if(!porCta[l.cuenta])porCta[l.cuenta]={nm:pdcNm(l.cuenta),monto:0};porCta[l.cuenta].monto+=(l.monto||0)*sg;});});
 
   let tN=0,tE=0,tI=0,tO=0,tT=0,tC=0;
   let rowsM=porMes.map((p,i)=>{
@@ -563,11 +644,13 @@ function mostrarDocsImportados(res,nombreArchivo){
     );
     d.dup=dup||null;
     d.incluir=!dup;
-    // Pre-poblar cuenta y CC desde la ficha del proveedor si existe.
-    // Esto agiliza el flujo: los proveedores recurrentes ya vienen clasificados.
+    // Pre-poblar cuenta y CC. Prioridad: la clasificación que ya tiene el
+    // documento registrado (si es una recarga del mismo periodo), luego la
+    // ficha del proveedor. Así una re-importación no pierde el trabajo hecho.
     const ficha=fichaAux('proveedor',d.rutCodigo);
-    d.cuenta=ficha?.cuentaDefault||'';
-    d.cc=ficha?.ccDefault||'';
+    const distPrev=dup&&Array.isArray(dup.dist)?dup.dist[0]:null;
+    d.cuenta=distPrev?.cuenta||ficha?.cuentaDefault||'';
+    d.cc=distPrev?.cc||ficha?.ccDefault||'';
     d.fechaOriginal=d.fecha;
   });
 
@@ -576,6 +659,7 @@ function mostrarDocsImportados(res,nombreArchivo){
   IM.docs=res.docs;
   IM.descartados=res.descartados||0;
   IM.archivo=nombreArchivo;
+  IM.modo='agregar';   // 'agregar' | 'sobrescribir'
   IM.periodoMes=+mesTop;
   IM.periodoAnio=+anioTop;
   IM.periodos=periodos;
@@ -583,6 +667,8 @@ function mostrarDocsImportados(res,nombreArchivo){
 }
 
 function abrirImportModal(){
+  const selModo=document.getElementById('imp-modo');
+  if(selModo)selModo.value=IM.modo||'agregar';
   // Poblar select de mes
   const selMes=document.getElementById('imp-periodo-mes');
   selMes.innerHTML=MESES.map((m,i)=>`<option value="${i+1}" ${i+1===IM.periodoMes?'selected':''}>${m}</option>`).join('');
@@ -616,6 +702,24 @@ function cambiarPeriodoImport(){
   IM.periodoMes=+document.getElementById('imp-periodo-mes').value;
   IM.periodoAnio=+document.getElementById('imp-periodo-anio').value;
   renderImportModal();
+}
+
+// ═══ MODO DE IMPORTACIÓN ═══
+// 'agregar'      → solo carga documentos que aún no existen (comportamiento clásico)
+// 'sobrescribir' → reemplaza el libro completo del periodo con el archivo,
+//                  reutilizando el correlativo mensual de los documentos que ya
+//                  estaban registrados (mismo RUT + tipo DTE + folio).
+function cambiarModoImport(){
+  IM.modo=document.getElementById('imp-modo')?.value||'agregar';
+  // Al sobrescribir, los duplicados SÍ entran (son justamente los que se reemplazan)
+  IM.docs.forEach(d=>{d.incluir=IM.modo==='sobrescribir'?true:!d.dup;});
+  renderImportModal();
+}
+
+// Documentos del libro (no de asientos) que caen en el periodo seleccionado
+function docsLibroDelPeriodo(){
+  const per=`${IM.periodoAnio}-${String(IM.periodoMes).padStart(2,'0')}`;
+  return S.compras.filter(d=>(d.fecha||'').slice(0,7)===per);
 }
 
 function cerrarImportModal(){
@@ -661,21 +765,41 @@ function renderImportModal(){
   }
   document.getElementById('imp-periodo-info').innerHTML=periodoInfo;
 
+  // ── Modo sobrescribir: qué se reemplaza y qué se pierde ──
+  const modo=IM.modo||'agregar';
+  const sobre=modo==='sobrescribir';
+  let avisoModo='';
+  if(sobre){
+    const enLibro=docsLibroDelPeriodo();
+    const clavesArchivo=new Set(IM.docs.filter(d=>d.incluir).map(claveDocCompra));
+    const conservan=enLibro.filter(d=>clavesArchivo.has(claveDocCompra(d))).length;
+    const sePierden=enLibro.length-conservan;
+    avisoModo=`<div style="background:rgba(210,153,34,.10);border:1px solid rgba(210,153,34,.35);border-radius:6px;padding:9px 12px;margin-top:8px;font-size:11px;line-height:1.5">
+      🔁 <strong>Sobrescribir ${periodoStr}</strong> — se eliminan los <strong>${enLibro.length}</strong> documento${enLibro.length===1?'':'s'} que hoy tiene el libro en ese periodo y se cargan los <strong>${incl}</strong> del archivo.
+      <strong style="color:var(--ach)">${conservan}</strong> conservan su correlativo actual; los nuevos toman los números libres del mes.
+      ${sePierden?`<br><span style="color:var(--err)">⚠️ ${sePierden} documento${sePierden===1?'':'s'} del libro no viene${sePierden===1?'':'n'} en el archivo y se eliminará${sePierden===1?'':'n'}.</span>`:''}
+      <br><span style="color:var(--mt)">Los documentos registrados vía asientos manuales no se tocan.</span>
+    </div>`;
+  }
+
   // Summary
   document.getElementById('imp-summary').innerHTML=`📊 <strong>${total}</strong> documentos detectados` +
     (IM.descartados?` · ${IM.descartados} descartados (datos incompletos o DTE no soportado)`:'')+
-    (dups?` · <strong style="color:var(--err)">${dups} duplicados</strong> (ya existen)`:'')+
-    ` · Archivo: <code style="font-family:var(--mono);font-size:11px">${IM.archivo||'-'}</code>`;
+    (dups?` · <strong style="color:${sobre?'var(--info)':'var(--err)'}">${dups} ya registrado${dups===1?'':'s'}</strong>${sobre?' (se reemplazan)':' (se omiten)'}`:'')+
+    ` · Archivo: <code style="font-family:var(--mono);font-size:11px">${IM.archivo||'-'}</code>`+avisoModo;
   document.getElementById('imp-count').textContent=`${conCuenta}/${incl} con cuenta asignada`;
 
   // Botón OK
   const btnOk=document.getElementById('imp-btn-ok');
-  btnOk.textContent=`💾 Importar ${incl} documento${incl===1?'':'s'} al ${periodoStr}`;
+  btnOk.textContent=sobre
+    ?`♻️ Reemplazar ${periodoStr} con ${incl} documento${incl===1?'':'s'}`
+    :`💾 Importar ${incl} documento${incl===1?'':'s'} al ${periodoStr}`;
   btnOk.disabled=incl===0;
 
   // Checkbox "todos"
   const chkAll=document.getElementById('imp-all');
-  chkAll.checked=incl>0&&incl===IM.docs.filter(d=>!d.dup).length;
+  const seleccionables=sobre?IM.docs.length:IM.docs.filter(d=>!d.dup).length;
+  chkAll.checked=incl>0&&incl===seleccionables;
 
   // Filas: cada una usa buscador dinámico (compra = gasto + activo)
   document.getElementById('imp-rows').innerHTML=IM.docs.map((d,i)=>{
@@ -685,16 +809,18 @@ function renderImportModal(){
     const fechaShow=fueraP
       ? `<span style="color:var(--err)" title="Fuera del periodo">${d.fechaOriginal}</span>${forzar?`<div style="font-size:9px;color:var(--info)">→ ${fechaEfectivaImport(d)}</div>`:''}`
       : d.fechaOriginal;
-    const estado=d.dup
+    const estado=(d.dup&&!sobre)
       ?`<span class="dup-badge">DUPLICADO</span>`
-      :(d.cuenta?`<span class="ok-badge">LISTO</span>`:`<span style="color:var(--mt);font-size:10px">pendiente</span>`);
+      :(d.dup
+        ?(d.cuenta?`<span class="ok-badge" style="background:rgba(88,166,255,.15);color:var(--info)" title="Ya existe: se reemplaza conservando su correlativo">REEMPLAZA${typeof d.dup.corrMes==='number'?' N°'+String(d.dup.corrMes).padStart(3,'0'):''}</span>`:`<span style="color:var(--mt);font-size:10px">pendiente</span>`)
+        :(d.cuenta?`<span class="ok-badge">LISTO</span>`:`<span style="color:var(--mt);font-size:10px">pendiente</span>`));
     const selHtml=inputCuenta({id:`imp-cd-${i}`,value:d.cuenta||'',
       onPick:`setImportCuenta(${i},'%CD%')`,
       placeholder:'Buscar cuenta…',clase:'linea-inp',filtro:'compra'});
     // Selector de centro de costo (opcional)
     const ccHtml=`<select onchange="setImportCC(${i},this.value)" style="width:100%;font-size:11px;padding:3px">${ccOpts(d.cc||'')}</select>`;
     return `<div class="${cls}">
-      <div style="text-align:center"><input type="checkbox" ${d.incluir?'checked':''} ${d.dup?'disabled':''} onchange="toggleImportDoc(${i},this.checked)"></div>
+      <div style="text-align:center"><input type="checkbox" ${d.incluir?'checked':''} ${(d.dup&&!sobre)?'disabled':''} onchange="toggleImportDoc(${i},this.checked)"></div>
       <div style="font-family:var(--mono);font-size:10px">${fechaShow}</div>
       <div style="font-family:var(--mono);font-size:10px">${d.tipoDTE}</div>
       <div style="font-family:var(--mono);font-size:10px">${d.numero}</div>
@@ -716,7 +842,8 @@ function toggleImportDoc(i,checked){
   renderImportModal();
 }
 function toggleAllImport(checked){
-  IM.docs.forEach(d=>{if(!d.dup)d.incluir=checked;});
+  const sobre=(IM.modo||'agregar')==='sobrescribir';
+  IM.docs.forEach(d=>{if(sobre||!d.dup)d.incluir=checked;});
   renderImportModal();
 }
 function setImportCuenta(i,cuenta){
@@ -771,13 +898,46 @@ function confirmarImportacion(){
       proveedoresNuevos.set(d.rutCodigo,{rutCodigo:d.rutCodigo,rutDV:d.rutDV,razonSocial:d.razonSocial});
     }
   });
+  // ── Modo sobrescribir ──────────────────────────────────────────────
+  // Reemplaza el libro del periodo por el contenido del archivo, conservando
+  // el correlativo mensual (corrMes), el folio de comprobante y la
+  // distribución de gastos de los documentos que ya existían.
+  const modo=IM.modo||'agregar';
+  const periodoStrConf=`${MESES[IM.periodoMes-1]} ${IM.periodoAnio}`;
+  const prevPorClave=new Map();   // clave → documento anterior
+  let reemplazados=0,depurados=0;
+  if(modo==='sobrescribir'){
+    // Se indexa TODO el libro (no solo el periodo) para poder recuperar el
+    // correlativo aunque el documento cambie de mes al recargarlo.
+    S.compras.forEach(d=>{const k=claveDocCompra(d);if(!prevPorClave.has(k))prevPorClave.set(k,d);});
+    const enPeriodo=docsLibroDelPeriodo();
+    const clavesArchivo=new Set(incluidos.map(claveDocCompra));
+    reemplazados=enPeriodo.filter(d=>clavesArchivo.has(claveDocCompra(d))).length;
+    depurados=enPeriodo.length-reemplazados;
+    const ok=confirm(
+      `♻️ Sobrescribir el Libro de Compras de ${periodoStrConf}\n\n`+
+      `• Se eliminan los ${enPeriodo.length} documento(s) que hoy tiene el libro en ese periodo.\n`+
+      `• Se cargan los ${incluidos.length} documento(s) del archivo del SII.\n`+
+      `• ${reemplazados} conservan su correlativo mensual y su clasificación de cuentas.\n`+
+      (depurados?`• ⚠️ ${depurados} documento(s) del libro NO vienen en el archivo y se eliminarán.\n`:'')+
+      `\nLos documentos registrados desde asientos manuales no se modifican.\n\n¿Continuar?`
+    );
+    if(!ok)return;
+    const per=`${IM.periodoAnio}-${String(IM.periodoMes).padStart(2,'0')}`;
+    S.compras=S.compras.filter(d=>(d.fecha||'').slice(0,7)!==per);
+  }
+
   // Crear registros de compras
   let agregados=0,normalizados=0;
+  const sinCorr=[];   // docs que quedaron sin correlativo (se asigna al final)
   const ts=Date.now();
   // Reservar el rango de folios de comprobante ANTES de crear los docs, así
   // cada uno recibe un correlativo único y consecutivo aunque el import
   // se interrumpa a mitad.
-  let folioNext=proxFolioComprobante();
+  // Los folios de comprobante se asignan DESPUÉS de crear los documentos: al
+  // sobrescribir, los que se conservan mantienen el suyo y los nuevos deben
+  // tomar números que no choquen con ellos.
+  const sinFolio=[];
   incluidos.forEach((d,i)=>{
     const fechaFinal=fechaEfectivaImport(d);
     if(fechaFinal!==d.fechaOriginal)normalizados++;
@@ -789,11 +949,20 @@ function confirmarImportacion(){
     // DTE 46 (factura de compra): el IVA lo retiene el receptor, así que el
     // proveedor solo recibe `total` (= neto). El gasto es igual al total.
     const montoDist=+d.tipoDTE===46 ? d.total : (d.total-d.iva);
+    // En modo sobrescribir recuperamos lo que ya estaba registrado para este
+    // mismo documento: correlativo, folio de comprobante, vencimiento y la
+    // distribución de gastos si sigue cuadrando con el nuevo neto.
+    const prev=modo==='sobrescribir'?prevPorClave.get(claveDocCompra(d)):null;
+    let dist=[{cuenta:d.cuenta,monto:montoDist,cc:d.cc||''}];
+    if(prev&&Array.isArray(prev.dist)&&prev.dist.length>1){
+      const sumPrev=prev.dist.reduce((s,l)=>s+(l.monto||0),0);
+      if(Math.abs(sumPrev-montoDist)<=1)dist=prev.dist.map(l=>({...l}));
+    }
     const doc={
-      id:'c_imp_'+ts+'_'+i,
-      folioComp:folioNext++,   // correlativo único de comprobante contable
+      id:prev?prev.id:'c_imp_'+ts+'_'+i,
+      folioComp:(prev&&+prev.folioComp)||0,   // correlativo único de comprobante contable
       fecha:fechaFinal,
-      fechaVencimiento:'',
+      fechaVencimiento:prev?.fechaVencimiento||'',
       tipoDTE:d.tipoDTE,
       numero:d.numero,
       rutCodigo:d.rutCodigo,
@@ -808,11 +977,47 @@ function confirmarImportacion(){
       // Guardamos el valor original por si se necesita para reportes SII.
       otrosImpuestosOriginal:d.otrosImpuestos||0,
       total:d.total,
-      dist:[{cuenta:d.cuenta,monto:montoDist,cc:d.cc||''}]
+      dist
     };
+    // Correlativo mensual: se reutiliza el del documento anterior si existía.
+    if(prev&&typeof prev.corrMes==='number')doc.corrMes=prev.corrMes;
+    else sinCorr.push(doc);
+    if(!doc.folioComp)sinFolio.push(doc);
     S.compras.push(doc);
     agregados++;
   });
+
+  // Asignar folio de comprobante a los documentos que no heredaron uno,
+  // saltando los que ya están ocupados en todo el sistema.
+  if(sinFolio.length){
+    const usadosF=new Set();
+    (S.asientos||[]).forEach(a=>{const n=+a.folioComp||+a.n||0;if(n)usadosF.add(n);});
+    (S.compras||[]).forEach(d=>{const n=+d.folioComp||0;if(n)usadosF.add(n);});
+    (S.ventas||[]).forEach(d=>{const n=+d.folioComp||0;if(n)usadosF.add(n);});
+    if(S.apertura?.folioComp)usadosF.add(+S.apertura.folioComp);
+    let fn=proxFolioComprobante();
+    sinFolio.forEach(doc=>{while(usadosF.has(fn))fn++;doc.folioComp=fn;usadosF.add(fn);});
+  }
+
+  // Asignar correlativo a los documentos nuevos: se toman los números libres
+  // del mes (los huecos que dejaron los documentos eliminados), de modo que el
+  // libro quede numerado de 1 a N sin saltos.
+  if(sinCorr.length){
+    const usados={};
+    S.compras.forEach(d=>{
+      if(typeof d.corrMes!=='number')return;
+      const m=(d.fecha||'').slice(0,7);if(!m)return;
+      (usados[m]||(usados[m]=new Set())).add(d.corrMes);
+    });
+    sinCorr.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||String(a.numero).localeCompare(String(b.numero)))
+      .forEach(doc=>{
+        const m=(doc.fecha||'').slice(0,7);if(!m)return;
+        const set=usados[m]||(usados[m]=new Set());
+        let n=1;while(set.has(n))n++;
+        doc.corrMes=n;set.add(n);
+      });
+  }
+
   window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>toast('❌ Error guardando en storage','e'));
 
   // Guardar cuenta y CC como default en la ficha del proveedor.
@@ -862,11 +1067,16 @@ function confirmarImportacion(){
   }
 
   cerrarImportModal();
-  const periodoStr=`${MESES[IM.periodoMes-1]} ${IM.periodoAnio}`;
+  const periodoStr=periodoStrConf;
   const msgProv=proveedoresNuevos.size?` · ${proveedoresNuevos.size} proveedor${proveedoresNuevos.size===1?'':'es'} nuevo${proveedoresNuevos.size===1?'':'s'} detectado${proveedoresNuevos.size===1?'':'s'} en auxiliares`:'';
   const msgFichas=(fichasCreadas||fichasActualizadas)?` · fichas: ${fichasCreadas} nuevas${fichasActualizadas?', '+fichasActualizadas+' completadas':''}`:'';
-  toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${normalizados?` (${normalizados} con fecha normalizada)`:''}${msgProv}${msgFichas}`);
-  logAccion('Importó compras SII',`${agregados} documentos${msgFichas}`);
+  if(modo==='sobrescribir'){
+    toast(`♻️ ${periodoStr} reemplazado — ${agregados} documento${agregados===1?'':'s'} · ${reemplazados} conservaron su correlativo${depurados?` · ${depurados} eliminado${depurados===1?'':'s'}`:''}${msgFichas}`);
+    logAccion('Sobrescribió compras SII',`${periodoStr}: ${agregados} documentos, ${reemplazados} correlativos reutilizados, ${depurados} eliminados`);
+  }else{
+    toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${normalizados?` (${normalizados} con fecha normalizada)`:''}${msgProv}${msgFichas}`);
+    logAccion('Importó compras SII',`${agregados} documentos${msgFichas}`);
+  }
   rerender();
 }
 
@@ -880,5 +1090,6 @@ function initImportListener(){
 }
 
 
-export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setImportCC, aplicarCCATodos, setBulkCuentaImp, confirmarImportacion, initImportListener,
+export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen,
+        renderCDupAlert, gruposDuplicadosCompras, verDuplicadoC, cambiarModoImport, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setImportCC, aplicarCCATodos, setBulkCuentaImp, confirmarImportacion, initImportListener,
         toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, CF};

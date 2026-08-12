@@ -35,54 +35,66 @@ function genDiario(){
     const m=i+1;
     const fecha=`${anio}-${String(m).padStart(2,'0')}-28`;
 
-    // VENTAS del mes — asiento agregado
+    // VENTAS del mes — UN ASIENTO POR CADA DOCUMENTO (mismo criterio que
+    // compras): así el auxiliar de clientes y el libro mayor muestran cada
+    // movimiento con su folio, fecha real y RUT. Las NC (signo -1) invierten
+    // los lados automáticamente.
     const vs=vPorMes[m]||[];
     if(vs.length){
-      // Acumuladores
-      let debBanco=0,debDeudores=0,debClientes=0;
-      let crFacturas=0,crBoletas=0,crTerceros=0;
-      let crIvaDebito=0;
-      vs.forEach(d=>{
-        const signo=(dteV(d.tipoDTE)?.signo)||1;
+      vs.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).forEach(d=>{
+        const signo=(dteV(d.tipoDTE)?.signo)||1;   // NC: -1, resto: +1
+        const dteInfo=dteV(d.tipoDTE);
+        const nombreDoc=dteInfo?.nm||('DTE '+d.tipoDTE);
+        const glosa=`${nombreDoc} N°${d.numero} — ${d.razonSocial||'cliente'}`;
+        const movs=[];
+
         const totSig=(d.total||0)*signo;
         const netoSig=(d.neto||0)*signo;
         const exentoSig=(d.exento||0)*signo;
         const otrosSig=(d.otrosImpuestos||0)*signo;
         const ivaSig=(d.iva||0)*signo;
-        // Débito según forma pago
-        if(d.formaPago==='banco')debBanco+=totSig;
-        else if(d.formaPago==='deudores')debDeudores+=totSig;
-        else debClientes+=totSig; // clientes (default)
-        // Crédito según DTE — otros impuestos también se suman al ingreso
-        const dte=dteV(d.tipoDTE);
-        const cuenta=dte?dte.cuenta:'4101002';
         const ingSig=netoSig+exentoSig+otrosSig;
-        if(cuenta==='4101002')crFacturas+=ingSig;
-        else if(cuenta==='4101003')crBoletas+=ingSig;
-        else crTerceros+=ingSig;
-        crIvaDebito+=ivaSig;
+
+        // DEBE según forma de pago (banco=contado, clientes=crédito, deudores)
+        const cuentaDeb=d.formaPago==='banco'?'1101201':d.formaPago==='deudores'?'1107003':'1104001';
+        if(totSig){
+          if(cuentaDeb==='1104001'){
+            // Cuenta cliente con TODOS los datos del auxiliar (RUT, folio, DTE)
+            const desc=`${d.razonSocial||''} · ${nombreDoc} N°${d.numero}`.trim();
+            if(totSig>0)movs.push({cd:'1104001',nm:pdcNm('1104001'),debe:totSig,haber:0,desc,rutCodigo:d.rutCodigo,rutDV:d.rutDV,folio:d.numero,tipoDTE:d.tipoDTE});
+            else movs.push({cd:'1104001',nm:pdcNm('1104001'),debe:0,haber:-totSig,desc,rutCodigo:d.rutCodigo,rutDV:d.rutDV,folio:d.numero,tipoDTE:d.tipoDTE});
+          }else{
+            if(totSig>0)movs.push({cd:cuentaDeb,nm:pdcNm(cuentaDeb),debe:totSig,haber:0});
+            else movs.push({cd:cuentaDeb,nm:pdcNm(cuentaDeb),debe:0,haber:-totSig});
+          }
+        }
+        // HABER: ingreso por venta según DTE
+        const cuentaIng=dteInfo?dteInfo.cuenta:'4101002';
+        if(ingSig){
+          if(ingSig>0)movs.push({cd:cuentaIng,nm:pdcNm(cuentaIng),debe:0,haber:ingSig});
+          else movs.push({cd:cuentaIng,nm:pdcNm(cuentaIng),debe:-ingSig,haber:0});
+        }
+        // HABER: IVA débito fiscal
+        if(ivaSig){
+          if(ivaSig>0)movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:0,haber:ivaSig});
+          else movs.push({cd:'2103003',nm:pdcNm('2103003'),debe:-ivaSig,haber:0});
+        }
+
+        if(movs.length){
+          entries.push({
+            n:d.folioComp||n++,
+            fecha:d.fecha,
+            glosa,
+            movs,
+            origen:'auto',
+            fuente:'ventas',
+            docId:d.id,
+            tipoDTE:d.tipoDTE,
+            folio:d.numero,
+            rutCodigo:d.rutCodigo,
+          });
+        }
       });
-      const movs=[];
-      // Cuando el mes tiene más NC que facturas en algún concepto, invertir el
-      // lado del asiento (los débitos negativos pasan a haber y viceversa).
-      const pushDeb=(cd,v,desc)=>{
-        if(!v)return;
-        if(v>0)movs.push(desc?{cd,nm:pdcNm(cd),debe:v,haber:0,desc}:{cd,nm:pdcNm(cd),debe:v,haber:0});
-        else movs.push(desc?{cd,nm:pdcNm(cd),debe:0,haber:-v,desc}:{cd,nm:pdcNm(cd),debe:0,haber:-v});
-      };
-      const pushCr=(cd,v,desc)=>{
-        if(!v)return;
-        if(v>0)movs.push(desc?{cd,nm:pdcNm(cd),debe:0,haber:v,desc}:{cd,nm:pdcNm(cd),debe:0,haber:v});
-        else movs.push(desc?{cd,nm:pdcNm(cd),debe:-v,haber:0,desc}:{cd,nm:pdcNm(cd),debe:-v,haber:0});
-      };
-      pushDeb('1101201',debBanco);
-      pushDeb('1104001',debClientes,'Auxiliar clientes');
-      pushDeb('1107003',debDeudores);
-      pushCr('4101002',crFacturas);
-      pushCr('4101003',crBoletas);
-      pushCr('4101003',crTerceros);
-      pushCr('2103003',crIvaDebito);
-      if(movs.length)entries.push({n:n++,fecha,glosa:`Resumen ventas ${mesNm} ${anio} (${vs.length} doc.)`,movs,origen:'auto',fuente:'ventas',mes:m,anio});
     }
 
     // COMPRAS del mes — asiento agregado (CREDITO A PROVEEDORES)

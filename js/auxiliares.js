@@ -11,12 +11,14 @@ import {rerender} from './ui.js';
 let AUX_TAB='c';       // 'c'=clientes | 'p'=proveedores
 let AUX_VIEW='detalle';// 'detalle' | 'aging'
 let AUX_Q='';          // texto de búsqueda (RUT o razón social)
+let AUX_VER_TODOS=false;// mostrar el listado completo sin buscar
 let AUX_DATA=null;     // cache de {clientes,proveedores} para re-render al buscar
 
 // ═══ AUXILIARES ═══
 function setAuxTab(t){
   AUX_TAB=t;
   AUX_Q='';  // al cambiar entre clientes/proveedores, limpiar la búsqueda
+  AUX_VER_TODOS=false;
   document.getElementById('aux-tab-c').classList.toggle('active',t==='c');
   document.getElementById('aux-tab-p').classList.toggle('active',t==='p');
   renderAuxiliares();
@@ -30,7 +32,18 @@ function setAuxView(v){
 }
 function setAuxQ(v){
   AUX_Q=v;
+  if(v)AUX_VER_TODOS=false;  // escribir una búsqueda desactiva "ver todos"
   renderAuxLista();
+}
+function verTodosAux(){
+  AUX_VER_TODOS=true;
+  AUX_Q='';
+  renderAuxiliares();  // re-render completo para limpiar el input de búsqueda
+}
+function ocultarTodosAux(){
+  AUX_VER_TODOS=false;
+  AUX_Q='';
+  renderAuxiliares();
 }
 function toggleAux(id){
   const el=document.getElementById(id);if(!el)return;
@@ -113,6 +126,7 @@ function renderAuxiliares(){
       <input type="text" id="aux-search" placeholder="RUT o razón social del ${AUX_TAB==='c'?'cliente':'proveedor'}…" value="${AUX_Q.replace(/"/g,'&quot;')}"
         oninput="setAuxQ(this.value)" style="min-width:240px">
       ${AUX_Q?`<button class="btn btn-g" onclick="setAuxQ('')">Limpiar</button>`:''}
+      ${AUX_VER_TODOS?`<button class="btn btn-g" onclick="ocultarTodosAux()">Ocultar</button>`:`<button class="btn btn-i" onclick="verTodosAux()">📋 Ver todos</button>`}
       <span class="doc-count" id="aux-count"></span>
     </div>
     <div id="aux-lista"></div>`;
@@ -130,28 +144,30 @@ function renderAuxLista(){
 
   const q=AUX_Q.toLowerCase().trim();
   const hayBusqueda=!!q;
+  const mostrarLista=hayBusqueda||AUX_VER_TODOS;
   const tipoLbl=AUX_TAB==='c'?'clientes':'proveedores';
   const tipoIco=AUX_TAB==='c'?'📇':'🏭';
   const cnt=document.getElementById('aux-count');
 
-  // Sin búsqueda: listado en blanco con instrucción
-  if(!hayBusqueda){
+  // Sin búsqueda ni "ver todos": listado en blanco con instrucción
+  if(!mostrarLista){
     if(cnt)cnt.textContent=`${Object.keys(data).length} ${tipoLbl} en total`;
     el.innerHTML=`<div class="empty" style="padding:36px 20px"><div class="ei">🔎</div>
       Busca un ${AUX_TAB==='c'?'cliente':'proveedor'} para ver su detalle<br>
-      <span style="font-size:11px;color:var(--mt)">Escribe un RUT o razón social. Hay <strong>${Object.keys(data).length}</strong> ${tipoLbl} registrados.</span>
+      <span style="font-size:11px;color:var(--mt)">Escribe un RUT o razón social, o pulsa <strong>Ver todos</strong>. Hay <strong>${Object.keys(data).length}</strong> ${tipoLbl} registrados.</span>
     </div>`;
     return;
   }
 
-  // Filtrar por RUT o razón social
+  // Filtrar por RUT o razón social (si no hay búsqueda, pasan todos)
   const filtrado={};
   Object.keys(data).forEach(k=>{
     const a=data[k];
+    if(!hayBusqueda){filtrado[k]=a;return;}
     const txt=((a.rutCodigo||'')+' '+(a.rutDV||'')+' '+(a.razonSocial||'')).toLowerCase();
     if(txt.includes(q))filtrado[k]=a;
   });
-  if(cnt)cnt.textContent=`${Object.keys(filtrado).length} de ${Object.keys(data).length} ${tipoLbl}`;
+  if(cnt)cnt.textContent=hayBusqueda?`${Object.keys(filtrado).length} de ${Object.keys(data).length} ${tipoLbl}`:`${Object.keys(filtrado).length} ${tipoLbl}`;
 
   // Vista Aging (respeta el filtro)
   if(AUX_VIEW==='aging'){renderAuxAging(filtrado,el);return;}
@@ -520,5 +536,5 @@ async function guardarFichaAuxUI(){
   rerender();
 }
 
-export {setAuxTab, setAuxView, setAuxQ, toggleAux, renderAuxiliares, AGING_BUCKETS, diasEntre, calcularAging, toggleAgingDetalle, renderAuxAging, AUX_TAB,
+export {setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux, renderAuxiliares, AGING_BUCKETS, diasEntre, calcularAging, toggleAgingDetalle, renderAuxAging, AUX_TAB,
         abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI};

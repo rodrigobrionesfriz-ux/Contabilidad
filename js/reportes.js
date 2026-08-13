@@ -4,11 +4,35 @@ import {toast, fmtC, fmt, pn, today, MESES, MC, IVA, pdcNm, PDC, CUENTAS_SEL, dt
 import {nav} from './ui.js';
 import {retencionHonorarios} from './indicadores.js';
 import {toggleAgingDetalle} from './auxiliares.js';
+import {mesOpts, mesRango} from './helpers.js';
 import {S} from './state.js';
 import './storage.js';
 
 // ═══ LIBRO DIARIO (auto + manuales) ═══
 let DIARIO_Q='';   // texto de búsqueda del libro diario
+// Filtros de periodo del Libro Diario y del Libro Mayor. El mes es un atajo:
+// al elegirlo se rellenan desde/hasta con el primer y último día del mes.
+let DIA_F={mes:'',desde:'',hasta:''};
+let MAY_F={mes:'',desde:'',hasta:'',q:''};
+
+// Nombre de archivo estándar para las exportaciones
+function nombreArchivoExport(base,f){
+  const emp=(S.empresa.nombre||'contabilidad').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')||'contabilidad';
+  const per=f&&(f.desde||f.hasta)?`_${(f.desde||'inicio')}_a_${(f.hasta||'fin')}`:`_${S.empresa.anio}`;
+  return `${emp}_${base}${per}.xlsx`;
+}
+// Etiqueta legible del periodo aplicado
+function etiquetaPeriodo(f){
+  if(f.mes)return `${MESES[+f.mes-1]} ${S.empresa.anio}`;
+  if(f.desde&&f.hasta)return `${f.desde} a ${f.hasta}`;
+  if(f.desde)return `desde ${f.desde}`;
+  if(f.hasta)return `hasta ${f.hasta}`;
+  return `Ejercicio ${S.empresa.anio}`;
+}
+// Ancho de columnas para las hojas exportadas
+function anchosXLSX(hdr,rows){
+  return hdr.map((h,i)=>({wch:Math.min(46,Math.max(String(h).length+2,...rows.slice(0,400).map(r=>String(r[i]??'').length+2)))}));
+}
 function genDiario(){
   const entries=[];let n=1;const anio=S.empresa.anio;
 
@@ -251,12 +275,18 @@ function renderDiario(){
     </div>`;
   }
 
-  // Buscador (por N°, glosa o cuenta). Solo re-renderiza la lista, no el input.
+  // Filtros de periodo + buscador. Solo re-renderiza la tabla, no la barra,
+  // para no perder el foco del input al teclear (importante en móvil).
   const buscador=`<div class="filter-row" style="margin-bottom:12px">
+    <span class="f-lbl">Periodo:</span>
+    <select id="diario-mes" onchange="onDiarioMes(this.value)">${mesOpts(DIA_F.mes)}</select>
+    <input type="date" id="diario-desde" value="${DIA_F.desde}" onchange="setDiarioFecha('desde',this.value)" title="Desde">
+    <input type="date" id="diario-hasta" value="${DIA_F.hasta}" onchange="setDiarioFecha('hasta',this.value)" title="Hasta">
     <span class="f-lbl">Buscar:</span>
-    <input type="text" id="diario-search" placeholder="N° comprobante, glosa o cuenta…" value="${DIARIO_Q.replace(/"/g,'&quot;')}"
-      oninput="setDiarioQ(this.value)" style="min-width:240px">
-    ${DIARIO_Q?`<button class="btn btn-g" onclick="setDiarioQ('')">Limpiar</button>`:''}
+    <input type="text" id="diario-search" placeholder="N° comprobante, glosa, cuenta o RUT…" value="${DIARIO_Q.replace(/"/g,'&quot;')}"
+      oninput="setDiarioQ(this.value)" style="min-width:230px">
+    <button class="btn btn-g" onclick="limpiarFiltrosDiario()">Limpiar</button>
+    <button class="btn btn-i" onclick="exportarDiarioExcel()" title="Descargar el Libro Diario en Excel">📊 Excel</button>
     <span class="doc-count" id="diario-count"></span>
   </div>`;
 
@@ -264,50 +294,78 @@ function renderDiario(){
   renderDiarioTabla();
 }
 
+// ── Filtros del Libro Diario ──
+function onDiarioMes(v){
+  DIA_F.mes=v;
+  if(v){const r=mesRango(+v);DIA_F.desde=r.desde;DIA_F.hasta=r.hasta;}
+  else{DIA_F.desde='';DIA_F.hasta='';}
+  const d=document.getElementById('diario-desde'),h=document.getElementById('diario-hasta');
+  if(d)d.value=DIA_F.desde;if(h)h.value=DIA_F.hasta;
+  renderDiarioTabla();
+}
+function setDiarioFecha(k,v){
+  DIA_F[k]=v;
+  // Ajustar el rango a mano desactiva el atajo de mes
+  DIA_F.mes='';const s=document.getElementById('diario-mes');if(s)s.value='';
+  renderDiarioTabla();
+}
+function limpiarFiltrosDiario(){
+  DIA_F={mes:'',desde:'',hasta:''};DIARIO_Q='';
+  renderDiario();
+}
+// Aplica periodo + búsqueda a los asientos del diario
+function filtrarDiario(entries){
+  const {desde,hasta}=DIA_F;
+  const q=DIARIO_Q.toLowerCase().trim();
+  return entries.filter(e=>{
+    const f=e.fecha||'';
+    if(desde&&f<desde)return false;
+    if(hasta&&f>hasta)return false;
+    if(!q)return true;
+    if(String(e.n||'').includes(q))return true;
+    if((e.glosa||'').toLowerCase().includes(q))return true;
+    return e.movs.some(m=>String(m.cd).includes(q)
+      ||(m.nm||pdcNm(m.cd)||'').toLowerCase().includes(q)
+      ||(m.desc||'').toLowerCase().includes(q));
+  });
+}
+
 // Renderiza SOLO la tabla del diario (depende de la búsqueda). Separado para
 // no destruir el input de búsqueda al teclear (evita perder foco en móvil).
 function renderDiarioTabla(){
   const box=document.getElementById('diario-tabla');
   if(!box)return;
-  let entries=genDiario();
+  const todasEntries=genDiario();
+  let entries=filtrarDiario(todasEntries);
 
-  const q=DIARIO_Q.toLowerCase().trim();
-  const hayBusqueda=!!q;
-  if(hayBusqueda){
-    entries=entries.filter(e=>{
-      if(String(e.n||'').includes(q))return true;
-      if((e.glosa||'').toLowerCase().includes(q))return true;
-      return e.movs.some(m=>String(m.cd).includes(q)||(m.nm||pdcNm(m.cd)||'').toLowerCase().includes(q));
-    });
-  }
-
+  const hayFiltro=!!(DIARIO_Q.trim()||DIA_F.desde||DIA_F.hasta);
   const totalDisp=entries.length;
-  // Sin búsqueda: solo los últimos 5 (más recientes). genDiario viene ascendente.
+  // Sin ningún filtro: solo los últimos 5 (más recientes). genDiario viene ascendente.
   const LIMITE_DIA=5;
   let ocultos=0;
-  if(!hayBusqueda&&entries.length>LIMITE_DIA){
+  if(!hayFiltro&&entries.length>LIMITE_DIA){
     ocultos=entries.length-LIMITE_DIA;
     entries=entries.slice(-LIMITE_DIA);
   }
 
   const cnt=document.getElementById('diario-count');
-  if(cnt)cnt.textContent=hayBusqueda?`${totalDisp} resultado${totalDisp===1?'':'s'}`:'';
+  if(cnt)cnt.textContent=hayFiltro?`${totalDisp} asiento${totalDisp===1?'':'s'} · ${etiquetaPeriodo(DIA_F)}`:'';
 
   if(!entries.length){
-    box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--mt)">No hay asientos que coincidan con la búsqueda.</div>`;
+    box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--mt)">No hay asientos que coincidan con el filtro.</div>`;
     return;
   }
 
   let aviso='';
   if(ocultos){
     aviso=`<div style="background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.25);color:var(--info);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px">
-      📖 Mostrando los <strong>${LIMITE_DIA} asientos más recientes</strong> de ${totalDisp}. Usa el buscador para ver el resto.
+      📖 Mostrando los <strong>${LIMITE_DIA} asientos más recientes</strong> de ${totalDisp}. Filtra por mes, rango de fechas o búsqueda para ver el resto.
     </div>`;
   }
 
-  // Totales SIEMPRE sobre todo el diario (no solo lo visible).
+  // Totales: del periodo filtrado si hay filtro, de todo el diario si no.
   let tD=0,tH=0;
-  genDiario().forEach(e=>{tD+=e.movs.reduce((s,m)=>s+m.debe,0);tH+=e.movs.reduce((s,m)=>s+m.haber,0);});
+  filtrarDiario(todasEntries).forEach(e=>{tD+=e.movs.reduce((s,m)=>s+m.debe,0);tH+=e.movs.reduce((s,m)=>s+m.haber,0);});
 
   let h=aviso+`<div class="card-np"><div class="tw"><table>
     <thead><tr><th class="tl" style="width:38px">N°</th><th class="tl" style="width:92px">FECHA</th><th class="tl">GLOSA / CUENTA</th><th class="tl" style="width:82px">CÓD.</th><th style="min-width:110px">DEBE</th><th style="min-width:110px">HABER</th><th class="tl" style="width:65px">ORIGEN</th></tr></thead><tbody>`;
@@ -325,10 +383,54 @@ function renderDiarioTabla(){
     });
   });
   const ok=Math.abs(tD-tH)<1;
-  h+=`</tbody><tfoot><tr><td class="tl" colspan="4">TOTALES${!hayBusqueda&&ocultos?' (todo el diario)':''}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tD)}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tH)}</td><td></td></tr></tfoot></table></div></div>`;
+  h+=`</tbody><tfoot><tr><td class="tl" colspan="4">TOTALES ${hayFiltro?'— '+etiquetaPeriodo(DIA_F):(ocultos?'(todo el diario)':'')}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tD)}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tH)}</td><td></td></tr></tfoot></table></div></div>`;
   h+=`<div style="margin-top:10px;font-size:12px;color:${ok?'var(--ach)':'var(--err)'}">
-    ${ok?'✅ Partida doble cuadrada — Debe = Haber = '+fmtC(tD):'⚠️ Descuadre global: Debe '+fmtC(tD)+' | Haber '+fmtC(tH)+' | Diferencia '+fmtC(Math.abs(tD-tH))}</div>`;
+    ${ok?'✅ Partida doble cuadrada — Debe = Haber = '+fmtC(tD):'⚠️ Descuadre: Debe '+fmtC(tD)+' | Haber '+fmtC(tH)+' | Diferencia '+fmtC(Math.abs(tD-tH))}</div>`;
   box.innerHTML=h;
+}
+
+// ── Exportar Libro Diario a Excel (respeta los filtros activos) ──
+function exportarDiarioExcel(){
+  try{
+    if(typeof XLSX==='undefined'){toast('⚠️ Biblioteca Excel no cargada (¿sin internet?)','e');return;}
+    const entries=filtrarDiario(genDiario());
+    if(!entries.length){toast('⚠️ No hay asientos que exportar con el filtro actual','e');return;}
+    const hdr=['N°','FECHA','GLOSA','CÓDIGO','CUENTA','DESCRIPCIÓN','DEBE','HABER','ORIGEN'];
+    const rows=[];
+    let tD=0,tH=0;
+    entries.forEach(e=>{
+      const org=e.origen==='manual'?'Manual':(e.origen==='apertura'?'Apertura':'Automático');
+      e.movs.forEach(m=>{
+        tD+=m.debe||0;tH+=m.haber||0;
+        rows.push([e.n,e.fecha,e.glosa||'',m.cd,m.nm||pdcNm(m.cd)||'',m.desc||'',
+          Math.round(m.debe||0),Math.round(m.haber||0),org]);
+      });
+    });
+    rows.push(['','','TOTALES','','','',Math.round(tD),Math.round(tH),'']);
+    const ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);
+    ws['!cols']=anchosXLSX(hdr,rows);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Libro Diario');
+    // Portada con los datos del contribuyente y el periodo exportado
+    const meta=[
+      ['LIBRO DIARIO'],
+      ['Empresa',S.empresa.nombre||''],
+      ['RUT',S.empresa.rut||''],
+      ['Giro',S.empresa.giro||''],
+      ['Periodo',etiquetaPeriodo(DIA_F)],
+      ['Búsqueda',DIARIO_Q||'(sin filtro de texto)'],
+      ['Asientos',entries.length],
+      ['Total Debe',Math.round(tD)],
+      ['Total Haber',Math.round(tH)],
+      ['Diferencia',Math.round(tD-tH)],
+      ['Generado',new Date().toLocaleString('es-CL')],
+    ];
+    const wsm=XLSX.utils.aoa_to_sheet(meta);
+    wsm['!cols']=[{wch:16},{wch:46}];
+    XLSX.utils.book_append_sheet(wb,wsm,'Datos');
+    XLSX.writeFile(wb,nombreArchivoExport('libro_diario',DIA_F));
+    toast(`✅ Libro Diario exportado — ${entries.length} asiento${entries.length===1?'':'s'}, ${rows.length-1} líneas`);
+  }catch(e){toast('❌ Error al exportar: '+e.message,'e');}
 }
 
 function setDiarioQ(v){
@@ -362,17 +464,61 @@ function editarAsientoRef(n){
 }
 
 // ═══ MAYOR ═══
-function buildMayor(){
+// buildMayor(desde,hasta) — sin argumentos se comporta exactamente igual que
+// antes (todo el ejercicio). Con rango, los movimientos anteriores a `desde` se
+// acumulan en `saldoAnterior` (como corresponde a un mayor por periodo) y los
+// posteriores a `hasta` se ignoran. El saldo final sigue siendo
+// saldoAnterior + debe − haber, así que Balance y Resultados no cambian.
+function buildMayor(desde,hasta){
   const M={};
   genDiario().forEach(e=>{
+    const f=e.fecha||'';
+    const antes=!!(desde&&f<desde);
+    const despues=!!(hasta&&f>hasta);
     e.movs.forEach(m=>{
-      if(!M[m.cd])M[m.cd]={nm:m.nm||pdcNm(m.cd),debe:0,haber:0,movs:[]};
+      if(!M[m.cd])M[m.cd]={nm:m.nm||pdcNm(m.cd),debe:0,haber:0,saldoAnterior:0,movs:[]};
+      if(antes){M[m.cd].saldoAnterior+=m.debe-m.haber;return;}
+      if(despues)return;
       M[m.cd].debe+=m.debe;M[m.cd].haber+=m.haber;
-      M[m.cd].movs.push({fecha:e.fecha,glosa:e.glosa,debe:m.debe,haber:m.haber});
+      M[m.cd].movs.push({n:e.n,fecha:e.fecha,glosa:e.glosa,desc:m.desc||'',debe:m.debe,haber:m.haber});
     });
   });
-  Object.values(M).forEach(a=>{let s=0;a.movs.forEach(m=>{s+=m.debe-m.haber;m.saldo=s;});a.saldo=a.debe-a.haber;});
+  Object.values(M).forEach(a=>{let s=a.saldoAnterior;a.movs.forEach(m=>{s+=m.debe-m.haber;m.saldo=s;});a.saldo=a.saldoAnterior+a.debe-a.haber;});
   return M;
+}
+
+// ── Filtros del Libro Mayor ──
+function onMayorMes(v){
+  MAY_F.mes=v;
+  if(v){const r=mesRango(+v);MAY_F.desde=r.desde;MAY_F.hasta=r.hasta;}
+  else{MAY_F.desde='';MAY_F.hasta='';}
+  const d=document.getElementById('mayor-desde'),h=document.getElementById('mayor-hasta');
+  if(d)d.value=MAY_F.desde;if(h)h.value=MAY_F.hasta;
+  renderMayorTabla();
+}
+function setMayorFecha(k,v){
+  MAY_F[k]=v;
+  MAY_F.mes='';const s=document.getElementById('mayor-mes');if(s)s.value='';
+  renderMayorTabla();
+}
+function setMayorQ(v){MAY_F.q=v;renderMayorTabla();}
+function limpiarFiltrosMayor(){
+  MAY_F={mes:'',desde:'',hasta:'',q:''};
+  renderMayor();
+}
+// Cuentas visibles según periodo y búsqueda (código, nombre o glosa del movimiento)
+function cuentasMayorFiltradas(M){
+  const q=(MAY_F.q||'').toLowerCase().trim();
+  const hayPeriodo=!!(MAY_F.desde||MAY_F.hasta);
+  return Object.keys(M).filter(cd=>{
+    const a=M[cd];
+    // Con periodo activo, ocultar cuentas sin movimientos ni saldo de arrastre
+    if(hayPeriodo&&!a.movs.length&&Math.abs(a.saldoAnterior)<0.5)return false;
+    if(!q)return true;
+    if(cd.toLowerCase().includes(q))return true;
+    if((a.nm||'').toLowerCase().includes(q))return true;
+    return a.movs.some(m=>(m.glosa||'').toLowerCase().includes(q)||(m.desc||'').toLowerCase().includes(q));
+  }).sort();
 }
 
 // Construye el Mayor de OTRO año leyendo su storage, sin alterar el estado actual.
@@ -419,9 +565,40 @@ function fmtVar(actual,anterior){
   return {txt:(pct>0?'+':'')+pct.toFixed(1)+'%',color,sig,dif};
 }
 function renderMayor(){
-  const M=buildMayor(),el=document.getElementById('mayor-content');
-  const keys=Object.keys(M);
-  if(!keys.length){el.innerHTML=`<div class="empty"><div class="ei">📊</div>No hay movimientos.</div>`;return;}
+  const el=document.getElementById('mayor-content');
+  if(!Object.keys(buildMayor()).length){el.innerHTML=`<div class="empty"><div class="ei">📊</div>No hay movimientos.</div>`;return;}
+  // Barra de filtros fija; solo se re-renderiza el contenido al filtrar.
+  el.innerHTML=`<div class="filter-row" style="margin-bottom:12px">
+    <span class="f-lbl">Periodo:</span>
+    <select id="mayor-mes" onchange="onMayorMes(this.value)">${mesOpts(MAY_F.mes)}</select>
+    <input type="date" id="mayor-desde" value="${MAY_F.desde}" onchange="setMayorFecha('desde',this.value)" title="Desde">
+    <input type="date" id="mayor-hasta" value="${MAY_F.hasta}" onchange="setMayorFecha('hasta',this.value)" title="Hasta">
+    <span class="f-lbl">Buscar:</span>
+    <input type="text" id="mayor-search" placeholder="Código, nombre de cuenta o glosa…" value="${(MAY_F.q||'').replace(/"/g,'&quot;')}"
+      oninput="setMayorQ(this.value)" style="min-width:230px">
+    <button class="btn btn-g" onclick="limpiarFiltrosMayor()">Limpiar</button>
+    <button class="btn btn-i" onclick="exportarMayorExcel()" title="Descargar el Libro Mayor en Excel">📊 Excel</button>
+    <span class="doc-count" id="mayor-count"></span>
+  </div><div id="mayor-tabla"></div>`;
+  renderMayorTabla();
+}
+
+// Renderiza SOLO el contenido del mayor (respeta periodo y búsqueda).
+function renderMayorTabla(){
+  const box=document.getElementById('mayor-tabla');if(!box)return;
+  const M=buildMayor(MAY_F.desde,MAY_F.hasta);
+  const keys=cuentasMayorFiltradas(M);
+  const hayPeriodo=!!(MAY_F.desde||MAY_F.hasta);
+
+  const cnt=document.getElementById('mayor-count');
+  if(cnt)cnt.textContent=`${keys.length} cuenta${keys.length===1?'':'s'} · ${etiquetaPeriodo(MAY_F)}`;
+
+  if(!keys.length){
+    box.innerHTML=`<div style="text-align:center;padding:30px;color:var(--mt)">No hay cuentas que coincidan con el filtro.</div>`;
+    return;
+  }
+
+  // Los KPI se calculan sobre las cuentas visibles del periodo
   const tA=keys.filter(k=>k.startsWith('1')).reduce((s,k)=>s+M[k].saldo,0);
   const tP=keys.filter(k=>k.startsWith('2')&&!k.startsWith('23')).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
   const tC=keys.filter(k=>k.startsWith('3')).reduce((s,k)=>s+M[k].saldo,0);
@@ -432,12 +609,16 @@ function renderMayor(){
     <div class="kpi"><div class="kpi-lbl">Total Ingresos</div><div class="kpi-val pos">${fmtC(tI)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Total Costos</div><div class="kpi-val neg">${fmtC(tC)}</div></div>
   </div>`;
-  keys.sort().forEach(cd=>{
+  keys.forEach(cd=>{
     const a=M[cd];
+    const filaAnt=hayPeriodo
+      ? `<tr style="background:var(--sf2)"><td class="tl" style="font-family:var(--mono);font-size:10px">—</td><td class="tl" style="font-style:italic;color:var(--mt)">Saldo anterior al ${MAY_F.desde||'inicio'}</td><td>–</td><td>–</td><td style="font-weight:600">${fmtC(Math.abs(a.saldoAnterior))}</td></tr>`
+      : '';
     h+=`<div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div><span style="font-family:var(--mono);font-size:11px;color:var(--mt)">${cd}</span><span style="font-size:14px;font-weight:700;margin-left:10px">${a.nm}</span></div>
-        <div style="display:flex;gap:14px;align-items:center">
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+          ${hayPeriodo?`<span style="font-size:11px;color:var(--mt)">Ant: ${fmtC(a.saldoAnterior)}</span>`:''}
           <span style="font-size:11px;color:var(--mt)">D: ${fmtC(a.debe)}</span>
           <span style="font-size:11px;color:var(--mt)">H: ${fmtC(a.haber)}</span>
           <span class="badge ${a.saldo>=0?'bg':'br'}">Saldo: ${fmtC(Math.abs(a.saldo))}</span>
@@ -445,12 +626,74 @@ function renderMayor(){
       </div>
       <table style="font-size:11px">
         <thead><tr><th class="tl">FECHA</th><th class="tl">GLOSA</th><th>DEBE</th><th>HABER</th><th>SALDO</th></tr></thead><tbody>
-        ${a.movs.map(m=>`<tr><td class="tl" style="font-family:var(--mono);font-size:10px">${m.fecha}</td><td class="tl">${m.glosa}</td><td>${m.debe?fmtC(m.debe):'–'}</td><td>${m.haber?fmtC(m.haber):'–'}</td><td style="font-weight:600">${fmtC(Math.abs(m.saldo))}</td></tr>`).join('')}
+        ${filaAnt}
+        ${a.movs.map(m=>`<tr><td class="tl" style="font-family:var(--mono);font-size:10px">${m.fecha}</td><td class="tl">${m.glosa}${m.desc?` <span style="color:var(--mt)">— ${m.desc}</span>`:''}</td><td>${m.debe?fmtC(m.debe):'–'}</td><td>${m.haber?fmtC(m.haber):'–'}</td><td style="font-weight:600">${fmtC(Math.abs(m.saldo))}</td></tr>`).join('')
+          ||`<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:10px">Sin movimientos en el periodo</td></tr>`}
         </tbody>
       </table>
     </div>`;
   });
-  el.innerHTML=h;
+  box.innerHTML=h;
+}
+
+// ── Exportar Libro Mayor a Excel (respeta los filtros activos) ──
+// Genera dos hojas: "Mayor" con el detalle línea a línea y "Resumen" con los
+// saldos por cuenta (formato balance de comprobación).
+function exportarMayorExcel(){
+  try{
+    if(typeof XLSX==='undefined'){toast('⚠️ Biblioteca Excel no cargada (¿sin internet?)','e');return;}
+    const M=buildMayor(MAY_F.desde,MAY_F.hasta);
+    const keys=cuentasMayorFiltradas(M);
+    if(!keys.length){toast('⚠️ No hay cuentas que exportar con el filtro actual','e');return;}
+    const hayPeriodo=!!(MAY_F.desde||MAY_F.hasta);
+
+    const hdr=['CÓDIGO','CUENTA','N°','FECHA','GLOSA','DESCRIPCIÓN','DEBE','HABER','SALDO'];
+    const rows=[];
+    keys.forEach(cd=>{
+      const a=M[cd];
+      if(hayPeriodo)rows.push([cd,a.nm,'','','Saldo anterior','',0,0,Math.round(a.saldoAnterior)]);
+      a.movs.forEach(m=>rows.push([cd,a.nm,m.n,m.fecha,m.glosa||'',m.desc||'',
+        Math.round(m.debe||0),Math.round(m.haber||0),Math.round(m.saldo)]));
+      rows.push([cd,a.nm,'','','TOTAL CUENTA','',Math.round(a.debe),Math.round(a.haber),Math.round(a.saldo)]);
+    });
+    const ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);
+    ws['!cols']=anchosXLSX(hdr,rows);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Mayor');
+
+    // Hoja resumen — balance de comprobación y saldos
+    const rHdr=['CÓDIGO','CUENTA','SALDO ANTERIOR','DEBE','HABER','SALDO FINAL','MOVIMIENTOS'];
+    let sAnt=0,sD=0,sH=0,sF=0;
+    const rRows=keys.map(cd=>{
+      const a=M[cd];
+      sAnt+=a.saldoAnterior;sD+=a.debe;sH+=a.haber;sF+=a.saldo;
+      return [cd,a.nm,Math.round(a.saldoAnterior),Math.round(a.debe),Math.round(a.haber),Math.round(a.saldo),a.movs.length];
+    });
+    rRows.push(['','TOTALES',Math.round(sAnt),Math.round(sD),Math.round(sH),Math.round(sF),'']);
+    const wsr=XLSX.utils.aoa_to_sheet([rHdr,...rRows]);
+    wsr['!cols']=anchosXLSX(rHdr,rRows);
+    XLSX.utils.book_append_sheet(wb,wsr,'Resumen');
+
+    const meta=[
+      ['LIBRO MAYOR'],
+      ['Empresa',S.empresa.nombre||''],
+      ['RUT',S.empresa.rut||''],
+      ['Giro',S.empresa.giro||''],
+      ['Periodo',etiquetaPeriodo(MAY_F)],
+      ['Búsqueda',MAY_F.q||'(sin filtro de texto)'],
+      ['Cuentas',keys.length],
+      ['Total Debe',Math.round(sD)],
+      ['Total Haber',Math.round(sH)],
+      ['Diferencia',Math.round(sD-sH)],
+      ['Generado',new Date().toLocaleString('es-CL')],
+    ];
+    const wsm=XLSX.utils.aoa_to_sheet(meta);
+    wsm['!cols']=[{wch:16},{wch:46}];
+    XLSX.utils.book_append_sheet(wb,wsm,'Datos');
+
+    XLSX.writeFile(wb,nombreArchivoExport('libro_mayor',MAY_F));
+    toast(`✅ Libro Mayor exportado — ${keys.length} cuenta${keys.length===1?'':'s'}, ${rows.length} líneas`);
+  }catch(e){toast('❌ Error al exportar: '+e.message,'e');}
 }
 
 // ═══ BALANCE ═══
@@ -678,4 +921,6 @@ async function renderResultados(){
 }
 
 
-export {genDiario, renderDiario, setDiarioQ, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados, corregirDesdeDiario, editarAsientoRef};
+export {genDiario, renderDiario, setDiarioQ, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados, corregirDesdeDiario, editarAsientoRef,
+        onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
+        onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel};

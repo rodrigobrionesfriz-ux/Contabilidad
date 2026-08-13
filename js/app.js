@@ -83,7 +83,10 @@ import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
 
 // Reportes
 import {genDiario, renderDiario, setDiarioQ, buildMayor, renderMayor, renderBalance,
-        poblarCmpSelect, onCmpYear, renderResultados, corregirDesdeDiario, editarAsientoRef} from './reportes.js';
+        poblarCmpSelect, onCmpYear, renderResultados, corregirDesdeDiario, editarAsientoRef,
+        onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
+        onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla,
+        exportarMayorExcel} from './reportes.js';
 import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
@@ -406,6 +409,8 @@ Object.assign(window,{
   generarProvisionIncobrables, generarProvisionFeriado, renderCorreccion, previewCM,
   // reportes
   renderDiario, setDiarioQ, renderMayor, renderBalance, onCmpYear, renderResultados,
+  onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
+  onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
   setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux, renderAuxiliares, toggleAgingDetalle,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,

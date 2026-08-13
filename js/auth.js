@@ -36,6 +36,7 @@ const SECCIONES=[
   {id:'empresas',lbl:'Empresas'},
   {id:'centroscosto',lbl:'Centros de Costo'},
   {id:'pdc',lbl:'Plan de Cuentas'},
+  {id:'cargadatos',lbl:'Carga desde Excel'},
   {id:'indicadores',lbl:'Indicadores'},
   {id:'apertura',lbl:'Balance de Apertura'},
   {id:'ventas',lbl:'Libro de Ventas'},

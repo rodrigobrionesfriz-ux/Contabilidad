@@ -367,8 +367,9 @@ function renderDiarioTabla(){
   let tD=0,tH=0;
   filtrarDiario(todasEntries).forEach(e=>{tD+=e.movs.reduce((s,m)=>s+m.debe,0);tH+=e.movs.reduce((s,m)=>s+m.haber,0);});
 
-  let h=aviso+`<div class="card-np"><div class="tw"><table>
-    <thead><tr><th class="tl" style="width:38px">N°</th><th class="tl" style="width:92px">FECHA</th><th class="tl">GLOSA / CUENTA</th><th class="tl" style="width:82px">CÓD.</th><th style="min-width:110px">DEBE</th><th style="min-width:110px">HABER</th><th class="tl" style="width:65px">ORIGEN</th></tr></thead><tbody>`;
+  let h=aviso+`<div class="card-np"><div class="tw"><table class="tbl-fija">
+    <colgroup><col style="width:42px"><col style="width:92px"><col><col style="width:82px"><col style="width:118px"><col style="width:118px"><col style="width:70px"></colgroup>
+    <thead><tr><th class="tl">N°</th><th class="tl">FECHA</th><th class="tl">GLOSA / CUENTA</th><th class="tl">CÓD.</th><th>DEBE</th><th>HABER</th><th class="tl">ORIGEN</th></tr></thead><tbody>`;
   entries.forEach(e=>{
     const eD=e.movs.reduce((s,m)=>s+m.debe,0),eH=e.movs.reduce((s,m)=>s+m.haber,0);
     const asDescuadrado=Math.abs(eD-eH)>1;
@@ -376,10 +377,12 @@ function renderDiarioTabla(){
     const ob=e.origen==='manual'?`<span class="badge bb">Manual</span>`:`<span class="badge" style="background:rgba(130,130,130,.12);color:var(--mt)">Auto</span>`;
     const trStyle=asDescuadrado?' style="background:rgba(248,81,73,.05)"':'';
     const badgeDescuadre=asDescuadrado?' <span style="background:rgba(248,81,73,.15);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">⚠ DESCUADRE</span>':'';
-    h+=`<tr class="rth"${trStyle}><td class="tl">${e.n}</td><td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td><td class="tl" colspan="2">${e.glosa}${badgeDescuadre}</td><td style="${estiloTotal}">${fmtC(eD)}</td><td style="${estiloTotal}">${fmtC(eH)}</td><td>${ob}</td></tr>`;
+    h+=`<tr class="rth"${trStyle}><td class="tl">${e.n}</td><td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td><td class="cel-trunc" colspan="2" title="${attr(e.glosa)}">${e.glosa}${badgeDescuadre}</td><td style="${estiloTotal}">${fmtC(eD)}</td><td style="${estiloTotal}">${fmtC(eH)}</td><td>${ob}</td></tr>`;
     e.movs.forEach(m=>{
       const isH=m.haber>0;
-      h+=`<tr><td></td><td></td><td class="tnm" style="${isH?'padding-left:28px;color:var(--mt)':''}">${m.nm||pdcNm(m.cd)}${m.desc?` <span style="color:var(--mt);font-size:11px">— ${m.desc}</span>`:''}</td><td class="tl" style="font-family:var(--mono);font-size:11px;color:var(--mt)">${m.cd}</td><td>${m.debe?fmtC(m.debe):''}</td><td>${m.haber?fmtC(m.haber):''}</td><td></td></tr>`;
+      const nmC=m.nm||pdcNm(m.cd)||'';
+      const extra=m.desc?` — ${m.desc}`:'';
+      h+=`<tr><td></td><td></td><td class="cel-trunc" title="${attr(nmC+extra)}" style="${isH?'padding-left:28px;color:var(--mt)':''}">${nmC}${extra?`<span style="color:var(--mt);font-size:11px">${extra}</span>`:''}</td><td class="tl" style="font-family:var(--mono);font-size:11px;color:var(--mt)">${m.cd}</td><td>${m.debe?fmtC(m.debe):''}</td><td>${m.haber?fmtC(m.haber):''}</td><td></td></tr>`;
     });
   });
   const ok=Math.abs(tD-tH)<1;
@@ -506,6 +509,18 @@ function limpiarFiltrosMayor(){
   MAY_F={mes:'',desde:'',hasta:'',q:''};
   renderMayor();
 }
+// La descripción de la línea suele repetir lo que ya dice la glosa
+// ("Factura N°539 — PROVEEDOR" + "PROVEEDOR · Factura N°539"). Si todas sus
+// palabras ya están en la glosa, no aporta nada y la omitimos.
+function descAporta(glosa,desc){
+  if(!desc)return false;
+  const norm=t=>String(t).toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi,' ').trim();
+  const g=' '+norm(glosa)+' ';
+  return norm(desc).split(' ').filter(w=>w.length>2).some(w=>!g.includes(' '+w+' '));
+}
+// Escapa comillas para usar el texto dentro de un atributo title
+const attr=t=>String(t||'').replace(/"/g,'&quot;');
+
 // Cuentas visibles según periodo y búsqueda (código, nombre o glosa del movimiento)
 function cuentasMayorFiltradas(M){
   const q=(MAY_F.q||'').toLowerCase().trim();
@@ -612,7 +627,7 @@ function renderMayorTabla(){
   keys.forEach(cd=>{
     const a=M[cd];
     const filaAnt=hayPeriodo
-      ? `<tr style="background:var(--sf2)"><td class="tl" style="font-family:var(--mono);font-size:10px">—</td><td class="tl" style="font-style:italic;color:var(--mt)">Saldo anterior al ${MAY_F.desde||'inicio'}</td><td>–</td><td>–</td><td style="font-weight:600">${fmtC(Math.abs(a.saldoAnterior))}</td></tr>`
+      ? `<tr style="background:var(--sf2)"><td class="tl" style="font-family:var(--mono);font-size:10px">—</td><td class="cel-trunc" style="font-style:italic;color:var(--mt)">Saldo anterior al ${MAY_F.desde||'inicio'}</td><td>–</td><td>–</td><td style="font-weight:600">${fmtC(Math.abs(a.saldoAnterior))}</td></tr>`
       : '';
     h+=`<div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -624,13 +639,18 @@ function renderMayorTabla(){
           <span class="badge ${a.saldo>=0?'bg':'br'}">Saldo: ${fmtC(Math.abs(a.saldo))}</span>
         </div>
       </div>
-      <table style="font-size:11px">
+      <div class="tw"><table class="tbl-fija" style="font-size:11px">
+        <colgroup><col style="width:92px"><col><col style="width:118px"><col style="width:118px"><col style="width:126px"></colgroup>
         <thead><tr><th class="tl">FECHA</th><th class="tl">GLOSA</th><th>DEBE</th><th>HABER</th><th>SALDO</th></tr></thead><tbody>
         ${filaAnt}
-        ${a.movs.map(m=>`<tr><td class="tl" style="font-family:var(--mono);font-size:10px">${m.fecha}</td><td class="tl">${m.glosa}${m.desc?` <span style="color:var(--mt)">— ${m.desc}</span>`:''}</td><td>${m.debe?fmtC(m.debe):'–'}</td><td>${m.haber?fmtC(m.haber):'–'}</td><td style="font-weight:600">${fmtC(Math.abs(m.saldo))}</td></tr>`).join('')
+        ${a.movs.map(m=>{
+          const extra=descAporta(m.glosa,m.desc)?` — ${m.desc}`:'';
+          const txt=(m.glosa||'')+extra;
+          return `<tr><td class="tl" style="font-family:var(--mono);font-size:10px">${m.fecha}</td><td class="cel-trunc" title="${attr(txt)}">${m.glosa||''}${extra?`<span style="color:var(--mt)">${extra}</span>`:''}</td><td>${m.debe?fmtC(m.debe):'–'}</td><td>${m.haber?fmtC(m.haber):'–'}</td><td style="font-weight:600">${fmtC(Math.abs(m.saldo))}</td></tr>`;
+        }).join('')
           ||`<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:10px">Sin movimientos en el periodo</td></tr>`}
         </tbody>
-      </table>
+      </table></div>
     </div>`;
   });
   box.innerHTML=h;

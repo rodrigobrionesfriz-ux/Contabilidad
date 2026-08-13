@@ -43,6 +43,8 @@ import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borr
         setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual,
         revertirCierreMensual} from './centroscosto-ui.js';
 import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
+import {renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
+        initCargaDatosListener, CD} from './cargadatos.js';
 
 // Negocio
 import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
@@ -218,6 +220,7 @@ async function initApp(){
   initImportListener();
   initImportListenerV();
   initImportFichasListener();
+  initCargaDatosListener();
   initBDImportListener();
   initBalanceImportListener();
   bdStatusSet('offline');
@@ -261,6 +264,7 @@ function renderSec(s){
   else if(s==='empresas')renderEmpresas();
   else if(s==='centroscosto')renderCentrosCosto();
   else if(s==='pdc')renderPDC();
+  else if(s==='cargadatos')renderCargaDatos();
   else if(s==='indicadores')renderIndicadores();
   else if(s==='apertura')renderApertura();
   else if(s==='usuarios')renderUsuarios();
@@ -339,7 +343,7 @@ setOnAuthReady(initApp);
 // El HTML usa onclick="renderVentas()" etc. Los módulos ES tienen scope propio,
 // así que hay que publicar esas funciones en window.
 // Objetos de estado usados directamente en onclick del HTML
-Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec});
+Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec, CD});
 
 Object.assign(window,{
   // utilidades
@@ -411,6 +415,7 @@ Object.assign(window,{
   renderDiario, setDiarioQ, renderMayor, renderBalance, onCmpYear, renderResultados,
   onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
   onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
+  renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
   setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux, renderAuxiliares, toggleAgingDetalle,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,

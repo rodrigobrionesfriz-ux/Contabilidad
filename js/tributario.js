@@ -3,6 +3,8 @@ import {fmtC, fmt, MESES, IVA, dteV, dteC, PDC, pdcNm, toast} from './core.js';
 import {retencionHonorarios, getIndicadores} from './indicadores.js';
 import {todosDocsCompras, todosDocsVentas, proxFolioComprobante} from './asientos.js';
 import {inputCuenta} from './buscadorcuentas.js';
+import {buildMayor} from './reportes.js';
+import {calcularLiquidacion, getUF, getUTM} from './remuneraciones.js';
 import {logAccion} from './firebase.js';
 import {rerender} from './ui.js';
 import {savePDC} from './pdc.js';
@@ -28,18 +30,27 @@ function calcularF29Anual(){
     });
     // Compras del mes (crédito fiscal)
     const cs=todosDocsCompras().filter(d=>+d.fecha.slice(5,7)===m);
-    let comprasNetas=0,credito=0;
+    let comprasNetas=0,credito=0,ivaRetenido=0;
     cs.forEach(d=>{
       const signo=(dteC(d.tipoDTE)?.signo)||1;
       comprasNetas+=(d.neto||0)*signo;
       credito+=(d.iva||0)*signo;
+      // DTE 46 (factura de compra): el receptor RETIENE el IVA. Ese mismo monto
+      // es crédito fiscal Y una retención que hay que enterar, así que suma a
+      // ambos lados y su efecto neto sobre lo que se paga es cero. Si sólo se
+      // contara como crédito, el IVA a pagar quedaría subestimado y la cuenta
+      // IVA Débito Fiscal (donde el asiento automático acredita la retención)
+      // arrastraría un saldo que nunca se salda.
+      if(+d.tipoDTE===46)ivaRetenido+=(d.iva||0)*signo;
     });
     // Honorarios del mes → retención del año (código 151)
     const honM=S.honorarios.filter(h=>h.mes===m);
     const retencionHon=Math.round(honM.reduce((s,h)=>s+ +(h.bruto||0),0)*retencionHonorarios(S.empresa.anio));
     // IVA: crédito total = crédito del mes + remanente anterior
+    // Débito total = débito de las ventas + IVA retenido en facturas de compra
     const creditoTotal=credito+remanenteAnt;
-    const ivaDeterminado=debito-creditoTotal;
+    const debitoTotal=debito+ivaRetenido;
+    const ivaDeterminado=debitoTotal-creditoTotal;
     let ivaAPagar=0,remanente=0;
     if(ivaDeterminado>0){ivaAPagar=ivaDeterminado;remanente=0;}
     else{ivaAPagar=0;remanente=-ivaDeterminado;}
@@ -48,7 +59,7 @@ function calcularF29Anual(){
     const ppm=Math.round(basePPM*tasaPPM);
     // Total a pagar en el F29
     const totalPagar=ivaAPagar+ppm+retencionHon;
-    meses.push({m,ventasNetas,ventasExentas,debito,comprasNetas,credito,remanenteAnt,creditoTotal,ivaDeterminado,ivaAPagar,remanente,basePPM,ppm,retencionHon,totalPagar,nDocsV:vs.length,nDocsC:cs.length});
+    meses.push({m,ventasNetas,ventasExentas,debito,ivaRetenido,debitoTotal,comprasNetas,credito,remanenteAnt,creditoTotal,ivaDeterminado,ivaAPagar,remanente,basePPM,ppm,retencionHon,totalPagar,nDocsV:vs.length,nDocsC:cs.length});
     remanenteAnt=remanente;
   }
   return meses;
@@ -80,7 +91,8 @@ function renderF29(){
       <tr class="rth"><td colspan="3" class="tl" style="padding:7px 10px">DÉBITO FISCAL (Ventas)</td></tr>
       ${linea('502','Ventas netas afectas',d.ventasNetas)}
       ${linea('142','Ventas exentas',d.ventasExentas)}
-      ${linea('538','Débito fiscal IVA (19%)',d.debito,{bold:true})}
+      ${linea('538','Débito fiscal IVA (19%)',d.debito,{bold:!d.ivaRetenido})}
+      ${d.ivaRetenido?linea('39','IVA retenido facturas de compra (cambio de sujeto)',d.ivaRetenido,{color:'var(--info)'})+linea('','Débito fiscal total',d.debitoTotal,{bold:true}):''}
       <tr class="rth"><td colspan="3" class="tl" style="padding:7px 10px">CRÉDITO FISCAL (Compras)</td></tr>
       ${linea('520','Compras netas',d.comprasNetas)}
       ${linea('524','Crédito fiscal del mes',d.credito)}
@@ -101,8 +113,10 @@ function renderF29(){
     ${d.tasaPPM===0&&(S.empresa.tasaPPM==null||+S.empresa.tasaPPM===0)?'<div class="info-tip" style="margin-top:12px;font-size:11px">⚠️ La tasa de PPM está en 0%. Configúrala en Empresa → Configuración Tributaria para que se calcule el PPM.</div>':''}
     <div style="margin-top:12px;font-size:10px;color:var(--mt)">Los códigos corresponden al Formulario 29 del SII. Este es un cálculo referencial basado en tus registros; verifica antes de declarar.</div>
   </div>
-  <div id="ivac-content" style="max-width:760px"></div>`;
+  <div id="ivac-content" style="max-width:760px"></div>
+  <div id="pagof29-content" style="max-width:900px"></div>`;
   renderCompensacionIVA();
+  renderPagoF29();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -183,9 +197,11 @@ function calcularCompensacionIVA(mes){
     remanenteReaj=Math.round(remanenteUTM*utmA);
     reajuste=remanenteReaj-d.remanenteAnt;
   }
-  // Recalcular la determinación con el remanente reajustado
+  // Recalcular la determinación con el remanente reajustado.
+  // El débito a saldar incluye el IVA retenido en facturas de compra, porque el
+  // asiento automático de compras lo acredita en la misma cuenta de débito.
   const creditoTotal=d.credito+remanenteReaj;
-  const determinado=d.debito-creditoTotal;
+  const determinado=d.debitoTotal-creditoTotal;
   const ivaAPagar=determinado>0?determinado:0;
   const remanenteNuevo=determinado<0?-determinado:0;
   // Movimiento neto de la cuenta de remanente en el período
@@ -194,8 +210,10 @@ function calcularCompensacionIVA(mes){
   const movs=[];
   const nm=cd=>pdcNm(cd)||cd;
   const per=`${MESES[mes-1]} ${anio}`;
-  // 1) Se salda el IVA Débito Fiscal acumulado en el mes
-  if(d.debito>0)movs.push({cd:c.debito,nm:nm(c.debito),debe:Math.round(d.debito),haber:0,desc:`Débito fiscal ${per} (F29 cód. 538)`});
+  // 1) Se salda el IVA Débito Fiscal acumulado en el mes (ventas + IVA retenido
+  //    en facturas de compra, que el asiento de compras acredita en esta cuenta)
+  if(d.debitoTotal>0)movs.push({cd:c.debito,nm:nm(c.debito),debe:Math.round(d.debitoTotal),haber:0,
+    desc:`Débito fiscal ${per} (F29 cód. 538${d.ivaRetenido?` + ${fmtC(d.ivaRetenido)} retenido en facturas de compra`:''})`});
   // 2) Se salda el IVA Crédito Fiscal del mes
   if(d.credito>0)movs.push({cd:c.credito,nm:nm(c.credito),debe:0,haber:Math.round(d.credito),desc:`Crédito fiscal ${per} (F29 cód. 524)`});
   // 3) Reajuste del remanente arrastrado, si corresponde.
@@ -288,6 +306,7 @@ function renderCompensacionIVA(){
     <div class="card-np" style="margin-bottom:14px"><table><tbody>
       <tr class="rth"><td colspan="2" class="tl" style="padding:7px 10px">DETERMINACIÓN DEL PERÍODO</td></tr>
       <tr><td class="tl" style="font-size:12px">Débito fiscal del mes (cód. 538)</td><td style="font-family:var(--mono)">${fmtC(d.debito)}</td></tr>
+      ${d.ivaRetenido?`<tr><td class="tl" style="font-size:12px;color:var(--info)">IVA retenido en facturas de compra (cambio de sujeto)</td><td style="font-family:var(--mono);color:var(--info)">${fmtC(d.ivaRetenido)}</td></tr>`:''}
       <tr><td class="tl" style="font-size:12px">Crédito fiscal del mes (cód. 524)</td><td style="font-family:var(--mono)">${fmtC(d.credito)}</td></tr>
       ${d.remanenteAnt>0?`<tr><td class="tl" style="font-size:12px">Remanente del mes anterior (cód. 504)</td><td style="font-family:var(--mono)">${fmtC(d.remanenteAnt)}</td></tr>`:''}
       ${r.reajuste!==0?`<tr><td class="tl" style="font-size:12px;color:var(--info)">Reajuste del remanente (art. 27) — ${r.remanenteUTM.toFixed(2)} UTM</td><td style="font-family:var(--mono);color:var(--info)">${fmtC(r.reajuste)}</td></tr>`:''}
@@ -340,7 +359,7 @@ function renderCompensacionIVA(){
       <span>Incluir también el PPM del período (${fmtC(d.ppm)})</span>
     </label>
     <div style="font-size:10px;color:var(--mt);margin-top:-10px;margin-bottom:14px">
-      La retención de honorarios <strong>no</strong> se incluye: ya queda registrada al ingresar cada boleta en la cuenta ${pdcNm('2102006')||'2102006'}.
+      Las retenciones (honorarios, impuesto único, cambio de sujeto) <strong>no</strong> se incluyen acá: se registran al momento de cada operación y se cancelan en el asiento de pago del F29, más abajo.
     </div>
 
     <div style="font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Previsualización del asiento</div>
@@ -385,6 +404,7 @@ function generarAsientoIVA(){
       : '')
     +`Compensación de IVA — ${per}\n\n`
     +`Débito fiscal:   ${fmtC(r.d.debito)}\n`
+    +(r.d.ivaRetenido?`IVA retenido:    ${fmtC(r.d.ivaRetenido)} (facturas de compra)\n`:'')
     +`Crédito fiscal:  ${fmtC(r.d.credito)}\n`
     +(r.d.remanenteAnt>0?`Remanente ant.:  ${fmtC(r.d.remanenteAnt)}${r.reajuste?` (reajustado a ${fmtC(r.remanenteReaj)})`:''}\n`:'')
     +(IVAC.incluirPPM&&r.d.ppm>0?`PPM:             ${fmtC(r.d.ppm)}\n`:'')
@@ -427,6 +447,274 @@ function renderPPM(){
 }
 
 
+// ═══════════════════════════════════════════════════════════════════════
+// ASIENTO DE PAGO DEL F29
+// ═══════════════════════════════════════════════════════════════════════
+//
+// El F29 no paga sólo IVA: en el mismo formulario se enteran las retenciones
+// que la empresa practicó durante el mes actuando como agente retenedor.
+// El asiento de pago cancela esos pasivos contra banco/caja:
+//
+//   DEBE   IVA determinado a pagar .................... cód. 89
+//   DEBE   PPM Primera Categoría ...................... cód. 62
+//   DEBE   Retención boletas de honorarios recibidas .. cód. 151 (Art. 42 N°2)
+//   DEBE   Retención boletas de servicios de terceros . cód. 151 (BTE)
+//   DEBE   Impuesto Único de Segunda Categoría ........ cód. 48 (Art. 74 N°1)
+//   DEBE   IVA retenido en facturas de compra ......... cambio de sujeto
+//   DEBE   Multas, reajustes e intereses (si paga fuera de plazo) → gasto
+//     HABER  Banco / Caja ............................. total enterado
+//
+// Los montos se proponen desde el propio F29 del período (y desde las
+// liquidaciones, para el impuesto único), pero cada línea es editable: lo que
+// manda es lo efectivamente declarado.
+
+const PAGOF29_DEFAULT={
+  iva:'2104002',          // IMPUESTOS POR PAGAR
+  ivaRetenido:'2103003',  // IVA DÉBITO FISCAL (es donde el sistema acredita la retención del DTE 46)
+  ppm:'1108001',          // PAGOS PROVISIONALES MENSUALES (activo: anticipo de impuesto renta)
+  honorarios:'2103002',   // RETENCIÓN 2º CATEGORÍA
+  bte:'2103002',          // RETENCIÓN 2º CATEGORÍA
+  iusc:'2104002',         // IMPUESTOS POR PAGAR (donde lo acredita el asiento de remuneraciones)
+  multas:'3403001',       // OTROS GASTOS NO OPERACIONALES
+  banco:'1101201',        // BANCO ESTADO
+};
+const PAGOF29={cuentas:{...PAGOF29_DEFAULT},montos:{},incluir:null,fecha:'',glosa:'',periodo:''};
+
+// Conceptos que se enteran con el F29. `on` es el estado inicial del checkbox.
+const CONCEPTOS_F29=[
+  {k:'iva',lbl:'IVA determinado a pagar',cod:'89',on:true},
+  {k:'ivaRetenido',lbl:'IVA retenido en facturas de compra (cambio de sujeto)',cod:'',on:false,
+   nota:'El sistema acredita esta retención en IVA Débito Fiscal, así que <strong>ya viene incluida dentro del IVA a pagar</strong> de la compensación. Actívala sólo si la llevas en una cuenta separada.'},
+  {k:'ppm',lbl:'PPM Primera Categoría',cod:'62',on:true,
+   nota:'Va al activo <strong>Pagos Provisionales Mensuales</strong>: es un anticipo de impuesto a la renta, no un gasto. Si ya lo provisionaste en el asiento de compensación, apunta esta línea a la cuenta de provisión.'},
+  {k:'honorarios',lbl:'Retención boletas de honorarios recibidas',cod:'151',on:true},
+  {k:'bte',lbl:'Retención boletas de servicios de terceros (BTE)',cod:'151',on:false,
+   nota:'El sistema no registra BTE todavía: ingresa el monto a mano si emitiste boletas por cuenta de terceros.'},
+  {k:'iusc',lbl:'Impuesto Único de Segunda Categoría (trabajadores)',cod:'48',on:false,
+   nota:'Se estima con las liquidaciones vigentes en Remuneraciones; si no hay trabajadores cargados, ingrésalo a mano. El asiento de remuneraciones lo acredita hoy en <strong>Impuestos por Pagar</strong>, la misma cuenta del IVA: por eso el pendiente aparece mezclado.'},
+  {k:'multas',lbl:'Multas, reajustes e intereses por pago fuera de plazo',cod:'',on:false,gasto:true,
+   nota:'Va a resultado, no es un pasivo previo: sólo si pagas fuera de plazo.'},
+];
+
+// IVA retenido en facturas de compra (DTE 46) del período
+function ivaRetenidoDTE46(mes){
+  return Math.round(todosDocsCompras()
+    .filter(d=>+d.tipoDTE===46&&+((d.fecha||'').slice(5,7))===mes)
+    .reduce((s,d)=>s+(d.iva||0)*((dteC(d.tipoDTE)?.signo)||1),0));
+}
+// Impuesto único estimado con las liquidaciones vigentes
+function iuscEstimado(){
+  try{
+    const uf=getUF(),utm=getUTM();
+    return Math.round((S.trabajadores||[]).reduce((s,t)=>s+(calcularLiquidacion(t,uf,utm).iusc||0),0));
+  }catch(e){return 0;}
+}
+
+// Montos sugeridos por concepto para un mes
+function montosSugeridosF29(mes){
+  const d=calcularF29Anual()[mes-1];
+  const comp=calcularCompensacionIVA(mes);   // respeta el reajuste configurado arriba
+  return {
+    iva:comp.ivaAPagar,
+    ivaRetenido:ivaRetenidoDTE46(mes),
+    ppm:d.ppm,
+    honorarios:d.retencionHon,
+    bte:0,
+    iusc:iuscEstimado(),
+    multas:0,
+  };
+}
+
+// Saldo pendiente (acreedor) de una cuenta a la fecha de pago
+function saldoPendiente(M,cd){
+  const a=M[cd];
+  if(!a)return 0;
+  return -a.saldo;   // pasivo: saldo negativo (debe−haber) ⇒ pendiente positivo
+}
+
+function asientoPagoExistente(periodo){
+  return (S.asientos||[]).find(a=>!a.anulado&&a.origenAuto==='pagof29'&&a.periodoIVA===periodo)||null;
+}
+
+// Fecha legal de pago: día 12 del mes siguiente al período
+function fechaPagoDefault(anio,mes){
+  const y=mes===12?anio+1:anio, m=mes===12?1:mes+1;
+  return `${y}-${String(m).padStart(2,'0')}-12`;
+}
+
+function setPagoF29Cuenta(k,cd){PAGOF29.cuentas[k]=cd;renderPagoF29();}
+function setPagoF29Campo(k,v){PAGOF29[k]=v;renderPagoF29();}
+function setPagoF29Monto(k,v){PAGOF29.montos[k]=Math.max(0,Math.round(+v||0));renderPagoF29();}
+function togglePagoF29(k,on){PAGOF29.incluir[k]=!!on;renderPagoF29();}
+function resetPagoF29(){
+  PAGOF29.cuentas={...PAGOF29_DEFAULT};PAGOF29.montos={};
+  PAGOF29.incluir=Object.fromEntries(CONCEPTOS_F29.map(c=>[c.k,c.on]));
+  renderPagoF29();
+}
+// Repone en una línea el monto sugerido por el sistema
+function usarSugeridoF29(k){delete PAGOF29.montos[k];renderPagoF29();}
+
+// Arma las líneas del asiento de pago
+function calcularPagoF29(mes){
+  const sug=montosSugeridosF29(mes);
+  const anio=S.empresa.anio;
+  const per=`${MESES[mes-1]} ${anio}`;
+  const nm=cd=>pdcNm(cd)||cd;
+  const movs=[];
+  let total=0;
+  CONCEPTOS_F29.forEach(c=>{
+    if(!PAGOF29.incluir[c.k])return;
+    const monto=PAGOF29.montos[c.k]!=null?PAGOF29.montos[c.k]:sug[c.k];
+    if(!monto||monto<=0)return;
+    const cd=PAGOF29.cuentas[c.k];
+    movs.push({cd,nm:nm(cd),debe:Math.round(monto),haber:0,
+      desc:`${c.lbl}${c.cod?` (F29 cód. ${c.cod})`:''} — ${per}`});
+    total+=Math.round(monto);
+  });
+  if(total>0){
+    const cb=PAGOF29.cuentas.banco;
+    movs.push({cd:cb,nm:nm(cb),debe:0,haber:total,desc:`Pago F29 ${per}`});
+  }
+  const tD=movs.reduce((s,m)=>s+m.debe,0),tH=movs.reduce((s,m)=>s+m.haber,0);
+  return {movs,tD,tH,total,sug,cuadra:Math.abs(tD-tH)<1};
+}
+
+function renderPagoF29(){
+  const el=document.getElementById('pagof29-content');if(!el)return;
+  const mes=+(document.getElementById('f29-mes')?.value||1);
+  const anio=S.empresa.anio;
+  const periodo=`${anio}-${String(mes).padStart(2,'0')}`;
+  if(!PAGOF29.incluir)PAGOF29.incluir=Object.fromEntries(CONCEPTOS_F29.map(c=>[c.k,c.on]));
+  if(PAGOF29.periodo!==periodo){PAGOF29.periodo=periodo;PAGOF29.fecha='';PAGOF29.glosa='';PAGOF29.montos={};}
+
+  const r=calcularPagoF29(mes);
+  const yaExiste=asientoPagoExistente(periodo);
+  const fecha=PAGOF29.fecha||fechaPagoDefault(anio,mes);
+  const glosa=PAGOF29.glosa||`Pago F29 ${MESES[mes-1]} ${anio}`;
+  // Saldos del mayor hasta la fecha de pago, como referencia de lo pendiente
+  const M=buildMayor(undefined,fecha);
+  // Cuentas usadas por más de un concepto activo: su saldo es compartido
+  const usoCuenta={};
+  CONCEPTOS_F29.forEach(c=>{if(PAGOF29.incluir[c.k]&&!c.gasto)usoCuenta[PAGOF29.cuentas[c.k]]=(usoCuenta[PAGOF29.cuentas[c.k]]||0)+1;});
+
+  const filas=CONCEPTOS_F29.map(c=>{
+    const on=!!PAGOF29.incluir[c.k];
+    const monto=PAGOF29.montos[c.k]!=null?PAGOF29.montos[c.k]:r.sug[c.k];
+    const editado=PAGOF29.montos[c.k]!=null&&PAGOF29.montos[c.k]!==r.sug[c.k];
+    const cd=PAGOF29.cuentas[c.k];
+    const pend=c.gasto?null:saldoPendiente(M,cd);
+    const compartida=!c.gasto&&usoCuenta[cd]>1;
+    return `<tr style="${on?'':'opacity:.45'}">
+      <td style="text-align:center;width:26px"><input type="checkbox" ${on?'checked':''} onchange="togglePagoF29('${c.k}',this.checked)" style="width:auto"></td>
+      <td class="tnm" style="font-size:12px">
+        ${c.lbl}${c.cod?` <span style="font-family:var(--mono);font-size:10px;color:var(--mt)">cód. ${c.cod}</span>`:''}
+        ${c.nota?`<div style="font-size:10px;color:var(--mt);line-height:1.45;margin-top:2px">${c.nota}</div>`:''}
+      </td>
+      <td style="width:250px">${inputCuenta({id:'pf29-cd-'+c.k,value:cd||'',onPick:`setPagoF29Cuenta('${c.k}','%CD%')`,placeholder:'Cuenta…',clase:'linea-inp'})}</td>
+      <td style="width:130px"><input type="number" value="${monto||0}" onchange="setPagoF29Monto('${c.k}',this.value)" style="text-align:right;font-family:var(--mono)"></td>
+      <td style="width:150px;font-size:10px;color:var(--mt);text-align:right">
+        ${editado?`<div><button class="btn btn-g" style="padding:1px 6px;font-size:9px" onclick="usarSugeridoF29('${c.k}')">↺ ${fmtC(r.sug[c.k])}</button></div>`:''}
+        ${pend!==null?`<div title="Saldo acreedor de la cuenta al ${fecha}">Pendiente: ${fmtC(pend)}${compartida?' <span style="color:var(--warn)" title="Otro concepto usa la misma cuenta: el saldo es compartido">⚠</span>':''}</div>`:'<div>—</div>'}
+      </td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML=`<div class="card" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <div>
+        <div style="font-size:15px;font-weight:700">🏦 Asiento de pago del F29</div>
+        <div style="font-size:11px;color:var(--mt);margin-top:2px">Cancela los impuestos y retenciones del período ${MESES[mes-1]} ${anio} contra banco o caja</div>
+      </div>
+      ${yaExiste?`<span class="badge br">⚠️ Ya generado — Asiento N°${yaExiste.n}</span>`:''}
+    </div>
+
+    <div class="info-tip" style="margin:10px 0 14px;font-size:11px;line-height:1.6">
+      📘 En el F29 no se entera sólo el IVA: también las <strong>retenciones que la empresa practicó como agente retenedor</strong>
+      durante el mes — boletas de honorarios recibidas (Art. 42 N°2), boletas de servicios de terceros, el Impuesto Único de
+      Segunda Categoría de los trabajadores (Art. 74 N°1) y el IVA retenido en facturas de compra por cambio de sujeto.
+      Todos son pasivos que ya se registraron al momento de la operación: este asiento sólo los <strong>cancela contra banco</strong>.
+      Los montos se proponen desde el F29 del período, pero manda lo efectivamente declarado: edítalos si difieren.
+    </div>
+
+    <div class="card-np" style="margin-bottom:12px"><div class="tw"><table>
+      <thead><tr><th style="width:26px"></th><th class="tl">CONCEPTO</th><th class="tl">CUENTA</th><th style="text-align:right">MONTO</th><th style="text-align:right">REFERENCIA</th></tr></thead>
+      <tbody>${filas}</tbody>
+      <tfoot><tr><td colspan="3" class="tl">TOTAL A ENTERAR</td>
+        <td style="font-family:var(--mono);font-weight:700;color:${r.total>0?'var(--err)':'var(--mt)'}">${fmtC(r.total)}</td><td></td></tr></tfoot>
+    </table></div></div>
+
+    <div class="fg" style="margin-bottom:12px">
+      <div class="grp"><label>Fecha de pago</label>
+        <input type="date" value="${fecha}" onchange="setPagoF29Campo('fecha',this.value)">
+        <div style="font-size:10px;color:var(--mt);margin-top:2px">Por defecto el día 12 del mes siguiente</div></div>
+      <div class="grp"><label>Glosa</label>
+        <input type="text" value="${glosa.replace(/"/g,'&quot;')}" onchange="setPagoF29Campo('glosa',this.value)"></div>
+      <div class="grp"><label>Cuenta de pago (banco o caja)</label>
+        ${inputCuenta({id:'pf29-cd-banco',value:PAGOF29.cuentas.banco||'',onPick:"setPagoF29Cuenta('banco','%CD%')",placeholder:'Buscar cuenta…',clase:'linea-inp'})}</div>
+      <div class="grp" style="justify-content:flex-end">
+        <button class="btn btn-g" style="font-size:11px" onclick="resetPagoF29()">↺ Cuentas y montos por defecto</button></div>
+    </div>
+
+    <div style="font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Previsualización del asiento</div>
+    ${r.movs.length?`<div class="card-np" style="margin-bottom:12px"><div class="tw"><table>
+      <thead><tr><th class="tl" style="width:82px">CÓD.</th><th class="tl">CUENTA</th><th style="width:130px">DEBE</th><th style="width:130px">HABER</th></tr></thead>
+      <tbody>${r.movs.map(m=>`<tr>
+        <td class="tl" style="font-family:var(--mono);font-size:11px;color:var(--mt)">${m.cd}</td>
+        <td class="tnm" style="font-size:12px">${m.nm}<div style="font-size:10px;color:var(--mt)">${m.desc}</div></td>
+        <td style="font-family:var(--mono)">${m.debe?fmtC(m.debe):'–'}</td>
+        <td style="font-family:var(--mono)">${m.haber?fmtC(m.haber):'–'}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td class="tl" colspan="2">TOTALES</td>
+        <td style="font-family:var(--mono)">${fmtC(r.tD)}</td><td style="font-family:var(--mono)">${fmtC(r.tH)}</td></tr></tfoot>
+    </table></div></div>
+    <div style="font-size:12px;color:${r.cuadra?'var(--ach)':'var(--err)'};margin-bottom:12px">
+      ${r.cuadra?'✅ Asiento cuadrado — Debe = Haber = '+fmtC(r.tD):'⚠️ Descuadre de '+fmtC(Math.abs(r.tD-r.tH))}
+    </div>`
+    :`<div style="text-align:center;padding:24px;color:var(--mt);font-size:12px">No hay montos que enterar en ${MESES[mes-1]} ${anio}. Marca al menos un concepto con monto mayor a cero.</div>`}
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-p" onclick="generarAsientoPagoF29()" ${(!r.movs.length||!r.cuadra)?'disabled style="opacity:.5;cursor:not-allowed"':''}>
+        🏦 ${yaExiste?'Generar de nuevo':'Generar asiento de pago'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function generarAsientoPagoF29(){
+  const mes=+(document.getElementById('f29-mes')?.value||1);
+  const anio=S.empresa.anio;
+  const periodo=`${anio}-${String(mes).padStart(2,'0')}`;
+  const r=calcularPagoF29(mes);
+  if(!r.movs.length){toast('⚠️ No hay montos que enterar','e');return;}
+  if(!r.cuadra){toast('⚠️ El asiento no cuadra — revisa las cuentas','e');return;}
+  const faltantes=[...new Set(r.movs.filter(m=>!PDC.some(x=>x.cd===m.cd)).map(m=>m.cd))];
+  if(faltantes.length){toast(`⚠️ Estas cuentas no existen en el plan: ${faltantes.join(', ')}`,'e');return;}
+
+  const yaExiste=asientoPagoExistente(periodo);
+  const per=`${MESES[mes-1]} ${anio}`;
+  const detalle=r.movs.filter(m=>m.debe>0)
+    .map(m=>`  ${m.cd} ${m.nm}: ${fmtC(m.debe)}`).join('\n');
+  const msg=(yaExiste?`⚠️ Ya existe el asiento N°${yaExiste.n} de pago de ${per}.\nSe creará OTRO (anula el anterior si corresponde).\n\n`:'')
+    +`Pago F29 — ${per}\n\n${detalle}\n\nTotal a pagar: ${fmtC(r.total)}\nContra: ${pdcNm(PAGOF29.cuentas.banco)||PAGOF29.cuentas.banco}\n\n¿Generar el asiento?`;
+  if(!confirm(msg))return;
+
+  const folio=proxFolioComprobante();
+  const fecha=PAGOF29.fecha||fechaPagoDefault(anio,mes);
+  const glosa=PAGOF29.glosa||`Pago F29 ${per}`;
+  S.asientos.push({
+    id:'as_pagof29_'+Date.now(),n:folio,folioComp:folio,fecha,glosa,
+    movs:r.movs.map(m=>({...m})),
+    origenAuto:'pagof29',periodoIVA:periodo,
+  });
+  window.storage.set('asientos-'+anio,JSON.stringify(S.asientos)).catch(()=>toast('❌ Error guardando en storage','e'));
+  toast(`✅ Asiento N°${folio} — pago F29 ${per} · ${fmtC(r.total)}`);
+  logAccion('Generó pago de F29',`${per} · asiento N°${folio} · ${fmtC(r.total)}`);
+  rerender();
+  renderF29();
+}
+
 export {calcularF29Anual, renderF29, renderPPM,
         IVAC, calcularCompensacionIVA, renderCompensacionIVA, generarAsientoIVA,
-        setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente, asientoIVAExistente};
+        setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente, asientoIVAExistente,
+        PAGOF29, CONCEPTOS_F29, calcularPagoF29, montosSugeridosF29, renderPagoF29, generarAsientoPagoF29,
+        setPagoF29Cuenta, setPagoF29Campo, setPagoF29Monto, togglePagoF29, resetPagoF29, usarSugeridoF29,
+        ivaRetenidoDTE46, asientoPagoExistente};

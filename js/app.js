@@ -99,7 +99,9 @@ import {setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux,
         abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI} from './auxiliares.js';
 // AUX_TAB también viene de auxiliares.js — se recupera desde window.
 import {renderF29, renderPPM, IVAC, renderCompensacionIVA, generarAsientoIVA,
-        setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente} from './tributario.js';
+        setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente,
+        PAGOF29, renderPagoF29, generarAsientoPagoF29, setPagoF29Cuenta, setPagoF29Campo,
+        setPagoF29Monto, togglePagoF29, resetPagoF29, usarSugeridoF29} from './tributario.js';
 import {setFCView, renderFlujoCaja} from './flujocaja.js';
 import {renderConciliacion, onSaldoBancoChange, toggleConciliado,
         marcarTodosConciliados, cargarCartola, autoConciliarCartola} from './conciliacion.js';
@@ -344,7 +346,7 @@ setOnAuthReady(initApp);
 // El HTML usa onclick="renderVentas()" etc. Los módulos ES tienen scope propio,
 // así que hay que publicar esas funciones en window.
 // Objetos de estado usados directamente en onclick del HTML
-Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec, CD, IVAC});
+Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec, CD, IVAC, PAGOF29});
 
 Object.assign(window,{
   // utilidades
@@ -418,6 +420,8 @@ Object.assign(window,{
   onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
   renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
   renderCompensacionIVA, generarAsientoIVA, setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente,
+  renderPagoF29, generarAsientoPagoF29, setPagoF29Cuenta, setPagoF29Campo, setPagoF29Monto,
+  togglePagoF29, resetPagoF29, usarSugeridoF29,
   setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux, renderAuxiliares, toggleAgingDetalle,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,

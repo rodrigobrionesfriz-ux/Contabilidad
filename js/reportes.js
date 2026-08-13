@@ -195,7 +195,11 @@ function genDiario(){
       const tBruto=honM.reduce((s,h)=>s+ +(h.bruto||0),0),tRet=Math.round(tBruto*retencionHonorarios(S.empresa.anio));
       entries.push({n:n++,fecha,glosa:`Honorarios ${mesNm} ${anio}`,movs:[
         {cd:'3202019',nm:'HONORARIOS',debe:tBruto,haber:0},
-        {cd:'2102006',nm:pdcNm('2102006'),debe:0,haber:tRet},
+        // La retención de la boleta es un impuesto retenido que se entera al SII
+        // en el F29, no una deuda con el profesional: va a RETENCIÓN 2º CATEGORÍA.
+        // (Antes se acreditaba en HONORARIOS POR PAGAR, que además es la cuenta
+        // auxiliable de honorarios, y contaminaba ese auxiliar.)
+        {cd:'2103002',nm:pdcNm('2103002'),debe:0,haber:tRet,desc:`Retención ${(retencionHonorarios(S.empresa.anio)*100).toFixed(2)}% boletas de honorarios`},
         {cd:'1101201',nm:pdcNm('1101201'),debe:0,haber:tBruto-tRet},
       ],origen:'auto',fuente:'honorarios',mes:m,anio});
     }

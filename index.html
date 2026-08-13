@@ -58,7 +58,7 @@
 
 <header>
   <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
-  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.13-0240</span></div>
+  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.13-1311</span></div>
   <div class="hdr-empresa" id="hdr-empresa">Configure los datos de empresa</div>
   <span id="save-indicator" style="font-size:10px;color:var(--mt);white-space:nowrap"></span>
   <button id="btn-tema" onclick="cambiarTema()" title="Cambiar tema" style="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mt);font-size:13px;cursor:pointer;padding:5px 10px;line-height:1">🌙</button>
@@ -118,6 +118,7 @@
   <div class="nav-item active" onclick="nav('empresa')" data-s="empresa"><span class="nav-icon">🏢</span>Empresa</div>
   <div class="nav-item" onclick="nav('centroscosto')" data-s="centroscosto"><span class="nav-icon">📊</span>Centros de Costo</div>
   <div class="nav-item" onclick="nav('pdc')" data-s="pdc"><span class="nav-icon">📋</span>Plan de Cuentas</div>
+  <div class="nav-item" onclick="nav('cargadatos')" data-s="cargadatos"><span class="nav-icon">📥</span>Carga desde Excel</div>
   <div class="nav-item" onclick="nav('indicadores')" data-s="indicadores"><span class="nav-icon">📐</span>Indicadores</div>
   <div class="nav-item" onclick="nav('apertura')" data-s="apertura"><span class="nav-icon">🔰</span>Balance de Apertura</div>
   <div class="nav-item" onclick="nav('usuarios')" data-s="usuarios" id="nav-usuarios" style="display:none"><span class="nav-icon">👥</span>Usuarios</div>
@@ -266,6 +267,18 @@
   </div>
 
   <div id="pdc-content"></div>
+</section>
+
+<!-- CARGA DE DATOS DESDE EXCEL -->
+<section class="section" id="s-cargadatos">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">📥 Carga desde Excel</div>
+      <div class="sec-sub">Poblar los datos maestros del sistema desde una planilla</div>
+    </div>
+  </div>
+  <div id="cd-content"></div>
+  <input type="file" id="cd-file" accept=".xlsx,.xls,.csv" style="display:none">
 </section>
 
 <!-- USUARIOS -->
@@ -1157,6 +1170,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=1786588821"></script>
+<script type="module" src="js/app.js?v=1786626713"></script>
 </body>
 </html>

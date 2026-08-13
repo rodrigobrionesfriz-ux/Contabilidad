@@ -4,7 +4,7 @@ import {updateHdr} from './empresa.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {proxFolioAsiento} from './asientos.js';
-import {getIndicadores, IND} from './indicadores.js';
+import {getIndicadores, IND, calcularGratificacion, topeGratificacionMensual} from './indicadores.js';
 import {getPrevisional, afpInfo, isapreInfo, calcularAportePatronal} from './previsional.js';
 import './storage.js';
 
@@ -46,10 +46,32 @@ function getUF(){return +document.getElementById('rem-uf')?.value||IND('uf');}
 function getUTM(){return +document.getElementById('rem-utm')?.value||IND('utm');}
 
 // Calcula la liquidación completa de un trabajador con UF/UTM dados
+// Modo de gratificación de un trabajador. Los registros antiguos (sin
+// `gratifModo` ni `gratifPct`) siguen con su monto fijo: así una ficha ya
+// cargada no cambia de líquido sólo por actualizar el sistema.
+function gratificacionModo(t){
+  if(t.gratifModo==='pct'||t.gratifModo==='monto')return t.gratifModo;
+  return (t.gratifPct!=null&&t.gratifPct!=='')?'pct':'monto';
+}
+
 function calcularLiquidacion(t,uf,utm){
   const REM_PARAMS=remParams(); // indicadores configurables
-  const base=+t.base||0, grat=+t.grat||0, otros=+t.otros||0;
+  const base=+t.base||0, otros=+t.otros||0;
   const colacion=+t.colacion||0, movilizacion=+t.movilizacion||0;
+  // ── Gratificación legal (Art. 50 Código del Trabajo) ──
+  // Modo 'pct': % sobre la remuneración imponible del mes (sueldo base + otros
+  // haberes imponibles, sin incluirse a sí misma), con el tope legal prorrateado.
+  // Modo 'monto': cifra pactada, sin tope (es una gratificación convencional).
+  // Los trabajadores creados antes de este cambio no traen `gratifModo`: se
+  // mantienen en 'monto' para no alterar sus liquidaciones.
+  const gratModo=gratificacionModo(t);
+  let grat=0, gratInfo=null;
+  if(gratModo==='pct'){
+    gratInfo=calcularGratificacion(base+otros,t.gratifPct);
+    grat=gratInfo.monto;
+  }else{
+    grat=+t.grat||0;
+  }
   // Total imponible (haberes que cotizan)
   const totalImponible=base+grat+otros;
   const totalNoImponible=colacion+movilizacion;
@@ -93,6 +115,7 @@ function calcularLiquidacion(t,uf,utm){
   const patronal=calcularAportePatronal(t,baseAFP,baseCes);
   const costoEmpresa=totalHaberes+patronal.total;
   return {patronal,costoEmpresa,
+    grat,gratModo,gratInfo,
     totalImponible,totalNoImponible,totalHaberes,baseAFP,baseCes,
     descAFP,descAFP_pension,descAFP_comision,descSalud,saludLegal,adicionalIsapre,planUF,planPesos,descCesantia,
     totalPrevisional,baseTributable,iusc,totalDescuentos,liquido,
@@ -110,11 +133,30 @@ function abrirFormTrabajador(){
   ['grat','otros','colacion','movilizacion'].forEach(x=>{const e=document.getElementById('remf-'+x);if(e)e.value='0';});
   document.getElementById('remf-salud').value='fonasa';
   document.getElementById('remf-contrato').value='indefinido';
+  // Los trabajadores nuevos parten con la gratificación legal en porcentaje
+  document.getElementById('remf-gratmodo').value='pct';
+  document.getElementById('remf-gratpct').value=getIndicadores().gratifPct??25;
+  onGratModoChange();
   document.getElementById('remf-plan-wrap').style.display='none';
   document.getElementById('remf-preview').innerHTML='';
   f.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function cerrarFormTrabajador(){document.getElementById('rem-form').style.display='none';REMF={editId:null};}
+// Alterna entre gratificación por porcentaje y monto fijo, y muestra el tope legal vigente
+function onGratModoChange(){
+  const modo=document.getElementById('remf-gratmodo')?.value||'pct';
+  const wp=document.getElementById('remf-gratpct-wrap'),wm=document.getElementById('remf-gratmonto-wrap');
+  if(wp)wp.style.display=modo==='pct'?'':'none';
+  if(wm)wm.style.display=modo==='monto'?'':'none';
+  const hint=document.getElementById('remf-grat-hint');
+  if(hint){
+    const i=getIndicadores();
+    hint.innerHTML=modo==='pct'
+      ? `Tope legal: ${fmtC(topeGratificacionMensual())} al mes (${(+i.gratifTopeIMM||0).toLocaleString('es-CL')} IMM ÷ 12)`
+      : 'Gratificación pactada — no se le aplica el tope legal';
+  }
+  previewLiq();
+}
 function onSaludChange(){
   const isIsapre=document.getElementById('remf-salud').value!=='fonasa';
   document.getElementById('remf-plan-wrap').style.display=isIsapre?'':'none';
@@ -126,6 +168,8 @@ function leerFormTrabajador(){
     rut:document.getElementById('remf-rut').value.trim(),
     cargo:document.getElementById('remf-cargo').value.trim(),
     base:+document.getElementById('remf-base').value||0,
+    gratifModo:document.getElementById('remf-gratmodo')?.value||'pct',
+    gratifPct:+document.getElementById('remf-gratpct')?.value||0,
     grat:+document.getElementById('remf-grat').value||0,
     otros:+document.getElementById('remf-otros').value||0,
     colacion:+document.getElementById('remf-colacion').value||0,
@@ -144,6 +188,7 @@ function previewLiq(){
   const l=calcularLiquidacion(t,uf,utm);
   el.innerHTML=`<div class="info-tip" style="font-size:12px">
     <div style="display:grid;grid-template-columns:1fr auto;gap:2px 16px">
+      ${l.gratModo==='pct'&&l.gratInfo?`<span style="color:var(--mt)">Gratificación ${l.gratInfo.pct}% ${l.gratInfo.topeAplicado?`<span style="color:var(--warn)">(topeada desde ${fmtC(l.gratInfo.bruta)})</span>`:''}</span><span style="font-family:var(--mono);text-align:right">${fmtC(l.grat)}</span>`:''}
       <span>Total haberes</span><span style="font-family:var(--mono);text-align:right">${fmtC(l.totalHaberes)}</span>
       <span style="color:var(--mt)">AFP ${l.afpNm} (10% + comisión)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.descAFP)}</span>
       <span style="color:var(--mt)">Salud 7% legal</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.saludLegal)}</span>
@@ -180,7 +225,10 @@ function editarTrabajador(id){
   document.getElementById('remf-rut').value=t.rut||'';
   document.getElementById('remf-cargo').value=t.cargo||'';
   document.getElementById('remf-base').value=t.base;
+  document.getElementById('remf-gratmodo').value=gratificacionModo(t);
+  document.getElementById('remf-gratpct').value=(t.gratifPct!=null&&t.gratifPct!=='')?t.gratifPct:(getIndicadores().gratifPct??25);
   document.getElementById('remf-grat').value=t.grat||0;
+  onGratModoChange();
   document.getElementById('remf-otros').value=t.otros||0;
   document.getElementById('remf-colacion').value=t.colacion||0;
   document.getElementById('remf-movilizacion').value=t.movilizacion||0;
@@ -273,7 +321,9 @@ function verLiquidacion(id){
     <table><tbody>
       <tr class="rth"><td colspan="2" class="tl" style="padding:6px 10px">HABERES</td></tr>
       ${row('Sueldo base',+t.base)}
-      ${+t.grat?row('Gratificación legal',+t.grat):''}
+      ${l.grat?row(l.gratModo==='pct'
+          ?`Gratificación legal (${l.gratInfo.pct}%${l.gratInfo.topeAplicado?' · tope legal aplicado':''})`
+          :'Gratificación pactada',l.grat):''}
       ${+t.otros?row('Otros imponibles',+t.otros):''}
       ${+t.colacion?row('Colación (no imp.)',+t.colacion):''}
       ${+t.movilizacion?row('Movilización (no imp.)',+t.movilizacion):''}
@@ -338,4 +388,4 @@ function generarAsientoRemuneraciones(){
 }
 
 
-export {remParams, IUSC_TABLA, calcularIUSC, getUF, getUTM, calcularLiquidacion, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, leerFormTrabajador, previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem, renderRemuneraciones, verLiquidacion, generarAsientoRemuneraciones, REMF};
+export {remParams, IUSC_TABLA, calcularIUSC, getUF, getUTM, calcularLiquidacion, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, onGratModoChange, gratificacionModo, leerFormTrabajador, previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem, renderRemuneraciones, verLiquidacion, generarAsientoRemuneraciones, REMF};

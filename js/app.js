@@ -76,7 +76,7 @@ import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
         proxFolioAsiento, proxFolioComprobante, migrarFoliosComprobante, AF} from './asientos.js';
 import {renderActivoFijo, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF,
         editarAF, eliminarAF, generarAsientoDepreciacion, AFB} from './activofijo.js';
-import {renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange,
+import {renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, onGratModoChange,
         previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador,
         onParamRem, verLiquidacion, generarAsientoRemuneraciones, REMF} from './remuneraciones.js';
 import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
@@ -408,7 +408,7 @@ Object.assign(window,{
   renderActivoFijo, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF, editarAF,
   eliminarAF, generarAsientoDepreciacion,
   // remuneraciones
-  renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange,
+  renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, onGratModoChange,
   previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem,
   verLiquidacion, generarAsientoRemuneraciones,
   // cierre

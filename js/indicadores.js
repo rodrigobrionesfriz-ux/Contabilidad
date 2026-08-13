@@ -18,6 +18,8 @@ const INDICADORES_DEFAULT={
   topeAFP_UF:90.0,      // tope imponible AFP/salud
   topeCesantia_UF:135.2,// tope imponible seguro cesantía
   ingresoMinimo:539000, // ingreso mínimo mensual
+  gratifPct:25.0,       // % de gratificación legal (Art. 50 Código del Trabajo)
+  gratifTopeIMM:4.75,   // tope: 4,75 ingresos mínimos mensuales AL AÑO (Art. 50)
   tasaAFP:10.0,         // % cotización AFP (sin comisión)
   tasaSalud:7.0,        // % salud mínimo
   tasaCesantiaTrab:0.6, // % cesantía trabajador (indefinido)
@@ -29,6 +31,31 @@ const INDICADORES_DEFAULT={
 function getIndicadores(){
   const g=(S.empresa&&S.empresa.indicadores)||{};
   return {...INDICADORES_DEFAULT,...g};
+}
+
+// ═══ GRATIFICACIÓN LEGAL (Art. 50 Código del Trabajo) ═══
+// El empleador puede optar por pagar el 25% de las remuneraciones mensuales
+// devengadas, con un tope de 4,75 ingresos mínimos mensuales AL AÑO. Como las
+// liquidaciones son mensuales, el tope se prorratea: 4,75 × IMM ÷ 12.
+// Ambos parámetros son configurables en Indicadores por si cambia la norma o
+// la empresa pacta un porcentaje mayor.
+export function topeGratificacionMensual(){
+  const i=getIndicadores();
+  return Math.round(((+i.gratifTopeIMM||0)*(+i.ingresoMinimo||0))/12);
+}
+export function topeGratificacionAnual(){
+  const i=getIndicadores();
+  return Math.round((+i.gratifTopeIMM||0)*(+i.ingresoMinimo||0));
+}
+// Calcula la gratificación mensual de una base imponible.
+// `pct` opcional: si no viene, usa el porcentaje configurado.
+export function calcularGratificacion(baseImponible,pct){
+  const i=getIndicadores();
+  const p=(pct===''||pct==null||isNaN(+pct))?(+i.gratifPct||0):+pct;
+  const bruta=Math.round(Math.max(0,+baseImponible||0)*p/100);
+  const tope=topeGratificacionMensual();
+  const monto=tope>0?Math.min(bruta,tope):bruta;
+  return {pct:p,bruta,tope,monto,topeAplicado:tope>0&&bruta>tope};
 }
 
 // Tasa de retención de honorarios (2ª categoría, Art. 74 N°2 LIR).
@@ -125,6 +152,22 @@ function renderIndicadores(){
       ${campo('topeCesantia_UF','Tope imponible Cesantía',i.topeCesantia_UF,'0.1','UF','Tope 2026: 135,2 UF')}
       ${campo('ingresoMinimo','Ingreso mínimo mensual',i.ingresoMinimo,'1000','pesos','2026: $539.000')}
     </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bd)">
+      <div class="card-title" style="margin-bottom:10px">Gratificación legal (Art. 50 Código del Trabajo)</div>
+      <div class="info-tip" style="font-size:11px;margin-bottom:10px">
+        El empleador puede optar por pagar el <strong>25% de las remuneraciones mensuales devengadas</strong>,
+        con un tope de <strong>4,75 ingresos mínimos mensuales al año</strong>. Como las liquidaciones son mensuales,
+        el sistema prorratea el tope: <strong>4,75 × IMM ÷ 12</strong>.
+        <div style="margin-top:6px;font-family:var(--mono);font-size:11px">
+          Tope anual: <strong>${fmtC(topeGratificacionAnual())}</strong> ·
+          Tope mensual: <strong style="color:var(--ac)">${fmtC(topeGratificacionMensual())}</strong>
+        </div>
+      </div>
+      <div class="fg">
+        ${campo('gratifPct','Porcentaje de gratificación',i.gratifPct,'0.5','%','Legal: 25% de la remuneración imponible')}
+        ${campo('gratifTopeIMM','Tope en ingresos mínimos (anual)',i.gratifTopeIMM,'0.05','IMM','Legal: 4,75 IMM al año')}
+      </div>
+    </div>
   </div>
   <div class="card" style="margin-bottom:14px">
     <div class="card-title">📊 Tasas previsionales y tributarias</div>
@@ -169,6 +212,7 @@ function guardarIndicadores(){
     uf:num('uf'),utm:num('utm'),uta:num('uta'),dolar:num('dolar'),euro:num('euro'),
     topeAFP_UF:num('topeAFP_UF'),topeCesantia_UF:num('topeCesantia_UF'),
     ingresoMinimo:num('ingresoMinimo'),
+    gratifPct:num('gratifPct'),gratifTopeIMM:num('gratifTopeIMM'),
     tasaAFP:num('tasaAFP'),tasaSalud:num('tasaSalud'),tasaCesantiaTrab:num('tasaCesantiaTrab'),
     factorCM:num('factorCM'),
     retHonorarios:num('retHonorarios'),

@@ -63,37 +63,110 @@ function docsPendientes(tipo){
   });
 
   // Calcular saldos de facturas aplicando NC/ND referenciadas
-  const resultado=[];
-  facturas.forEach(f=>{
+  const conSaldo=facturas.map(f=>{
     const key=f.rutCodigo+'|'+String(f.numero).trim();
     const notas=notasReferenciadas[key]||[];
     const efectoNotas=notas.reduce((s,n)=>s+((n.total||0)*n.signo),0);
     // Total: factura + notas (NC restan, ND suman)
     const totalReal=(f.total||0)+efectoNotas;
     const pagosSum=(f.pagos||[]).reduce((s,p)=>s+(p.monto||0),0);
-    const saldo=totalReal-pagosSum;
-    if(Math.abs(saldo)>1){
-      resultado.push({
-        ...f,
-        totalSigno:totalReal,
-        pagosSum,
-        saldo,
-        notas,   // NC/ND asociadas para mostrar en detalle
-      });
-    }
+    return {...f,totalSigno:totalReal,pagosSum,saldo:totalReal-pagosSum,notas,notasAuto:[]};
   });
 
-  // Huérfanas: agregar como docs independientes con badge de advertencia
+  // ── Notas de crédito sin referencia: se imputan FIFO al mismo auxiliar ──
+  // Una NC sin folio de referencia igual reduce la deuda con ese proveedor.
+  // Si no se imputa, la factura que anula sigue apareciendo con saldo completo
+  // y se puede pagar igual: el auxiliar termina rebajado DOS VECES por la misma
+  // operación (una por la NC y otra por el pago). Se imputan de la más antigua
+  // a la más nueva, el mismo criterio FIFO que usa el Aging de Auxiliares.
+  const porRut={};
+  conSaldo.forEach(f=>{(porRut[f.rutCodigo]||(porRut[f.rutCodigo]=[])).push(f);});
+  Object.values(porRut).forEach(list=>list.sort((a,b)=>
+    (a.fecha||'').localeCompare(b.fecha||'')||String(a.numero||'').localeCompare(String(b.numero||''))));
+
+  const huerfanasRestantes=[];
   huerfanas.forEach(h=>{
     const totalSigno=(h.total||0)*h.signo;
     const pagosSum=(h.pagos||[]).reduce((s,p)=>s+(p.monto||0),0);
-    const saldo=totalSigno-pagosSum;
-    if(Math.abs(saldo)>1){
-      resultado.push({...h,totalSigno,pagosSum,saldo,huerfana:true});
+    let restante=totalSigno-pagosSum;
+    // Sólo las de efecto negativo (NC) se imputan; una ND aumenta la deuda y
+    // sigue siendo un documento por pagar en sí mismo.
+    if(restante>=0){
+      if(Math.abs(restante)>1)huerfanasRestantes.push({...h,totalSigno,pagosSum,saldo:restante,huerfana:true});
+      return;
+    }
+    const aplicadoA=[];
+    (porRut[h.rutCodigo]||[]).forEach(f=>{
+      if(restante>=-0.5||f.saldo<=0.5)return;
+      const aplica=Math.min(f.saldo,-restante);
+      f.saldo-=aplica;
+      restante+=aplica;
+      f.notasAuto.push({numero:h.numero,tipoDTE:h.tipoDTE,fecha:h.fecha,monto:aplica,id:h.id});
+      aplicadoA.push({numero:f.numero,monto:aplica});
+    });
+    if(restante<-0.5){
+      // Sobrante: queda como saldo a favor del auxiliar
+      huerfanasRestantes.push({...h,totalSigno,pagosSum,saldo:restante,huerfana:true,
+        aplicadoParcial:aplicadoA.length>0,aplicadoA});
     }
   });
 
+  const resultado=[];
+  conSaldo.forEach(f=>{if(Math.abs(f.saldo)>1)resultado.push(f);});
+  huerfanasRestantes.forEach(h=>resultado.push(h));
   return resultado;
+}
+
+// Auxiliares cuyo saldo quedó DEUDOR (se pagó más de lo que se debía).
+// Es la huella que deja un documento pagado dos veces o un pago sobre una
+// factura que ya estaba anulada por una nota de crédito.
+function auxiliaresSobrepagados(tipo){
+  const arr=tipo==='proveedor'?S.compras:S.ventas;
+  const porRut={};
+  arr.forEach(d=>{
+    const k=d.rutCodigo;if(!k)return;
+    const dteInfo=tipo==='proveedor'?dteC(d.tipoDTE):dteV(d.tipoDTE);
+    const signo=dteInfo?.signo||1;
+    if(!porRut[k])porRut[k]={rutCodigo:k,rutDV:d.rutDV,razonSocial:d.razonSocial||'',deuda:0,pagado:0};
+    porRut[k].deuda+=(d.total||0)*signo;
+    porRut[k].pagado+=(d.pagos||[]).reduce((s,p)=>s+(p.monto||0),0);
+    if(d.razonSocial)porRut[k].razonSocial=d.razonSocial;
+  });
+  return Object.values(porRut)
+    .map(a=>({...a,exceso:a.pagado-a.deuda}))
+    .filter(a=>a.exceso>1)
+    .sort((a,b)=>b.exceso-a.exceso);
+}
+
+// Panel de alerta: auxiliares con saldo deudor por pagos en exceso
+function avisoSobrepagos(){
+  const lista=auxiliaresSobrepagados(PAG.tipo);
+  if(!lista.length)return '';
+  const esProv=PAG.tipo==='proveedor';
+  const total=lista.reduce((s,a)=>s+a.exceso,0);
+  const filas=lista.slice(0,15).map(a=>`<tr>
+    <td class="tl" style="font-family:var(--mono);font-size:11px">${rutFmt(a.rutCodigo,a.rutDV)}</td>
+    <td class="tnm" style="font-size:11px">${a.razonSocial||'(sin razón social)'}</td>
+    <td style="font-family:var(--mono);text-align:right">${fmtC(a.deuda)}</td>
+    <td style="font-family:var(--mono);text-align:right">${fmtC(a.pagado)}</td>
+    <td style="font-family:var(--mono);text-align:right;color:var(--err);font-weight:700">${fmtC(a.exceso)}</td>
+  </tr>`).join('');
+  return `<div style="background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.35);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700;color:var(--err);margin-bottom:4px">
+      ⚠️ ${lista.length} ${esProv?'proveedor':'cliente'}${lista.length===1?'':'es'} con ${esProv?'pagos':'cobros'} por sobre lo adeudado
+    </div>
+    <div style="font-size:11px;color:var(--mt);margin-bottom:10px;line-height:1.5">
+      Se registró ${esProv?'un pago':'un cobro'} mayor al saldo real por <strong style="color:var(--err)">${fmtC(total)}</strong> en total.
+      La causa habitual es haber ${esProv?'pagado':'cobrado'} una factura que <strong>ya estaba anulada por una nota de crédito</strong>:
+      la cuenta del auxiliar queda rebajada dos veces por la misma operación.
+      Revisa el detalle en Auxiliares y anula el ${esProv?'pago':'cobro'} sobrante desde su asiento.
+    </div>
+    <div class="tw" style="max-height:220px;overflow:auto"><table>
+      <thead><tr><th class="tl">RUT</th><th class="tl">RAZÓN SOCIAL</th><th style="text-align:right">ADEUDADO</th><th style="text-align:right">${esProv?'PAGADO':'COBRADO'}</th><th style="text-align:right">EXCESO</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table></div>
+    ${lista.length>15?`<div style="font-size:10px;color:var(--mt);margin-top:6px">Mostrando los primeros 15 de ${lista.length}.</div>`:''}
+  </div>`;
 }
 
 // Facturas del mismo proveedor/cliente (para el selector "asociar a factura")
@@ -155,6 +228,7 @@ function renderPagos(){
       <button class="btn ${PAG.tipo==='proveedor'?'btn-p':'btn-g'}" onclick="setPagTipo('proveedor')">🏭 Pagar Proveedores</button>
       <button class="btn ${PAG.tipo==='cliente'?'btn-p':'btn-g'}" onclick="setPagTipo('cliente')">📇 Cobrar Clientes</button>
     </div>
+    ${avisoSobrepagos()}
 
     <div class="card" style="margin-bottom:14px">
       <div class="card-title">💳 Datos del ${sustantivo}</div>
@@ -271,14 +345,21 @@ function renderPagosTabla(){
       // Badge de huérfana: NC/ND sin referencia
       const badgeHuerfana=d.huerfana?`
         <span style="background:rgba(255,193,7,.15);color:var(--warn);padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px;cursor:pointer" onclick="event.stopPropagation();abrirAsociarNota('${d.id}','${d.rutCodigo}')">
-          ⚠ SIN REFERENCIA · Asociar
+          ⚠ SIN REFERENCIA${d.aplicadoParcial?' · IMPUTADA EN PARTE':''} · Asociar
+        </span>`:'';
+      // Nota de crédito sin referencia imputada automáticamente a esta factura:
+      // el saldo ya viene rebajado, por eso se avisa de dónde sale.
+      const badgeNotaAuto=(d.notasAuto&&d.notasAuto.length)?`
+        <span style="background:rgba(88,166,255,.13);color:var(--info);padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px"
+          title="Saldo rebajado por ${d.notasAuto.map(n=>`NC N°${n.numero}: ${fmtC(n.monto)}`).join(' · ')}">
+          ↩ NC APLICADA ${fmtC(d.notasAuto.reduce((s,n)=>s+n.monto,0))}
         </span>`:'';
 
       h+=`<tr ${sel?'style="background:rgba(46,160,67,.04)"':''}>
         <td style="text-align:center"><input type="checkbox" ${sel?'checked':''} onchange="togglePagSel('${d.id}',this.checked)"></td>
         <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}</td>
         <td class="tl" style="font-size:11px">${dteNm}</td>
-        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.numero}${badgeHuerfana}</td>
+        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.numero}${badgeHuerfana}${badgeNotaAuto}</td>
         <td class="tl" style="color:var(--mt);font-size:11px">${d.fechaVencimiento?'Vence '+d.fechaVencimiento:''}</td>
         <td style="text-align:right;font-family:var(--mono)">${fmtC(d.totalSigno)}</td>
         <td style="text-align:right;font-family:var(--mono);color:${d.pagosSum?'var(--ach)':'var(--mt)'}">${d.pagosSum?fmtC(d.pagosSum):'—'}</td>
@@ -371,13 +452,21 @@ async function ejecutarPago(){
   const movs=[];
   let totalPago=0;
   const pagosPorDoc=[];
+  const excedidos=[];
   const asientoId='a_pag_'+Date.now();
 
   PAG.seleccionados.forEach(docId=>{
     const d=docs.find(x=>x.id===docId);
     if(!d)return;
-    const monto=PAG.montoParcial[docId]!=null?+PAG.montoParcial[docId]:d.saldo;
+    let monto=PAG.montoParcial[docId]!=null?+PAG.montoParcial[docId]:d.saldo;
     if(!monto)return;
+    // Nunca pagar por sobre el saldo real del documento: `d.saldo` ya viene
+    // neto de notas de crédito (referenciadas e imputadas) y de pagos previos.
+    if(monto>d.saldo+1){
+      excedidos.push({numero:d.numero,pedido:monto,saldo:d.saldo});
+      monto=d.saldo;
+    }
+    if(monto<=0)return;
     totalPago+=monto;
     pagosPorDoc.push({docId,monto,doc:d});
     // Una línea de auxiliar por documento (para trazabilidad en el libro mayor)
@@ -398,6 +487,11 @@ async function ejecutarPago(){
     }
   });
 
+  if(excedidos.length){
+    const det=excedidos.map(x=>`  · N°${x.numero}: pediste ${fmtC(x.pedido)} y el saldo real es ${fmtC(x.saldo)}`).join('\n');
+    if(!confirm(`Hay ${excedidos.length} documento(s) con un monto mayor a su saldo real:\n\n${det}\n\n`+
+      `Se ajustarán al saldo para no rebajar dos veces la cuenta del auxiliar.\n¿Continuar?`))return;
+  }
   if(!totalPago){toast('⚠️ Monto total = 0','e');return;}
 
   // Una única línea de banco/caja consolidada

@@ -4,7 +4,8 @@ import {updateHdr} from './empresa.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
 import {proxFolioAsiento} from './asientos.js';
-import {getIndicadores, IND, calcularGratificacion, topeGratificacionMensual} from './indicadores.js';
+import {getIndicadores, IND, calcularGratificacion, topeGratificacionMensual,
+        getIUSCTabla, calcularIUSCDetalle, IUSC_TABLA_OFICIAL} from './indicadores.js';
 import {getPrevisional, afpInfo, isapreInfo, calcularAportePatronal} from './previsional.js';
 import './storage.js';
 
@@ -24,22 +25,11 @@ function remParams(){
   };
 }
 // Las AFP y sus comisiones viven en previsional.js (editables por el usuario).
-// Tabla IUSC en UTM (Art. 43 LIR) — factores y rebajas estables; solo cambia la UTM
-const IUSC_TABLA=[
-  {desde:0,    hasta:13.5, factor:0,     rebajaUTM:0},
-  {desde:13.5, hasta:30,   factor:0.04,  rebajaUTM:0.54},
-  {desde:30,   hasta:50,   factor:0.08,  rebajaUTM:1.74},
-  {desde:50,   hasta:70,   factor:0.135, rebajaUTM:4.49},
-  {desde:70,   hasta:90,   factor:0.23,  rebajaUTM:11.14},
-  {desde:90,   hasta:120,  factor:0.304, rebajaUTM:17.80},
-  {desde:120,  hasta:310,  factor:0.35,  rebajaUTM:23.32},
-  {desde:310,  hasta:1e9,  factor:0.40,  rebajaUTM:38.82},
-];
+// La tabla del Impuesto Único de Segunda Categoría (Art. 43 N°1 LIR) vive en
+// indicadores.js, donde es editable. Se expone acá por compatibilidad.
+const IUSC_TABLA=IUSC_TABLA_OFICIAL;
 function calcularIUSC(baseTributable,utm){
-  if(!utm||utm<=0)return 0;
-  const baseUTM=baseTributable/utm;
-  const t=IUSC_TABLA.find(x=>baseUTM>x.desde&&baseUTM<=x.hasta)||IUSC_TABLA[IUSC_TABLA.length-1];
-  return Math.max(0,Math.round(baseTributable*t.factor-t.rebajaUTM*utm));
+  return calcularIUSCDetalle(baseTributable,utm,getIUSCTabla()).impuesto;
 }
 // UF/UTM del mes: guardadas en empresa (editables). Defaults referenciales.
 function getUF(){return +document.getElementById('rem-uf')?.value||IND('uf');}
@@ -106,8 +96,9 @@ function calcularLiquidacion(t,uf,utm){
   const totalPrevisional=descAFP+descSalud+descCesantia;
   // Base tributable = imponible − cotizaciones previsionales
   const baseTributable=totalImponible-totalPrevisional;
-  // Impuesto único
-  const iusc=calcularIUSC(baseTributable,utm);
+  // Impuesto único de Segunda Categoría, según la tabla configurada en Indicadores
+  const iuscDet=calcularIUSCDetalle(baseTributable,utm,getIUSCTabla());
+  const iusc=iuscDet.impuesto;
   // Total descuentos y líquido
   const totalDescuentos=totalPrevisional+iusc;
   const liquido=totalHaberes-totalDescuentos;
@@ -118,7 +109,7 @@ function calcularLiquidacion(t,uf,utm){
     grat,gratModo,gratInfo,
     totalImponible,totalNoImponible,totalHaberes,baseAFP,baseCes,
     descAFP,descAFP_pension,descAFP_comision,descSalud,saludLegal,adicionalIsapre,planUF,planPesos,descCesantia,
-    totalPrevisional,baseTributable,iusc,totalDescuentos,liquido,
+    totalPrevisional,baseTributable,iusc,iuscDet,totalDescuentos,liquido,
     afpNm:afp.nm, saludNm:(t.salud&&t.salud!=='fonasa')?isapreInfo(t.salud).nm:'Fonasa'};
 }
 
@@ -194,7 +185,7 @@ function previewLiq(){
       <span style="color:var(--mt)">Salud 7% legal</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.saludLegal)}</span>
       ${l.adicionalIsapre?`<span style="color:var(--mt)">Adicional isapre (${l.planUF} UF)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.adicionalIsapre)}</span>`:''}
       <span style="color:var(--mt)">Cesantía (0,6%)</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.descCesantia)}</span>
-      <span style="color:var(--mt)">Impuesto único</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.iusc)}</span>
+      <span style="color:var(--mt)">Impuesto único${l.iuscDet&&l.iuscDet.idx>=0?` <span style="font-size:10px">(tramo ${l.iuscDet.idx+1} · ${(l.iuscDet.factor*100).toFixed(2)}% · ${l.iuscDet.baseUTM.toFixed(1)} UTM)</span>`:''}</span><span style="font-family:var(--mono);text-align:right;color:var(--err)">−${fmtC(l.iusc)}</span>
       <span style="font-weight:700;border-top:1px solid var(--bd);padding-top:4px">LÍQUIDO A PAGAR</span><span style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach);border-top:1px solid var(--bd);padding-top:4px">${fmtC(l.liquido)}</span>
     </div>
   </div>`;
@@ -262,10 +253,14 @@ function renderRemuneraciones(){
   const ufEl=document.getElementById('rem-uf'),utmEl=document.getElementById('rem-utm');
   if(ufEl&&!ufEl.value)ufEl.value=IND('uf');
   if(utmEl&&!utmEl.value)utmEl.value=IND('utm');
+  // El Libro de Remuneraciones es la otra vista de esta sección (libroremuneraciones.js).
+  // Se llama por window para no crear un ciclo de imports entre ambos módulos.
+  if(window.getRemView&&window.getRemView()==='libro'&&window.renderLibroRem){window.renderLibroRem();return;}
+  const tabs=window.tabsRemuneraciones?window.tabsRemuneraciones():'';
   const uf=getUF(),utm=getUTM();
   const el=document.getElementById('rem-content');
   if(!S.trabajadores.length){
-    el.innerHTML=`<div class="empty"><div class="ei">👷</div>No hay trabajadores registrados.<br><br><button class="btn btn-p" onclick="abrirFormTrabajador()">+ Registrar primer trabajador</button></div>`;
+    el.innerHTML=tabs+`<div class="empty"><div class="ei">👷</div>No hay trabajadores registrados.<br><br><button class="btn btn-p" onclick="abrirFormTrabajador()">+ Registrar primer trabajador</button></div>`;
     return;
   }
   let totHab=0,totLiq=0,totPrev=0,totIusc=0,totPatronal=0;
@@ -287,7 +282,7 @@ function renderRemuneraciones(){
       </td>
     </tr>`;
   }).join('');
-  el.innerHTML=`<div class="kpi-grid" style="margin-bottom:16px">
+  el.innerHTML=tabs+`<div class="kpi-grid" style="margin-bottom:16px">
     <div class="kpi"><div class="kpi-lbl">Total Haberes</div><div class="kpi-val">${fmtC(totHab)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Cotizaciones</div><div class="kpi-val neg">${fmtC(totPrev)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Impuesto Único</div><div class="kpi-val neg">${fmtC(totIusc)}</div></div>
@@ -334,7 +329,7 @@ function verLiquidacion(id){
       ${row('Salud 7% (cotización legal)',l.saludLegal,true)}
       ${l.adicionalIsapre?row(`Adicional ${l.saludNm} (plan ${l.planUF} UF)`,l.adicionalIsapre,true):''}
       ${l.descCesantia?row('Seguro cesantía 0,6%',l.descCesantia,true):''}
-      ${l.iusc?row('Impuesto único 2ª cat.',l.iusc,true):''}
+      ${l.iusc?row(`Impuesto único 2ª cat. (tramo ${l.iuscDet.idx+1} · ${(l.iuscDet.factor*100).toFixed(2)}%)`,l.iusc,true):''}
       ${row('Total descuentos',l.totalDescuentos,true,true)}
       <tr style="background:rgba(46,160,67,.14)"><td class="tl" style="padding:11px 10px;font-weight:700;font-size:14px">LÍQUIDO A PAGAR</td><td style="font-family:var(--mono);text-align:right;font-weight:700;font-size:14px;color:var(--ach)">${fmtC(l.liquido)}</td></tr>
     </tbody></table>

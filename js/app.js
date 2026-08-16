@@ -27,7 +27,8 @@ import {fillEmpresaForm, saveEmpresa, updateHdr} from './empresa.js';
 import {savePDC, renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm,
         guardarCuenta, eliminarCuenta, resetPDC, PF} from './pdc.js';
 import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
-        getIndicadores, IND, actualizarDesdeBancoCentral} from './indicadores.js';
+        getIndicadores, IND, actualizarDesdeBancoCentral,
+        renderIUSCTabla, setIUSC, addIUSCTramo, delIUSCTramo, restaurarIUSCTabla, setIUSCPrueba} from './indicadores.js';
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
 import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif} from './buscadorcuentas.js';
 import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './salida.js';
@@ -79,6 +80,8 @@ import {renderActivoFijo, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardar
 import {renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, onGratModoChange,
         previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador,
         onParamRem, verLiquidacion, generarAsientoRemuneraciones, REMF} from './remuneraciones.js';
+import {cargarLibroRem, libroDelMes, renderLibroRem, setRemView, getRemView, tabsRemuneraciones,
+        cerrarMesRem, reabrirMesRem, exportarLibroRemExcel} from './libroremuneraciones.js';
 import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
         previewProvFer, generarProvisionIncobrables, generarProvisionFeriado,
         renderCorreccion, previewCM} from './cierre.js';
@@ -205,7 +208,7 @@ async function initApp(){
   }catch(e){console.warn('Error cargando PDC:',e);}
   ys.value=S.empresa.anio;
   await loadYear(S.empresa.anio);
-  await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();
+  await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();await cargarLibroRem();
   // Migración de folios de comprobante para datos preexistentes:
   // asigna folioComp a asientos manuales, compras, ventas y apertura que no
   // lo tengan, respetando el orden cronológico.
@@ -331,7 +334,7 @@ async function recargarEmpresaActiva(){
     if(r){const l=JSON.parse(r.value);if(Array.isArray(l)&&l.length){PDC.length=0;l.forEach(c=>PDC.push(c));recalcDerivadasPDC();}}
   }catch(e){}
   await loadYear(S.empresa.anio);
-  await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();
+  await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();await cargarLibroRem();
   fillEmpresaForm();updateHdr();renderSelectorEmpresa();
   rerender();
 }
@@ -361,6 +364,7 @@ Object.assign(window,{
   fillEmpresaForm, saveEmpresa, updateHdr,
   renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm, guardarCuenta, eliminarCuenta, resetPDC,
   renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault, actualizarDesdeBancoCentral,
+  renderIUSCTabla, setIUSC, addIUSCTramo, delIUSCTramo, restaurarIUSCTabla, setIUSCPrueba,
   renderPrevisional, guardarPrevisional, restaurarPrevisional,
   renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
   verDetalleCC, abrirCapitalizar, confirmarCapitalizar, ccOpts, ccNombre,
@@ -409,6 +413,8 @@ Object.assign(window,{
   eliminarAF, generarAsientoDepreciacion,
   // remuneraciones
   renderRemuneraciones, abrirFormTrabajador, cerrarFormTrabajador, onSaludChange, onGratModoChange,
+  renderLibroRem, setRemView, getRemView, tabsRemuneraciones, cerrarMesRem, reabrirMesRem,
+  exportarLibroRemExcel, libroDelMes,
   previewLiq, guardarTrabajador, editarTrabajador, eliminarTrabajador, onParamRem,
   verLiquidacion, generarAsientoRemuneraciones,
   // cierre

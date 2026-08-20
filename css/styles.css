@@ -477,3 +477,25 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
   .sec-hdr .btn{display:none!important}
 }
 #print-header{display:none}
+
+
+/* ── Tabla del modal de Comprobante ───────────────────────────────────────
+   El problema: las columnas iban con anchos fijos en px, así que un monto
+   grande ($ 97.190.625) no cabía en sus 88px y se desbordaba.
+   La solución: `table-layout:auto` para que código, cuenta y montos se
+   dimensionen según su contenido y siempre quepan enteros; la DESCRIPCIÓN
+   absorbe el espacio sobrante y es la única que se corta, con el texto
+   completo disponible en el tooltip (atributo title). */
+.tbl-cmp{width:100%;font-size:12px;table-layout:auto;border-collapse:collapse}
+.tbl-cmp th,.tbl-cmp td{padding:6px 8px}
+.tbl-cmp .c-cod{font-family:var(--mono);color:var(--mt);white-space:nowrap}
+/* La cuenta nunca se corta: si es larga, envuelve en dos líneas en vez de
+   comerse el ancho que necesita la descripción */
+.tbl-cmp .c-cta{white-space:normal;overflow-wrap:anywhere;min-width:190px;max-width:240px}
+/* max-width:1px + width:100% es el truco para que ESTA celda sea la elástica
+   y la que trunca, dejando que las demás tomen su ancho natural */
+.tbl-cmp .c-desc{width:100%;max-width:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mt);font-size:11px;cursor:help}
+.tbl-cmp .c-num{text-align:right;font-family:var(--mono);white-space:nowrap}
+/* Red de seguridad en pantallas muy angostas */
+.cmp-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media (max-width:640px){.tbl-cmp{min-width:520px}}

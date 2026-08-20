@@ -24,11 +24,22 @@ import {FS, fsStatusSet} from './firebase.js';
       return null;
     }catch(e){console.warn('FS get',key,e);return null;}
   }
+  // ── Campo `empresa` ──
+  // Las reglas de Firestore no pueden leer el prefijo del id del documento en
+  // una consulta, así que cada documento lleva además un campo `empresa` con
+  // el id de la empresa dueña (o '_global' para el catálogo y la config).
+  // Las reglas endurecidas exigen que este campo coincida con el prefijo del id.
+  function empresaDeClave(key){
+    if(!key||key[0]==='_')return '_global';
+    const i=key.indexOf(':');
+    return i>0?key.slice(0,i):'_global';
+  }
+
   async function setRemote(key,value){
     if(!FS.enabled||!FS.db)return false;
     try{
       FS.pendingWrites++;fsStatusSet('syncing');
-      await FS.db.collection(COLL).doc(key).set({value,ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      await FS.db.collection(COLL).doc(key).set({value,empresa:empresaDeClave(key),ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
       FS.pendingWrites--;FS.lastSaveTs=Date.now();
       if(FS.pendingWrites===0)fsStatusSet('saved');
       return true;
@@ -113,14 +124,50 @@ import {FS, fsStatusSet} from './firebase.js';
       return {count};
     },
     // Sincronizar todo remoto → local (usado al abrir en un dispositivo nuevo)
-    async syncAllFromRemote(){
+    //
+    // `ids` = empresas que el usuario puede ver. Se consulta una vez por empresa
+    // (más '_global' para el catálogo) en vez de traer la colección completa:
+    // con las reglas endurecidas una consulta sin filtro se rechaza entera,
+    // porque Firestore no puede garantizar que todos los resultados sean legibles.
+    // Si no se pasan ids se cae a la consulta antigua (reglas permisivas).
+    async syncAllFromRemote(ids){
       if(!FS.enabled||!FS.db)return {count:0};
+      const guardar=snap=>{let n=0;snap.forEach(doc=>{const d=doc.data();if(d&&d.value!==undefined){setLocal(doc.id,d.value);n++;}});return n;};
       try{
-        const snap=await FS.db.collection(COLL).get();
-        let count=0;
-        snap.forEach(doc=>{const d=doc.data();if(d&&d.value!==undefined){setLocal(doc.id,d.value);count++;}});
-        return {count};
+        if(Array.isArray(ids)&&ids.length){
+          let count=0;
+          for(const emp of ['_global',...ids]){
+            const snap=await FS.db.collection(COLL).where('empresa','==',emp).get();
+            count+=guardar(snap);
+          }
+          return {count};
+        }
+        return {count:guardar(await FS.db.collection(COLL).get())};
       }catch(e){console.error('syncAllFromRemote',e);return {count:0,error:e.message};}
+    },
+
+    // Recorre la colección y devuelve los documentos SIN campo `empresa`.
+    // Sólo funciona con las reglas antiguas (hace un list sin filtro): se usa
+    // exactamente una vez, en la migración previa a publicar las reglas nuevas.
+    async docsSinEmpresa(){
+      if(!FS.enabled||!FS.db)throw new Error('Firestore no está disponible');
+      const snap=await FS.db.collection(COLL).get();
+      const faltan=[];let total=0;
+      snap.forEach(doc=>{total++;const d=doc.data()||{};if(d.empresa===undefined)faltan.push(doc.id);});
+      return {total,faltan};
+    },
+    // Estampa el campo `empresa` en los documentos que no lo tienen.
+    async estamparEmpresa(ids,onProgreso){
+      if(!FS.enabled||!FS.db)throw new Error('Firestore no está disponible');
+      let hechos=0;
+      for(let i=0;i<ids.length;i+=400){
+        const lote=FS.db.batch();
+        ids.slice(i,i+400).forEach(id=>lote.update(FS.db.collection(COLL).doc(id),{empresa:empresaDeClave(id)}));
+        await lote.commit();
+        hechos+=Math.min(400,ids.length-i);
+        if(onProgreso)onProgreso(hechos,ids.length);
+      }
+      return {hechos};
     }
   };
 })();

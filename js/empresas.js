@@ -9,6 +9,7 @@
 
 import {toast} from './core.js';
 import {AUTH} from './state.js';
+import {guardarACLEmpresa, borrarACLEmpresa, miembrosDe, aclDisponible} from './acl.js';
 
 // Marcos contables disponibles
 export const MARCOS=[
@@ -147,12 +148,28 @@ export async function cargarEmpresas(){
   return EMPRESAS;
 }
 
+// Firma de acceso de una empresa: si no cambió, no hace falta reescribir su ACL
+const firmaACL=e=>`${String(e.creadoPor||'').toLowerCase()}|${miembrosDe(e).sort().join(',')}|${e.nombre||''}`;
+const ULTIMA_ACL={};   // id → firma escrita en esta sesión
+
+// Replica en `empresas_acl` los cambios de dueño/compartidos, porque las reglas
+// de Firestore no pueden leer el catálogo (es un JSON dentro de un string).
+async function refrescarACL(){
+  if(!aclDisponible())return;
+  for(const e of EMPRESAS.todas){
+    const f=firmaACL(e);
+    if(ULTIMA_ACL[e.id]===f)continue;
+    if(await guardarACLEmpresa(e))ULTIMA_ACL[e.id]=f;
+  }
+}
+
 export async function guardarCatalogo(){
   // Se persiste el catálogo COMPLETO: si se guardara sólo lo visible, un
   // usuario borraría del catálogo las empresas de los demás sin querer.
   await window.storage.setGlobal('_empresas',JSON.stringify(EMPRESAS.todas));
   if(EMPRESAS.activa)await window.storage.setGlobal(claveActiva(),EMPRESAS.activa);
   aplicarVisibilidad();
+  refrescarACL();   // en segundo plano: no debe frenar el guardado
 }
 
 export const empresaActiva=()=>EMPRESAS.todas.find(e=>e.id===EMPRESAS.activa)||null;
@@ -200,6 +217,7 @@ export async function eliminarEmpresa(id,borrarDatos=false){
   if(EMPRESAS.lista.length<=1)throw new Error('Debe existir al menos una empresa');
   const era=EMPRESAS.activa===id;
   EMPRESAS.todas=EMPRESAS.todas.filter(e=>e.id!==id);
+  borrarACLEmpresa(id);
   aplicarVisibilidad();
   if(era)EMPRESAS.activa=(EMPRESAS.lista[0]||EMPRESAS.todas[0]||{}).id||null;
   await guardarCatalogo();

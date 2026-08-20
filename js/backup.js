@@ -5,6 +5,7 @@ import {S} from './state.js';
 import {FS, fsStatusSet} from './firebase.js';
 import {rerender} from './ui.js';
 import './storage.js';
+import {EMPRESAS} from './empresas.js';
 
 // ═══ BASE DE DATOS EXCEL — auto-save con File System Access API ═══
 let BD={
@@ -243,7 +244,10 @@ async function fsRestoreFromCloud(){
   if(!confirm('¿Descargar TODOS los datos desde Firestore?\n\nEsto reemplazará los datos locales de este dispositivo con los que hay en la nube.\n\nÚsalo al abrir la app en un dispositivo nuevo, o si sospechas que los datos locales están desactualizados.'))return;
   toast('⏬ Descargando datos desde Firestore...');
   try{
-    const r=await window.storage.syncAllFromRemote();
+    // Con las reglas endurecidas una consulta sin filtro se rechaza entera:
+    // hay que pedir empresa por empresa (sólo las que este usuario puede ver).
+    const ids=EMPRESAS.lista.map(e=>e.id);
+    const r=await window.storage.syncAllFromRemote(ids);
     if(r.error){toast('❌ Error: '+r.error,'e');return;}
     toast(`✅ ${r.count} elementos descargados. Recargando app...`);
     setTimeout(()=>location.reload(),1500);

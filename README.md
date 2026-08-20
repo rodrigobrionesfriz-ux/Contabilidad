@@ -251,3 +251,12 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
 - **Comprobantes — tabla**: código, cuenta y montos se dimensionan según su
   contenido y siempre caben enteros; la descripción absorbe el espacio sobrante y
   es la única que se corta, con el texto completo en el tooltip.
+- **Signo de presentación en los informes**: `buildMayor` guarda `saldo = debe − haber`,
+  así que las cuentas de pasivo, patrimonio e ingreso quedan con saldo negativo. Para
+  presentarlas hay que **invertir el signo**, nunca tomar el valor absoluto: con
+  `Math.abs`, una cuenta de activo con saldo acreedor (un banco sobregirado) se muestra
+  sumando en vez de restando y el balance descuadra en el DOBLE de ese saldo. El helper
+  `saldoPres(cd,saldo)` centraliza la regla y lo usan Balance, Mayor, EERR y comparativo.
+- **Aviso de saldos invertidos**: el Balance lista las cuentas que quedaron con saldo
+  contrario a su naturaleza (excluyendo las correctoras de activo, donde es normal),
+  porque casi siempre son datos pendientes de cargar.

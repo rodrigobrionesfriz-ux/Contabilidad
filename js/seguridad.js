@@ -237,9 +237,10 @@ export function bloqueSeguridad(){
         🔒 <strong>El aislamiento está activo.</strong> Las reglas endurecidas ya rechazan las consultas
         sin filtro — por eso esta verificación pasó a contar los documentos empresa por empresa.
         Todo lo que tienes en este equipo se alcanza en la nube.<br><br>
-        Último paso pendiente: en <code>firestore.rules</code>, dentro de la función <code>miembro()</code>,
-        borra la línea <code>|| !hayAcl(emp)</code> y vuelve a publicar. Ahí una empresa sin ficha de
-        acceso deja de ser visible para todos menos los administradores.
+        Si publicaste la versión con la escotilla de transición (la que trae
+        <code>|| !hayAcl(emp)</code> en la función <code>miembro()</code>), bórrala y vuelve a publicar
+        para que el aislamiento quede estricto. El <code>firestore.rules</code> del repositorio ya
+        viene sin ella.
       </div>`
       :e.listo?`<div class="info-tip" style="margin-top:10px;font-size:11px;line-height:1.6">
         ✅ <strong>La base está lista.</strong> Ya puedes publicar <code>firestore.rules</code> en

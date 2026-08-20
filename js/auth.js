@@ -345,13 +345,16 @@ function mostrarLogin(){
 }
 
 async function logout(){
-  // Avisar si queda trabajo sin guardar antes de cerrar la sesión
-  let msg='¿Cerrar sesión?';
-  try{
-    if(window.haySinGuardar&&window.haySinGuardar())
-      msg='⚠️ Hay cambios SIN GUARDAR.\n\nSi cierras sesión ahora podrías perderlos.\n\n¿Cerrar sesión de todas formas?';
-  }catch(e){}
-  if(!confirm(msg))return;
+  // Antes de cerrar sesión: si queda trabajo sin guardar, se ofrece guardarlo.
+  // No se avisa y ya — se guarda, que es lo que la gente quiere de verdad.
+  const pendiente=(()=>{try{return !!(window.haySinGuardar&&window.haySinGuardar());}catch(e){return false;}})();
+  if(pendiente){
+    // Con trabajo pendiente: Aceptar guarda y sale, Cancelar se queda.
+    try{
+      if(window.confirmarSalida){ if(!await window.confirmarSalida('cerrar sesión'))return; }
+      else if(!confirm('⚠️ Hay cambios SIN GUARDAR.\n\n¿Cerrar sesión de todas formas?'))return;
+    }catch(e){return;}
+  }else if(!confirm('¿Cerrar sesión?'))return;
   try{await AUTH.auth.signOut();}catch(e){}
   location.reload();
 }

@@ -12,6 +12,7 @@
 import {S, AUTH} from './state.js';
 import {TEMAS} from './tema.js';
 import {bloqueSeguridad} from './seguridad.js';
+import {AG, OPCIONES_INTERVALO, etiquetaIntervalo} from './autoguardado.js';
 
 // Lee el texto que los módulos de sincronización dejaron en los indicadores
 function estadoTexto(id,fallback){
@@ -35,7 +36,7 @@ function renderSistema(){
 
   el.innerHTML=`
     <div class="info-tip" style="margin-bottom:14px;font-size:11px;line-height:1.6">
-      💡 La barra superior quedó solo con el título, la hora del último guardado y tu usuario.
+      💡 La barra superior quedó solo con el título, el estado de guardado, el botón 💾 y tu usuario.
       Todo lo demás vive acá. La <strong>empresa activa</strong> y el <strong>ejercicio</strong> se cambian
       desde el bloque de arriba del menú lateral, y el buscador global sigue abriéndose con <strong>Ctrl+K</strong>
       desde cualquier sección.
@@ -51,10 +52,27 @@ function renderSistema(){
           <tr><td class="tl" style="font-size:12px">Carpeta Excel</td><td style="text-align:right;font-size:12px">${excel}</td></tr>
         </tbody></table>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button class="btn btn-p" onclick="saveAll();renderSistema()">💾 Guardar todo ahora</button>
+          <button class="btn btn-p" onclick="saveAll().then(renderSistema)">💾 Guardar todo ahora</button>
           <button class="btn btn-g" onclick="renderSistema()">🔄 Actualizar</button>
         </div>
         <div style="font-size:10px;color:var(--mt);margin-top:8px">El sistema guarda solo cada vez que registras algo; este botón fuerza un guardado inmediato.</div>`)}
+
+      ${tarjeta('⏱','Guardado automático',
+        'Guarda solo cada cierto rato mientras trabajas, y también al cambiar de pestaña o cerrar. La preferencia queda en este dispositivo.',
+        `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn ${AG.activo?'btn-p':'btn-g'}" onclick="setAutoguardado(${!AG.activo})">
+            ${AG.activo?'✅ Activado':'⏸ Desactivado'}
+          </button>
+          <select onchange="setIntervaloAutoguardado(this.value)" ${AG.activo?'':'disabled'} style="width:auto">
+            ${OPCIONES_INTERVALO.map(s=>`<option value="${s}" ${s===AG.segundos?'selected':''}>Cada ${etiquetaIntervalo(s)}</option>`).join('')}
+          </select>
+        </div>
+        <div style="font-size:10px;color:var(--mt);margin-top:10px;line-height:1.6">
+          ${AG.activo
+            ? `Guarda cada <strong>${etiquetaIntervalo(AG.segundos)}</strong> si hay algo pendiente${AG.ultimo?` · último automático a las ${AG.ultimo.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}`:''}.`
+            : 'Con el automático apagado, el botón 💾 de la barra superior se pone <strong>amarillo</strong> cuando hay algo sin guardar.'}
+          <br>Al cerrar sesión o cerrar la pestaña con trabajo pendiente, el sistema ofrece guardarlo antes de salir.
+        </div>`)}
 
       ${tarjeta('☁️','Respaldo en la nube',
         'Copia de todos tus datos en Firestore. Útil para abrir el sistema en otro equipo o recuperar información.',

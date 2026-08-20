@@ -26,6 +26,10 @@ export const haySinGuardar=()=>_sucio;
 
 // Indicador visual en el encabezado
 function actualizarIndicador(){
+  // El botón de la barra superior también refleja el estado. Se llama por
+  // window para no importar autoguardado.js desde acá (él ya importa este
+  // módulo y quedaría un ciclo).
+  try{ if(window.actualizarBotonGuardar)window.actualizarBotonGuardar(); }catch(e){}
   const el=document.getElementById('save-indicator');
   if(!el)return;
   if(_sucio){

@@ -34,6 +34,8 @@ import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
 import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif} from './buscadorcuentas.js';
 import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './salida.js';
+import {initAutoguardado, actualizarBotonGuardar, guardarTodoAhora, setAutoguardado,
+        setIntervaloAutoguardado, confirmarSalida, AG} from './autoguardado.js';
 import {cargarFichasAux, descargarPlantillaAux, abrirImportFichas,
         initImportFichasListener, fichasAux, fichaAux} from './importadoraux.js';
 import {cargarComprobantes} from './comprobantestipo.js';
@@ -119,8 +121,17 @@ import {exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud,
         importarExcelBD, initBDImportListener, bdRestaurarHandle, BD} from './backup.js';
 
 // ═══ STORAGE ═══
-async function saveAll(){
-  const btn=document.querySelector('.btn-save-all');btn.textContent='⏳...';
+// Guarda todo el estado en curso. `silencioso` lo usa el autoguardado para no
+// llenar la pantalla de toasts. Devuelve true/false según haya podido guardar.
+//
+// Ojo: antes esta función empezaba con `document.querySelector('.btn-save-all').textContent=…`
+// sin comprobar que el botón existiera. Al sacar el botón de la barra superior
+// quedó en null y saveAll() reventaba en la primera línea sin guardar nada.
+async function saveAll({silencioso=false}={}){
+  const btn=document.getElementById('btn-guardar-todo');
+  const rotulo=btn?btn.innerHTML:'';
+  if(btn){btn.innerHTML='⏳';btn.disabled=true;}
+  let ok=false;
   try{
     const y=S.empresa.anio;
     await window.storage.set('empresa',JSON.stringify(S.empresa));
@@ -134,9 +145,16 @@ async function saveAll(){
     if(S.cierresCC&&S.cierresCC.length)await window.storage.set('cierresCC',JSON.stringify(S.cierresCC));
     if(S.comprobantesTipo&&S.comprobantesTipo.length)await window.storage.set('comprobantesTipo',JSON.stringify(S.comprobantesTipo));
     if(S.fichasAux)await window.storage.set('fichasAux',JSON.stringify(S.fichasAux));
-    toast('✅ Todos los datos guardados');
-  }catch(e){toast('❌ Error: '+e.message,'e');}
-  btn.textContent='💾 Guardar Todo';
+    ok=true;
+    marcarGuardado();
+    if(!silencioso)toast('✅ Todos los datos guardados');
+  }catch(e){
+    console.error('saveAll',e);
+    toast('❌ No se pudo guardar: '+e.message,'e');   // el error se avisa siempre
+  }
+  if(btn){btn.disabled=false;btn.innerHTML=rotulo||'💾 Guardar';}
+  actualizarBotonGuardar();
+  return ok;
 }
 async function loadYear(y){
   S.ventas=[];S.compras=[];S.honorarios=[];S.asientos=[];S.apertura=null;S.activos=[];S.trabajadores=[];
@@ -385,6 +403,7 @@ Object.assign(window,{
   onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual, revertirCierreMensual,
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif,
   marcarGuardado, marcarSucio, haySinGuardar,
+  actualizarBotonGuardar, guardarTodoAhora, setAutoguardado, setIntervaloAutoguardado, confirmarSalida, AG,
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, cambiarFPVSel,
   abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
@@ -469,5 +488,6 @@ function abrirImportFichasActual(){abrirImportFichas(tipoAuxActual());}
 
 // ═══ ARRANQUE ═══
 initTema();
-initAvisoSalida();   // aviso si se cierra con cambios sin guardar   // aplicar tema guardado antes de renderizar
+initAvisoSalida();   // aviso si se cierra con cambios sin guardar
+initAutoguardado();  // temporizador + guardado al dejar la pestaña o cerrar   // aplicar tema guardado antes de renderizar
 init();

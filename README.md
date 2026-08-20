@@ -134,15 +134,58 @@ firebase.auth.Auth.Persistence.NONE     // pide clave hasta al recargar
 firebase.auth.Auth.Persistence.LOCAL    // recuerda siempre
 ```
 
-### Reglas de Firestore necesarias
-Para que el registro de actividad funcione, agrega en `firestore.rules`:
-```
-match /audit_log/{doc} {
-  allow create: if esUsuarioActivo();
-  allow read: if esAdminActivo();
-  allow update, delete: if false;   // el historial es inmutable
-}
-```
+### Reglas de Firestore
+
+El archivo **`firestore.rules`** del repositorio contiene las reglas endurecidas.
+Cada usuario sólo lee y escribe los datos de las empresas de las que es miembro,
+el rol `consulta` no puede escribir, nadie puede cambiar su propio rol y el
+registro de auditoría es inmutable.
+
+#### Cómo funciona el aislamiento
+
+Las reglas no saben parsear JSON ni leer el prefijo del id en una consulta, así
+que la app mantiene dos cosas para ellas:
+
+| Qué | Dónde | Para qué |
+|---|---|---|
+| `empresas_acl/<empresaId>` | colección propia | `{creadoPor, miembros:[emails]}` — las reglas leen `miembros` |
+| campo `empresa` | en cada doc de `contabilidad_data` | permite consultar con `where('empresa','==',id)` |
+
+`js/acl.js` mantiene el ACL al día cada vez que se crea, comparte, reclama o
+elimina una empresa. `js/storage.js` estampa el campo `empresa` en cada escritura.
+
+#### Puesta en marcha (en este orden — importante)
+
+1. **Prepara la base con las reglas VIEJAS todavía publicadas.**
+   Entra como administrador → Configuración → Sistema → 🔒 Aislamiento por empresa →
+   **Preparar aislamiento**. Crea las fichas de acceso y marca los documentos
+   existentes. No toca ningún dato contable.
+2. **Verifica.** El mismo panel debe quedar en verde: *"La base está lista"*.
+3. **Publica** el contenido de `firestore.rules` en
+   Firebase → Firestore Database → Reglas → Publicar.
+4. **Vuelve a verificar** desde la app. Si sigue en verde, el aislamiento está activo.
+5. **Cierra la escotilla.** En `firestore.rules`, dentro de la función `miembro()`,
+   borra la línea `|| !hayAcl(emp)` y vuelve a publicar. Hasta ese momento, una
+   empresa sin ficha de acceso sigue siendo visible para cualquier usuario activo
+   (así nada se rompe durante la migración).
+
+Si compartes una empresa y el otro usuario no la ve, usa **Reparar accesos** en
+el mismo panel: reescribe las fichas desde el catálogo.
+
+#### Consecuencias a tener en cuenta
+
+- **Proyecto nuevo desde cero**: el atajo "primer usuario = admin" que trae la app
+  no se puede validar desde las reglas, así que queda prohibido. Crea a mano el
+  primer documento en la consola de Firebase:
+  `usuarios/<tu-email>` = `{email, nombre, rol:'admin', activo:true, pendiente:false}`.
+- **Auto-promoción del usuario único**: la red de seguridad de `auth.js` que
+  promueve a admin al único usuario del sistema deja de funcionar por la misma
+  razón. Se arregla desde la consola.
+- **El catálogo `_empresas` sigue siendo escribible** por cualquier usuario con
+  permiso de escritura: es un único documento compartido. El aislamiento protege
+  los *datos*, no la lista de nombres de empresa.
+- **"Descargar de la nube"** ahora consulta empresa por empresa en lugar de traer
+  la colección completa (una consulta sin filtro se rechaza entera).
 
 ---
 

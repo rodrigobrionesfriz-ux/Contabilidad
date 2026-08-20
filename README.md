@@ -174,7 +174,15 @@ elimina una empresa. `js/storage.js` estampa el campo `empresa` en cada escritur
 2. **Verifica.** El mismo panel debe quedar en verde: *"La base está lista"*.
 3. **Publica** el contenido de `firestore.rules` en
    Firebase → Firestore Database → Reglas → Publicar.
-4. **Vuelve a verificar** desde la app. Si sigue en verde, el aislamiento está activo.
+4. **Vuelve a verificar** desde la app. Aquí el panel cambia de modo: con las
+   reglas endurecidas publicadas, la consulta sin filtro que usaba el recuento
+   completo se rechaza **a propósito**, así que el diagnóstico pasa a contar los
+   documentos **empresa por empresa** y a contrastarlos con lo guardado en este
+   equipo. Que ese recuento se rechace es la señal de que el aislamiento está
+   activo, no un error.
+   Si aparecen documentos que este equipo tiene y la nube ya no deja leer
+   (quedaron sin marcar), el botón **🛠 Reparar documentos** los vuelve a subir
+   —hazlo desde el equipo con la información más al día.
 5. **Cierra la escotilla.** En `firestore.rules`, dentro de la función `miembro()`,
    borra la línea `|| !hayAcl(emp)` y vuelve a publicar. Hasta ese momento, una
    empresa sin ficha de acceso sigue siendo visible para cualquier usuario activo

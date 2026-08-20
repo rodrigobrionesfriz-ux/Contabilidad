@@ -201,6 +201,11 @@ el mismo panel: reescribe las fichas desde el catálogo.
 
 #### Consecuencias a tener en cuenta
 
+- **Alta de usuarios**: un administrador puede invitar a cualquiera desde
+  Configuración → Usuarios (pre-autoriza el email con su rol). Quien se registra
+  por su cuenta queda siempre inactivo y de sólo consulta hasta que un admin lo
+  apruebe. En ambos casos el id del documento tiene que ser el email que lleva
+  dentro.
 - **Proyecto nuevo desde cero**: el atajo "primer usuario = admin" que trae la app
   no se puede validar desde las reglas, así que queda prohibido. Crea a mano el
   primer documento en la consola de Firebase:
@@ -236,3 +241,13 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
 - **IFRS**: el marco contable por empresa hoy adapta advertencias y el encabezado de reportes. Una implementación NIIF completa requeriría plan de cuentas por naturaleza, estados en formato NIIF, notas, deterioro (NIC 36), arrendamientos (NIIF 16) e impuestos diferidos (NIC 12)
 - **Corrección monetaria**: el régimen 14 D N°3 Pro-Pyme General **no está sujeto** a la CM del Art. 41 LIR. El módulo es informativo
 - **Indicadores automáticos**: dependen de mindicador.cl, un servicio externo gratuito. Si está caído, los valores se ingresan a mano
+
+- **Comprobantes — eliminar**: desde el modal se puede eliminar cualquier comprobante.
+  Un comprobante manual borra su asiento (y ofrece "Anular" como alternativa, que
+  conserva el N° correlativo); uno de apertura borra el asiento N°0; uno automático
+  de ventas o compras borra el **documento que lo origina**, porque el comprobante
+  es su reflejo y no existe por separado. Honorarios queda fuera: su comprobante
+  resume todas las boletas del mes, así que manda al libro correspondiente.
+- **Comprobantes — tabla**: código, cuenta y montos se dimensionan según su
+  contenido y siempre caben enteros; la descripción absorbe el espacio sobrante y
+  es la única que se corta, con el texto completo en el tooltip.

@@ -9,9 +9,11 @@ import './storage.js';
 import {registrarUI} from './ui.js';
 import {initTema, cambiarTema, aplicarTema} from './tema.js';
 import {EMPRESAS, MARCOS, marcoInfo, cargarEmpresas, empresaActiva, crearEmpresa,
-        eliminarEmpresa, actualizarEmpresa, activarEmpresa, migrarSiHaceFalta} from './empresas.js';
+        eliminarEmpresa, actualizarEmpresa, activarEmpresa, migrarSiHaceFalta,
+        aplicarVisibilidad, puedeVerEmpresa} from './empresas.js';
 import {renderEmpresas, abrirFormEmpresa, cerrarFormEmpresa, editarEmpresaCat,
-        guardarEmpresaCat, seleccionarEmpresa, borrarEmpresa, onMarcoChange} from './empresas-ui.js';
+        guardarEmpresaCat, seleccionarEmpresa, borrarEmpresa, onMarcoChange,
+        abrirCompartir, cerrarCompartir, guardarCompartir, reclamarEmpresa} from './empresas-ui.js';
 
 // Sistema
 import {initAuth, puedeVer, puedeEditar, esAdmin, ROLES, SECCIONES, permisosDeRol,
@@ -447,6 +449,7 @@ Object.assign(window,{
   abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda, irAResultado,
   cambiarTema, aplicarTema, onCambiarEmpresa, renderSelectorEmpresa, recargarEmpresaActiva,
   renderEmpresas, abrirFormEmpresa, cerrarFormEmpresa, editarEmpresaCat, guardarEmpresaCat,
+  abrirCompartir, cerrarCompartir, guardarCompartir, reclamarEmpresa, aplicarVisibilidad,
   seleccionarEmpresa, borrarEmpresa, onMarcoChange,
   exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud, importarExcelBD,
 });

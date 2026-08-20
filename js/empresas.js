@@ -8,6 +8,7 @@
 //   <id>:ventas-2026   → datos de esa empresa (el prefijo lo aplica storage.js)
 
 import {toast} from './core.js';
+import {AUTH} from './state.js';
 
 // Marcos contables disponibles
 export const MARCOS=[
@@ -17,8 +18,50 @@ export const MARCOS=[
 ];
 export const marcoInfo=id=>MARCOS.find(m=>m.id===id)||MARCOS[0];
 
-// Estado en memoria del catálogo
-export const EMPRESAS={lista:[],activa:null};
+// ── Visibilidad por usuario ──
+// Cada empresa guarda quién la creó (`creadoPor`, el email) y con quién está
+// compartida (`compartidaCon`, lista de emails). Un usuario ve sus empresas,
+// las que le compartieron y las heredadas (las que existían antes de este
+// cambio, que no tienen dueño y quedan visibles para todos hasta que alguien
+// las reclame). Los administradores ven todo el catálogo.
+//
+// IMPORTANTE: esto es visibilidad de interfaz, no aislamiento de datos. Los
+// documentos siguen en la misma colección de Firestore y las reglas actuales
+// permiten leerlos a cualquier usuario activo. Para aislamiento real hay que
+// endurecer las reglas (ver README).
+export const EMPRESAS={
+  lista:[],      // visibles para el usuario en sesión
+  todas:[],      // catálogo completo (lo que se persiste)
+  activa:null,
+};
+
+const emailActual=()=>((AUTH.user&&AUTH.user.email)||'').toLowerCase();
+const esAdminActual=()=>!!(AUTH.user&&AUTH.user.activo&&AUTH.user.rol==='admin');
+
+export const empresaSinDuenio=e=>!e.creadoPor;
+export function puedeVerEmpresa(e){
+  if(!e)return false;
+  if(esAdminActual())return true;              // el admin administra todo el catálogo
+  if(empresaSinDuenio(e))return true;          // heredada: visible hasta que se reclame
+  const yo=emailActual();
+  if(!yo)return true;                          // sin sesión identificada, no ocultamos nada
+  if(String(e.creadoPor).toLowerCase()===yo)return true;
+  return (e.compartidaCon||[]).some(x=>String(x).toLowerCase()===yo);
+}
+export const esDuenioDeEmpresa=e=>!!e&&String(e.creadoPor||'').toLowerCase()===emailActual();
+
+// Recalcula la lista visible a partir del catálogo completo
+export function aplicarVisibilidad(){
+  EMPRESAS.lista=EMPRESAS.todas.filter(puedeVerEmpresa);
+  return EMPRESAS.lista;
+}
+
+// Clave de empresa activa POR USUARIO: antes era global y dos usuarios se
+// pisaban la selección entre sí.
+const claveActiva=()=>{
+  const yo=emailActual();
+  return yo?'_empresaActiva:'+yo:'_empresaActiva';
+};
 
 // ── Migración desde monoempresa ──
 // Los datos antiguos se guardaron sin prefijo (ej "ventas-2026"). Al pasar a
@@ -66,39 +109,86 @@ export async function migrarSiHaceFalta(){
 export async function cargarEmpresas(){
   try{
     const r=await window.storage.getGlobal('_empresas');
-    EMPRESAS.lista=r?JSON.parse(r.value):[];
-  }catch(e){EMPRESAS.lista=[];}
+    EMPRESAS.todas=r?JSON.parse(r.value):[];
+  }catch(e){EMPRESAS.todas=[];}
+  // Empresa activa: primero la del usuario, si no la global (compatibilidad)
+  EMPRESAS.activa=null;
   try{
-    const r=await window.storage.getGlobal('_empresaActiva');
-    EMPRESAS.activa=r?r.value:null;
-  }catch(e){EMPRESAS.activa=null;}
+    const r=await window.storage.getGlobal(claveActiva());
+    if(r)EMPRESAS.activa=r.value;
+  }catch(e){}
+  if(!EMPRESAS.activa){
+    try{
+      const r=await window.storage.getGlobal('_empresaActiva');
+      EMPRESAS.activa=r?r.value:null;
+    }catch(e){}
+  }
   // Si no hay ninguna, crear la empresa por defecto (migración desde monoempresa)
-  if(!EMPRESAS.lista.length){
-    const def={id:'emp1',nombre:'Mi Empresa',rut:'',marco:'tributaria',creada:new Date().toISOString()};
-    EMPRESAS.lista=[def];
+  if(!EMPRESAS.todas.length){
+    const def={id:'emp1',nombre:'Mi Empresa',rut:'',marco:'tributaria',
+      creada:new Date().toISOString(),creadoPor:emailActual()||'',compartidaCon:[]};
+    EMPRESAS.todas=[def];
     EMPRESAS.activa='emp1';
     await guardarCatalogo();
   }
+  aplicarVisibilidad();
+  // Si el usuario no puede ver la empresa activa, cae a la primera visible.
+  // Si no tiene ninguna visible, se le crea una propia: nunca queda sin trabajar.
   if(!EMPRESAS.activa||!EMPRESAS.lista.find(e=>e.id===EMPRESAS.activa)){
-    EMPRESAS.activa=EMPRESAS.lista[0].id;
-    await window.storage.setGlobal('_empresaActiva',EMPRESAS.activa);
+    if(!EMPRESAS.lista.length){
+      const nombre=(AUTH.user&&AUTH.user.nombre)?`Empresa de ${AUTH.user.nombre}`:'Mi Empresa';
+      const id=await crearEmpresa(nombre,'','tributaria');
+      EMPRESAS.activa=id;
+    }else{
+      EMPRESAS.activa=EMPRESAS.lista[0].id;
+    }
+    await window.storage.setGlobal(claveActiva(),EMPRESAS.activa);
   }
   return EMPRESAS;
 }
 
 export async function guardarCatalogo(){
-  await window.storage.setGlobal('_empresas',JSON.stringify(EMPRESAS.lista));
-  if(EMPRESAS.activa)await window.storage.setGlobal('_empresaActiva',EMPRESAS.activa);
+  // Se persiste el catálogo COMPLETO: si se guardara sólo lo visible, un
+  // usuario borraría del catálogo las empresas de los demás sin querer.
+  await window.storage.setGlobal('_empresas',JSON.stringify(EMPRESAS.todas));
+  if(EMPRESAS.activa)await window.storage.setGlobal(claveActiva(),EMPRESAS.activa);
+  aplicarVisibilidad();
 }
 
-export const empresaActiva=()=>EMPRESAS.lista.find(e=>e.id===EMPRESAS.activa)||null;
+export const empresaActiva=()=>EMPRESAS.todas.find(e=>e.id===EMPRESAS.activa)||null;
 
 // ── Operaciones ──
 export async function crearEmpresa(nombre,rut,marco){
-  const id='emp'+Date.now().toString(36);
-  EMPRESAS.lista.push({id,nombre,rut:rut||'',marco:marco||'tributaria',creada:new Date().toISOString()});
+  // El id debe ser único aunque se creen dos empresas en el mismo milisegundo
+  // (pasaba al auto-crear la empresa de un usuario justo después de otra).
+  let id='emp'+Date.now().toString(36);
+  while(EMPRESAS.todas.some(e=>e.id===id))id='emp'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  EMPRESAS.todas.push({id,nombre,rut:rut||'',marco:marco||'tributaria',
+    creada:new Date().toISOString(),
+    creadoPor:emailActual()||'',      // dueño = quien la crea
+    compartidaCon:[]});
   await guardarCatalogo();
   return id;
+}
+
+// ── Compartir y traspasar ──
+export async function compartirEmpresa(id,emails){
+  const e=EMPRESAS.todas.find(x=>x.id===id);
+  if(!e)return false;
+  const limpios=[...new Set((emails||[]).map(x=>String(x).trim().toLowerCase()).filter(Boolean))]
+    .filter(x=>x!==String(e.creadoPor||'').toLowerCase());   // el dueño no se auto-comparte
+  e.compartidaCon=limpios;
+  await guardarCatalogo();
+  return true;
+}
+// Reclama una empresa heredada (sin dueño) o traspasa el dueño (solo admin)
+export async function asignarDuenio(id,email){
+  const e=EMPRESAS.todas.find(x=>x.id===id);
+  if(!e)return false;
+  e.creadoPor=String(email||'').trim().toLowerCase();
+  e.compartidaCon=(e.compartidaCon||[]).filter(x=>String(x).toLowerCase()!==e.creadoPor);
+  await guardarCatalogo();
+  return true;
 }
 
 // Elimina una empresa del catálogo y opcionalmente todos sus datos del storage.
@@ -109,8 +199,9 @@ export async function crearEmpresa(nombre,rut,marco){
 export async function eliminarEmpresa(id,borrarDatos=false){
   if(EMPRESAS.lista.length<=1)throw new Error('Debe existir al menos una empresa');
   const era=EMPRESAS.activa===id;
-  EMPRESAS.lista=EMPRESAS.lista.filter(e=>e.id!==id);
-  if(era)EMPRESAS.activa=EMPRESAS.lista[0].id;
+  EMPRESAS.todas=EMPRESAS.todas.filter(e=>e.id!==id);
+  aplicarVisibilidad();
+  if(era)EMPRESAS.activa=(EMPRESAS.lista[0]||EMPRESAS.todas[0]||{}).id||null;
   await guardarCatalogo();
 
   if(borrarDatos){
@@ -137,7 +228,7 @@ export async function eliminarEmpresa(id,borrarDatos=false){
 }
 
 export async function actualizarEmpresa(id,campos){
-  const e=EMPRESAS.lista.find(x=>x.id===id);
+  const e=EMPRESAS.todas.find(x=>x.id===id);
   if(!e)return;
   Object.assign(e,campos);
   await guardarCatalogo();
@@ -145,9 +236,11 @@ export async function actualizarEmpresa(id,campos){
 
 // Cambia la empresa activa. Requiere recargar los datos (lo hace app.js).
 export async function activarEmpresa(id){
-  if(!EMPRESAS.lista.find(e=>e.id===id))return false;
+  const e=EMPRESAS.todas.find(x=>x.id===id);
+  if(!e)return false;
+  if(!puedeVerEmpresa(e)){toast('⚠️ No tienes acceso a esa empresa','e');return false;}
   EMPRESAS.activa=id;
-  await window.storage.setGlobal('_empresaActiva',id);
+  await window.storage.setGlobal(claveActiva(),id);
   window.storage.setPrefijo(id);
   return true;
 }

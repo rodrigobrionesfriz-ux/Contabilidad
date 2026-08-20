@@ -3,9 +3,17 @@ import {toast} from './core.js';
 import {esAdmin} from './auth.js';
 import {logAccion} from './firebase.js';
 import {EMPRESAS, MARCOS, marcoInfo, empresaActiva, crearEmpresa,
-        eliminarEmpresa, actualizarEmpresa, activarEmpresa} from './empresas.js';
+        eliminarEmpresa, actualizarEmpresa, activarEmpresa,
+        compartirEmpresa, asignarDuenio, empresaSinDuenio, esDuenioDeEmpresa} from './empresas.js';
+import {AUTH} from './state.js';
+import {US} from './usuarios.js';
 
 let EMPF={editId:null};
+let EMPC={id:null};   // empresa cuyo panel de compartir está abierto
+
+const miEmail=()=>((AUTH.user&&AUTH.user.email)||'').toLowerCase();
+// Usuarios del sistema con los que se puede compartir (todos menos yo)
+const otrosUsuarios=()=>(US.usuarios||[]).filter(u=>String(u.email).toLowerCase()!==miEmail());
 
 export function renderEmpresas(){
   const el=document.getElementById('empresas-content');
@@ -13,6 +21,18 @@ export function renderEmpresas(){
   const filas=EMPRESAS.lista.map(e=>{
     const m=marcoInfo(e.marco);
     const activa=e.id===EMPRESAS.activa;
+    const mia=esDuenioDeEmpresa(e);
+    const huerfana=empresaSinDuenio(e);
+    const compartida=(e.compartidaCon||[]).length;
+    // Quién es el dueño y con quién está compartida
+    const duenio=huerfana
+      ? `<span class="badge" style="background:rgba(210,153,34,.15);color:var(--warn)" title="Creada antes de activar la visibilidad por usuario: la ven todos">heredada</span>`
+      : (mia?`<span class="badge bg">tuya</span>`
+            :`<span class="badge bb" title="Creada por ${e.creadoPor}">de ${String(e.creadoPor).split('@')[0]}</span>`);
+    const compBadge=compartida
+      ? `<span class="badge bb" title="Compartida con: ${(e.compartidaCon||[]).join(', ')}">👥 ${compartida}</span>`:'';
+    // Sólo el dueño (o un admin) puede compartir o traspasar
+    const puedeGestionar=mia||esAdmin();
     return `<tr${activa?' style="background:rgba(88,166,255,.08)"':''}>
       <td class="tl" style="font-size:13px">
         ${activa?'<span style="color:var(--ac)">● </span>':''}<strong>${e.nombre}</strong>
@@ -20,17 +40,29 @@ export function renderEmpresas(){
         <div style="font-size:10px;color:var(--mt)">${e.rut||'sin RUT'}</div>
       </td>
       <td class="tl" style="font-size:11px">${m.nm}</td>
+      <td class="tl" style="font-size:11px">${duenio} ${compBadge}</td>
       <td style="text-align:right;white-space:nowrap">
         ${activa?'':`<button class="btn btn-i" onclick="seleccionarEmpresa('${e.id}')" title="Activar">▶</button>`}
+        ${huerfana?`<button class="btn btn-i" onclick="reclamarEmpresa('${e.id}')" title="Marcarla como tuya: dejará de verla el resto">🙋 Reclamar</button>`:''}
+        ${puedeGestionar&&!huerfana?`<button class="btn btn-i" onclick="abrirCompartir('${e.id}')" title="Compartir con otros usuarios">👥</button>`:''}
         <button class="btn btn-i" onclick="editarEmpresaCat('${e.id}')">✏️</button>
         ${EMPRESAS.lista.length>1&&esAdmin()?`<button class="btn btn-d" onclick="borrarEmpresa('${e.id}')" title="Eliminar empresa (solo administradores)">🗑</button>`:''}
       </td>
-    </tr>`;
+    </tr>${EMPC.id===e.id?filaCompartir(e):''}`;
   }).join('');
 
-  el.innerHTML=`<div class="info-tip" style="margin-bottom:14px">🏢 Cada empresa tiene sus datos <strong>completamente separados</strong>: plan de cuentas, libros, asientos e indicadores propios. Cambia de empresa con el selector del encabezado.</div>
+  const ocultas=EMPRESAS.todas.length-EMPRESAS.lista.length;
+
+  el.innerHTML=`<div class="info-tip" style="margin-bottom:14px">🏢 Cada empresa tiene sus datos <strong>completamente separados</strong>: plan de cuentas, libros, asientos e indicadores propios. Cambia de empresa con el selector del menú lateral.</div>
+  <div class="info-tip" style="margin-bottom:14px;font-size:11px;line-height:1.6">
+    👤 <strong>Cada usuario ve sólo sus empresas.</strong> La empresa queda a nombre de quien la crea; el dueño puede
+    compartirla con otros usuarios desde el botón 👥. ${esAdmin()?'Como administrador ves <strong>todo el catálogo</strong>, con el dueño de cada una.':''}
+    Las marcadas como <em>heredadas</em> son anteriores a este cambio y las sigue viendo todo el mundo hasta que alguien las reclame.
+    ${ocultas>0&&!esAdmin()?`<br><span style="color:var(--mt)">Hay ${ocultas} empresa(s) de otros usuarios que no se muestran.</span>`:''}
+    <br><span style="color:var(--warn)">⚠️ Es separación de vista, no de acceso: los datos siguen en la misma base y un usuario con conocimientos técnicos podría alcanzarlos. Para aislamiento real hay que endurecer las reglas de Firestore.</span>
+  </div>
   <div class="card-np" style="margin-bottom:14px"><div class="tw"><table>
-    <thead><tr><th class="tl">EMPRESA</th><th class="tl">MARCO CONTABLE</th><th></th></tr></thead>
+    <thead><tr><th class="tl">EMPRESA</th><th class="tl">MARCO CONTABLE</th><th class="tl">ACCESO</th><th></th></tr></thead>
     <tbody>${filas}</tbody>
   </table></div></div>
   <button class="btn btn-p" onclick="abrirFormEmpresa()">+ Nueva empresa</button>
@@ -165,4 +197,54 @@ ${nombre}`);
     // Si borró la activa, hay que recargar todo con la nueva activa
     if(window.recargarEmpresaActiva)await window.recargarEmpresaActiva();
   }catch(err){toast('⚠️ '+err.message,'e');}
+}
+
+
+// ── Compartir empresa con otros usuarios ──
+function filaCompartir(e){
+  const users=otrosUsuarios();
+  const sel=new Set((e.compartidaCon||[]).map(x=>String(x).toLowerCase()));
+  const cuerpo=users.length
+    ? users.map(u=>`<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;text-transform:none;letter-spacing:0;font-weight:400;color:var(--tx);cursor:pointer">
+        <input type="checkbox" value="${u.email}" class="chk-comp" ${sel.has(String(u.email).toLowerCase())?'checked':''} style="width:auto">
+        <span>${u.nombre||u.email}<span style="color:var(--mt);font-size:10px"> · ${u.email}${u.rol?' · '+u.rol:''}</span></span>
+      </label>`).join('')
+    : '<div style="font-size:11px;color:var(--mt)">No hay otros usuarios registrados todavía. Invítalos desde Configuración → Usuarios.</div>';
+  return `<tr><td colspan="4" style="background:var(--sf2);padding:14px 16px">
+    <div style="font-size:12px;font-weight:700;margin-bottom:8px">👥 Compartir «${e.nombre}»</div>
+    <div style="font-size:11px;color:var(--mt);margin-bottom:10px">Los usuarios marcados verán esta empresa en su selector y podrán trabajar en ella.</div>
+    <div style="max-height:220px;overflow:auto;margin-bottom:12px">${cuerpo}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="guardarCompartir('${e.id}')">💾 Guardar acceso</button>
+      <button class="btn btn-g" onclick="cerrarCompartir()">Cancelar</button>
+    </div>
+  </td></tr>`;
+}
+
+export function abrirCompartir(id){EMPC.id=id;renderEmpresas();}
+export function cerrarCompartir(){EMPC.id=null;renderEmpresas();}
+
+export async function guardarCompartir(id){
+  const emails=[...document.querySelectorAll('.chk-comp:checked')].map(c=>c.value);
+  await compartirEmpresa(id,emails);
+  const e=EMPRESAS.todas.find(x=>x.id===id);
+  toast(emails.length?`👥 «${e?e.nombre:''}» compartida con ${emails.length} usuario(s)`:`🔒 «${e?e.nombre:''}» ya no está compartida`);
+  logAccion('Compartió empresa',`${e?e.nombre:id} → ${emails.join(', ')||'(nadie)'}`);
+  EMPC.id=null;
+  renderEmpresas();
+  if(window.renderSelectorEmpresa)window.renderSelectorEmpresa();
+}
+
+// Reclamar una empresa heredada: pasa a ser tuya y deja de verla el resto
+export async function reclamarEmpresa(id){
+  const e=EMPRESAS.todas.find(x=>x.id===id);
+  if(!e)return;
+  const yo=miEmail();
+  if(!yo){toast('⚠️ No hay sesión identificada','e');return;}
+  if(!confirm(`Reclamar «${e.nombre}»\n\nQuedará a tu nombre (${yo}) y dejará de aparecerle al resto de los usuarios, salvo que la compartas.\n\n¿Continuar?`))return;
+  await asignarDuenio(id,yo);
+  toast(`🙋 «${e.nombre}» quedó a tu nombre`);
+  logAccion('Reclamó empresa',`${e.nombre} → ${yo}`);
+  renderEmpresas();
+  if(window.renderSelectorEmpresa)window.renderSelectorEmpresa();
 }

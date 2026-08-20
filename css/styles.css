@@ -65,6 +65,15 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);padding:0 20px;hei
 .year-sel:hover{border-color:var(--ac)}
 .btn-save-all{background:var(--ac);color:#fff;border:none;border-radius:6px;padding:7px 14px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;transition:background .15s}
 .btn-save-all:hover{background:var(--ach)}
+.btn-save-all:disabled{opacity:.6;cursor:default}
+/* Sin cambios pendientes el botón se apaga; con cambios pendientes llama la
+   atención en el color de aviso y late suave, para que no se pase por alto. */
+.btn-save-all{background:var(--sf2,rgba(255,255,255,.06));color:var(--mt);border:1px solid var(--bd)}
+.btn-save-all:hover{background:var(--sf);color:var(--tx)}
+.btn-save-all.pendiente{background:var(--warn);color:#1b1200;border-color:var(--warn);animation:latido 2s ease-in-out infinite}
+.btn-save-all.pendiente:hover{filter:brightness(1.08);background:var(--warn);color:#1b1200}
+@keyframes latido{0%,100%{opacity:1}50%{opacity:.72}}
+@media (prefers-reduced-motion:reduce){.btn-save-all.pendiente{animation:none}}
 .layout{display:flex;flex:1;overflow:hidden}
 nav{width:200px;background:var(--sf);border-right:1px solid var(--bd);overflow-y:auto;flex-shrink:0;padding:10px 0}
 .nav-label{font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.09em;padding:10px 14px 4px}

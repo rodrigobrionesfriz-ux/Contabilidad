@@ -156,6 +156,17 @@ elimina una empresa. `js/storage.js` estampa el campo `empresa` en cada escritur
 
 #### Puesta en marcha (en este orden — importante)
 
+0. **Abre la colección nueva en tus reglas actuales.** `empresas_acl` no existe
+   todavía, así que Firestore la bloquea por defecto y la migración no puede
+   crear las fichas. Agrega este bloque a las reglas que ya tienes y publica:
+   ```
+   match /empresas_acl/{empresaId} {
+     allow read, write: if esUsuarioActivo();
+   }
+   ```
+   Es temporal: al publicar `firestore.rules` completo queda sustituido por la
+   versión estricta. Si te saltas este paso, el panel te lo dirá con el bloque
+   listo para copiar.
 1. **Prepara la base con las reglas VIEJAS todavía publicadas.**
    Entra como administrador → Configuración → Sistema → 🔒 Aislamiento por empresa →
    **Preparar aislamiento**. Crea las fichas de acceso y marca los documentos

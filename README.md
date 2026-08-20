@@ -260,3 +260,12 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
 - **Aviso de saldos invertidos**: el Balance lista las cuentas que quedaron con saldo
   contrario a su naturaleza (excluyendo las correctoras de activo, donde es normal),
   porque casi siempre son datos pendientes de cargar.
+- **Eliminar empresa**: tres pasos. El segundo pregunta SÓLO por los datos (Cancelar ahí
+  conserva la información, la empresa se elimina igual del listado) y el tercero es la
+  salida de emergencia donde Cancelar aborta todo. Antes el segundo Cancelar se
+  interpretaba como "no borres los datos" y la empresa desaparecía igual del catálogo,
+  que es exactamente lo que la gente creía estar evitando.
+- **Empresas recuperables**: eliminar sin borrar datos deja las claves `<id>:…` intactas.
+  La sección Empresas lista esas empresas huérfanas —leyendo su nombre y RUT de la propia
+  ficha guardada— y permite volver a registrarlas con SU MISMO id, que es lo que hace que
+  reaparezcan con todos sus libros.

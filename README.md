@@ -269,3 +269,9 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
   La sección Empresas lista esas empresas huérfanas —leyendo su nombre y RUT de la propia
   ficha guardada— y permite volver a registrarlas con SU MISMO id, que es lo que hace que
   reaparezcan con todos sus libros.
+- **Buscador global (Ctrl+K)**: al elegir un resultado se abre **su comprobante**, que es la
+  vista con el registro completo y su asiento. Antes sólo navegaba a la sección: si el
+  documento era de otro mes —o si ya estabas ahí— no pasaba nada visible y el clic parecía
+  perderse. Funciona para ventas, compras, asientos manuales, honorarios y apertura; los
+  resultados que tienen comprobante se marcan con 📄. Las cuentas del plan, trabajadores y
+  activos siguen navegando a su sección.

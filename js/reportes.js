@@ -563,11 +563,11 @@ function totalesDeMayor(M){
   const keys=Object.keys(M);
   const get=cd=>{const a=M[cd];return a?Math.abs(a.saldo):0;};
   return {
-    ingresos:keys.filter(k=>k.startsWith('4')).reduce((s,k)=>s+Math.abs(M[k].saldo),0),
+    ingresos:sumaPres(M,keys.filter(k=>k.startsWith('4'))),
     costos:keys.filter(k=>k.startsWith('3')).reduce((s,k)=>s+M[k].saldo,0),
     activos:keys.filter(k=>k.startsWith('1')).reduce((s,k)=>s+M[k].saldo,0),
-    pasivos:keys.filter(k=>k.startsWith('2')&&!k.startsWith('23')).reduce((s,k)=>s+Math.abs(M[k].saldo),0),
-    capital:keys.filter(k=>k.startsWith('23')).reduce((s,k)=>s+Math.abs(M[k].saldo),0),
+    pasivos:sumaPres(M,keys.filter(k=>k.startsWith('2')&&!k.startsWith('23'))),
+    capital:sumaPres(M,keys.filter(k=>k.startsWith('23'))),
   };
 }
 // Estado del comparativo (año seleccionado para comparar). null = sin comparar.
@@ -618,10 +618,10 @@ function renderMayorTabla(){
   }
 
   // Los KPI se calculan sobre las cuentas visibles del periodo
-  const tA=keys.filter(k=>k.startsWith('1')).reduce((s,k)=>s+M[k].saldo,0);
-  const tP=keys.filter(k=>k.startsWith('2')&&!k.startsWith('23')).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
-  const tC=keys.filter(k=>k.startsWith('3')).reduce((s,k)=>s+M[k].saldo,0);
-  const tI=keys.filter(k=>k.startsWith('4')).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
+  const tA=sumaPres(M,keys.filter(k=>k.startsWith('1')));
+  const tP=sumaPres(M,keys.filter(k=>k.startsWith('2')&&!k.startsWith('23')));
+  const tC=sumaPres(M,keys.filter(k=>k.startsWith('3')));
+  const tI=sumaPres(M,keys.filter(k=>k.startsWith('4')));
   let h=`<div class="kpi-grid">
     <div class="kpi"><div class="kpi-lbl">Total Activos</div><div class="kpi-val pos">${fmtC(tA)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Total Pasivos</div><div class="kpi-val neg">${fmtC(tP)}</div></div>
@@ -721,6 +721,42 @@ function exportarMayorExcel(){
 }
 
 // ═══ BALANCE ═══
+// ═══ SIGNO DE PRESENTACIÓN ═══
+//
+// buildMayor guarda `saldo = debe − haber`. Con esa convención:
+//   · activo (1) y costo (3) — naturaleza deudora  → saldo POSITIVO
+//   · pasivo/patrimonio (2) e ingreso (4) — acreedora → saldo NEGATIVO
+//
+// Para presentarlos en un informe hay que INVERTIR el signo de las acreedoras,
+// nunca tomar su valor absoluto.
+//
+// Por qué importa: con Math.abs, una cuenta de activo con saldo acreedor
+// (un banco sobregirado, por ejemplo) se muestra SUMANDO en vez de restando, y
+// el balance descuadra exactamente en el doble de ese saldo. Fue justo lo que
+// pasó con "1101202 BANCO DE CHILE 04": saldo acreedor de $182.311.185 que
+// aparecía como activo positivo y descuadraba el balance en $364.622.370.
+const naturalezaAcreedora=cd=>String(cd).startsWith('2')||String(cd).startsWith('4');
+const saldoPres=(cd,saldo)=>naturalezaAcreedora(cd)?-saldo:saldo;
+const sumaPres=(M,keys)=>keys.reduce((s,k)=>s+saldoPres(k,M[k].saldo),0);
+
+// Cuentas correctoras de activo: restan del activo por diseño, así que su
+// saldo acreedor es NORMAL y no debe alertarse.
+//  - Depreciación/amortización acumulada: grupo 12 con 5º dígito '2' (1201202)
+//  - Estimación de incobrables: subgrupo 1105 (1105001)
+const esCorrectoraActivo=cd=>(cd.startsWith('12')&&cd[4]==='2')||cd.startsWith('1105');
+
+// Una cuenta "invertida" es la que quedó con saldo contrario a su naturaleza
+// sin ser correctora. Casi siempre es un dato mal cargado —pagos desde un banco
+// sin depósitos registrados, un proveedor sobrepagado— y conviene avisarlo.
+function saldosInvertidos(M){
+  return Object.keys(M).filter(cd=>{
+    if(cd.length!==7)return false;
+    const v=saldoPres(cd,M[cd].saldo);
+    if(v>=-0.5)return false;
+    return !(cd.startsWith('1')&&esCorrectoraActivo(cd));
+  }).sort();
+}
+
 async function renderBalance(){
   const M=buildMayor();
   // Agrupación dinámica: recorre todas las cuentas imputables con saldo y las clasifica por prefijo.
@@ -728,17 +764,19 @@ async function renderBalance(){
   // El resultado del ejercicio (ingresos 04 − costos 03) se calcula aparte y se suma al patrimonio.
   const grpPrefijo=(pref,title)=>{
     let tot=0;
-    // Cuentas correctoras de activo (restan del activo, saldo acreedor):
-    //  - Depreciación/amortización acumulada: grupo 12 con 5º dígito '2' (ej 1201202)
-    //  - Estimación de incobrables: subgrupo 1105 (ej 1105001)
-    const esCorrectoraActivo=cd=>(cd.startsWith('12')&&cd[4]==='2')||cd.startsWith('1105');
     const cds=Object.keys(M).filter(cd=>cd.length===7&&pref.some(p=>cd.startsWith(p))&&Math.abs(M[cd].saldo)>=0.5)
       .sort();
     const rows=cds.map(cd=>{
-      const correctora=esCorrectoraActivo(cd);
-      const v=correctora?-Math.abs(M[cd].saldo):Math.abs(M[cd].saldo);
+      // Signo de presentación: nunca valor absoluto (ver nota arriba)
+      const v=saldoPres(cd,M[cd].saldo);
       tot+=v;
-      return`<tr><td class="tl" style="padding-left:16px;font-size:12px"><span style="font-family:var(--mono);font-size:10px;color:var(--mt)">${cd}</span> ${M[cd].nm||pdcNm(cd)}${correctora?' <span style="color:var(--mt);font-size:10px">(−)</span>':''}</td><td style="font-family:var(--mono);${correctora?'color:var(--err)':''}">${correctora?'('+fmt(Math.abs(v))+')':(fmt(v)||'–')}</td></tr>`;
+      const correctora=cd.startsWith('1')&&esCorrectoraActivo(cd);
+      const invertida=v<0&&!correctora;
+      const marca=correctora?' <span style="color:var(--mt);font-size:10px">(−)</span>'
+        :invertida?` <span style="color:var(--warn);font-size:10px" title="Saldo contrario a la naturaleza de la cuenta — revísala">⚠</span>`:'';
+      const color=v<0?'color:var(--err)':'';
+      const txt=v<0?'('+fmt(Math.abs(v))+')':(fmt(v)||'–');
+      return`<tr><td class="tl" style="padding-left:16px;font-size:12px"><span style="font-family:var(--mono);font-size:10px;color:var(--mt)">${cd}</span> ${M[cd].nm||pdcNm(cd)}${marca}</td><td style="font-family:var(--mono);${color}">${txt}</td></tr>`;
     }).join('')||`<tr><td class="tl" style="padding-left:16px;font-size:11px;color:var(--mt)">Sin movimientos</td><td>–</td></tr>`;
     return{h:`<tr class="rth"><td colspan="2" class="tl" style="padding:8px 10px">${title}</td></tr>${rows}`,tot};
   };
@@ -748,14 +786,15 @@ async function renderBalance(){
   const gPNC=grpPrefijo(['22'],'PASIVOS NO CORRIENTES');
   // Patrimonio: cuentas del prefijo 23 (capital, revalorización, resultados acumulados)
   const gPat=grpPrefijo(['23'],'PATRIMONIO');
-  const tI=Object.keys(M).filter(k=>k.startsWith('4')).reduce((s,k)=>s+Math.abs(M[k].saldo),0);
-  const tC=Object.keys(M).filter(k=>k.startsWith('3')).reduce((s,k)=>s+M[k].saldo,0);
+  const tI=sumaPres(M,Object.keys(M).filter(k=>k.startsWith('4')));
+  const tC=sumaPres(M,Object.keys(M).filter(k=>k.startsWith('3')));
   const res=tI-tC;
   const totAct=gAC.tot+gAF.tot;
   const totPas=gPC.tot+gPNC.tot;
   const totPat=gPat.tot+res; // patrimonio contable + resultado del ejercicio corriente
   const totPasYPat=totPas+totPat;
   const ok=Math.abs(totAct-totPasYPat)<2;
+  const invertidas=saldosInvertidos(M);
   document.getElementById('balance-content').innerHTML=`<div class="card">
     <div style="text-align:center;margin-bottom:18px">
       <div style="font-size:15px;font-weight:700">${S.empresa.nombre||'(sin empresa)'}</div>
@@ -784,6 +823,16 @@ async function renderBalance(){
       </div>
     </div>
     <div style="margin-top:12px;font-size:12px;color:${ok?'var(--ach)':'var(--warn)'}">${ok?'✅ Balance cuadrado':'⚠️ Diferencia: '+fmtC(Math.abs(totAct-totPasYPat))}</div>
+    ${invertidas.length?`<div class="info-tip" style="margin-top:10px;font-size:11px;line-height:1.6;border-color:var(--warn)">
+      ⚠️ <strong>${invertidas.length===1?'Una cuenta tiene':`${invertidas.length} cuentas tienen`} saldo contrario a su naturaleza</strong>
+      y en el balance ${invertidas.length===1?'aparece restando':'aparecen restando'}, entre paréntesis:
+      <div style="margin-top:6px">${invertidas.map(cd=>`<div style="font-family:var(--mono);font-size:11px">${cd} ${M[cd].nm||pdcNm(cd)} — ${fmtC(Math.abs(saldoPres(cd,M[cd].saldo)))} ${String(cd).startsWith('1')?'acreedor':'deudor'}</div>`).join('')}</div>
+      <div style="margin-top:6px">
+        El balance cuadra igual, pero esto casi siempre es un dato pendiente: un banco del que se
+        pagó sin registrar los depósitos o la apertura, un proveedor sobrepagado, un cliente con
+        notas de crédito de más. Revisa el auxiliar o el mayor de esas cuentas.
+      </div>
+    </div>`:''}
   </div>`;
   poblarCmpSelect('cmp-year-bal');
   if(CMP_YEAR)await renderComparativo('balance-content','balance');
@@ -854,11 +903,10 @@ async function renderComparativo(targetId,tipo){
 async function renderResultados(){
   const M=buildMayor();
   // Suma el saldo (valor absoluto) de todas las cuentas imputables cuyo código empieza con un prefijo dado
-  const sumaPref=pref=>Object.keys(M).filter(k=>k.length===7&&k.startsWith(pref)&&Math.abs(M[k].saldo)>=0.5)
-    .reduce((s,k)=>s+Math.abs(M[k].saldo),0);
+  const sumaPref=pref=>sumaPres(M,Object.keys(M).filter(k=>k.length===7&&k.startsWith(pref)&&Math.abs(M[k].saldo)>=0.5));
   // Filas de detalle por prefijo (cuentas con saldo)
   const detallePref=pref=>Object.keys(M).filter(k=>k.length===7&&k.startsWith(pref)&&Math.abs(M[k].saldo)>=0.5).sort()
-    .map(k=>`<tr><td class="tl" style="padding:5px 6px 5px 34px;font-size:11px;color:var(--mt)"><span style="font-family:var(--mono);font-size:10px">${k}</span> ${M[k].nm||pdcNm(k)}</td><td style="font-family:var(--mono);font-size:11px;color:var(--mt)">${fmtC(Math.abs(M[k].saldo))}</td></tr>`).join('');
+    .map(k=>`<tr><td class="tl" style="padding:5px 6px 5px 34px;font-size:11px;color:var(--mt)"><span style="font-family:var(--mono);font-size:10px">${k}</span> ${M[k].nm||pdcNm(k)}</td><td style="font-family:var(--mono);font-size:11px;color:var(--mt)">${fmtC(saldoPres(k,M[k].saldo))}</td></tr>`).join('');
 
   // Niveles del EERR
   const ingExp=sumaPref('41');   // Ingresos de explotación

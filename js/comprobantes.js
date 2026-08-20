@@ -34,6 +34,9 @@ function origenLbl(e){
   return {ic:'⚙️',nm:'Automático',c:'var(--mt)'};
 }
 
+// Escapa comillas para poder meter el texto en un atributo title="…"
+const attr=t=>String(t||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+
 let CMP_ENTRIES=[];        // cachea las entries actuales para el modal
 let CMP_MODAL={mode:'view',idx:-1,edit:null};
 
@@ -371,34 +374,152 @@ function renderCmpModalView(box,e,o){
       </div>
       <div style="font-size:14px;font-weight:600;margin-bottom:14px">${e.glosa||'(sin glosa)'}</div>
 
-      <table style="width:100%;font-size:12px;table-layout:fixed">
-        <colgroup><col style="width:72px"><col style="width:26%"><col><col style="width:88px"><col style="width:88px"></colgroup>
+      <div class="cmp-tbl-wrap">
+      <table class="tbl-cmp">
         <thead><tr style="border-bottom:1px solid var(--bd);color:var(--mt);text-transform:uppercase;font-size:10px">
-          <th class="tl" style="padding:6px 8px">CÓDIGO</th>
-          <th class="tl" style="padding:6px 8px">CUENTA</th>
-          <th class="tl" style="padding:6px 8px">DESCRIPCIÓN</th>
-          <th style="text-align:right;padding:6px 8px">DEBE</th>
-          <th style="text-align:right;padding:6px 8px">HABER</th>
+          <th class="tl">CÓDIGO</th>
+          <th class="tl">CUENTA</th>
+          <th class="tl">DESCRIPCIÓN</th>
+          <th style="text-align:right">DEBE</th>
+          <th style="text-align:right">HABER</th>
         </tr></thead>
-        <tbody>${e.movs.map(m=>`<tr style="border-bottom:1px solid rgba(48,54,61,.5)">
-          <td class="tl" style="padding:6px 8px;font-family:var(--mono);color:var(--mt);word-break:break-all">${m.cd}</td>
-          <td class="tl" style="padding:6px 8px;word-break:break-word">${m.nm||pdcNm(m.cd)}</td>
-          <td class="tl" style="padding:6px 8px;color:var(--mt);font-size:11px;word-break:break-word">${m.desc||''}</td>
-          <td style="text-align:right;padding:6px 8px;font-family:var(--mono);white-space:nowrap">${m.debe?fmtC(m.debe):'—'}</td>
-          <td style="text-align:right;padding:6px 8px;font-family:var(--mono);white-space:nowrap">${m.haber?fmtC(m.haber):'—'}</td>
-        </tr>`).join('')}</tbody>
+        <tbody>${e.movs.map(m=>{
+          const desc=m.desc||'';
+          return `<tr style="border-bottom:1px solid rgba(48,54,61,.5)">
+          <td class="tl c-cod">${m.cd}</td>
+          <td class="tl c-cta">${m.nm||pdcNm(m.cd)}</td>
+          <td class="tl c-desc" title="${attr(desc)}">${desc||'—'}</td>
+          <td class="c-num">${m.debe?fmtC(m.debe):'—'}</td>
+          <td class="c-num">${m.haber?fmtC(m.haber):'—'}</td>
+        </tr>`;}).join('')}</tbody>
         <tfoot><tr style="background:var(--sf2);font-weight:700">
-          <td colspan="3" class="tl" style="padding:8px">TOTALES</td>
-          <td style="text-align:right;padding:8px;font-family:var(--mono);color:${cuadra?'var(--tx)':'var(--err)'}">${fmtC(totD)}</td>
-          <td style="text-align:right;padding:8px;font-family:var(--mono);color:${cuadra?'var(--tx)':'var(--err)'}">${fmtC(totH)}</td>
+          <td colspan="3" class="tl">TOTALES</td>
+          <td class="c-num" style="color:${cuadra?'var(--tx)':'var(--err)'}">${fmtC(totD)}</td>
+          <td class="c-num" style="color:${cuadra?'var(--tx)':'var(--err)'}">${fmtC(totH)}</td>
         </tr></tfoot>
       </table>
+      </div>
 
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
-        <button class="btn btn-g" onclick="cerrarCmpModal()">Cerrar</button>
-        ${editable?`<button class="btn btn-p" onclick="cmpModalEditar()">✏️ Editar</button>`:''}
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${borrable(e)?`<button class="btn btn-d" onclick="eliminarComprobante()">🗑 Eliminar</button>`:''}
+          ${e.origen==='manual'?`<button class="btn btn-g" onclick="anularComprobante()" title="Mantiene el N° correlativo pero excluye sus efectos">🚫 Anular</button>`:''}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-g" onclick="cerrarCmpModal()">Cerrar</button>
+          ${editable?`<button class="btn btn-p" onclick="cmpModalEditar()">✏️ Editar</button>`:''}
+        </div>
       </div>
     </div>`;
+}
+
+// ── Eliminar comprobante ──
+// Un comprobante automático NO existe como registro propio: es el reflejo
+// contable de un documento del libro. Por eso "eliminar" significa cosas
+// distintas según el origen, y el diálogo lo dice con todas sus letras.
+//
+// Honorarios queda fuera: su comprobante resume TODAS las boletas del mes, así
+// que no hay un documento único que borrar — se manda al libro correspondiente.
+function borrable(e){
+  if(e.origen==='manual'||e.origen==='apertura')return true;
+  return e.origen==='auto'&&(e.fuente==='ventas'||e.fuente==='compras')&&!!e.docId;
+}
+
+function eliminarComprobante(){
+  const e=CMP_ENTRIES[CMP_MODAL.idx];
+  if(!e)return;
+
+  // ── Manual ──
+  if(e.origen==='manual'){
+    const a=S.asientos.find(x=>x.n===e.ref)||S.asientos.find(x=>x.folioComp===e.n);
+    if(!a){toast('⚠️ No se encontró el asiento de origen','e');return;}
+    if(!confirm(
+      `¿Eliminar el asiento manual N°${a.n}?\n\n`+
+      `"${a.glosa||'(sin glosa)'}"\n\n`+
+      `El N° ${a.n} queda libre y el correlativo pierde continuidad.\n`+
+      `Si lo que quieres es dejar constancia, usa "Anular" en vez de eliminar.\n\n`+
+      `Esta acción no se puede deshacer.`))return;
+    S.asientos=S.asientos.filter(x=>x!==a);
+    window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos)).catch(()=>{});
+    logAccion('Eliminó asiento',`N°${a.n} — ${a.glosa}`);
+    cerrarCmpModal();rerender();toast('🗑 Asiento eliminado');
+    return;
+  }
+
+  // ── Apertura ──
+  if(e.origen==='apertura'){
+    if(!confirm(
+      `¿Eliminar el Balance de Apertura ${S.empresa.anio}?\n\n`+
+      `Es el asiento N°0 del ejercicio: se van sus ${e.movs.length} líneas y con ellas\n`+
+      `los saldos iniciales del Mayor, el Balance y los auxiliares.\n\n`+
+      `Esta acción no se puede deshacer.`))return;
+    S.apertura=null;
+    window.storage.delete('apertura-'+S.empresa.anio).catch(()=>{});
+    logAccion('Eliminó apertura',`Ejercicio ${S.empresa.anio}`);
+    cerrarCmpModal();rerender();toast('🗑 Balance de apertura eliminado');
+    return;
+  }
+
+  // ── Automático de ventas o compras: se borra el DOCUMENTO ──
+  if(e.origen==='auto'&&(e.fuente==='ventas'||e.fuente==='compras')&&e.docId){
+    const esVenta=e.fuente==='ventas';
+    const lista=esVenta?S.ventas:S.compras;
+    const d=lista.find(x=>x.id===e.docId);
+    if(!d){toast('⚠️ No se encontró el documento de origen','e');return;}
+    const libro=esVenta?'Libro de Ventas':'Libro de Compras';
+    if(!confirm(
+      `Este comprobante es automático: lo genera un documento del ${libro}.\n\n`+
+      `Para que desaparezca hay que eliminar el documento que lo origina:\n\n`+
+      `   ${esVenta?dteV(d.tipoDTE)?.nm||'DTE '+d.tipoDTE:dteC(d.tipoDTE)?.nm||'DTE '+d.tipoDTE} N°${d.numero}\n`+
+      `   ${d.razonSocial||''}\n`+
+      `   ${fmtC(d.total||0)}\n\n`+
+      `Se borra del ${libro} y de todos los reportes.\n`+
+      `Esta acción no se puede deshacer.`))return;
+    if(esVenta){
+      S.ventas=S.ventas.filter(x=>x.id!==e.docId);
+      window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas)).catch(()=>{});
+    }else{
+      S.compras=S.compras.filter(x=>x.id!==e.docId);
+      window.storage.set('compras-'+S.empresa.anio,JSON.stringify(S.compras)).catch(()=>{});
+    }
+    logAccion('Eliminó documento',`${libro} — N°${d.numero} ${d.razonSocial||''}`);
+    cerrarCmpModal();rerender();toast('🗑 Documento eliminado — el comprobante ya no se genera');
+    return;
+  }
+
+  // ── Honorarios: resumen mensual, sin documento único ──
+  if(e.fuente==='honorarios'){
+    if(confirm(
+      `Este comprobante resume TODAS las boletas de honorarios del mes,\n`+
+      `así que no hay un documento único que eliminar.\n\n`+
+      `¿Quieres ir al libro de Honorarios para borrar las boletas que\n`+
+      `correspondan?`)){cerrarCmpModal();nav('honorarios');}
+    return;
+  }
+
+  toast('⚠️ Este comprobante no se puede eliminar desde aquí','e');
+}
+
+// Anular deja el N° en su sitio y excluye los efectos: es lo correcto en
+// contabilidad, donde el correlativo no debería tener huecos.
+function anularComprobante(){
+  const e=CMP_ENTRIES[CMP_MODAL.idx];
+  if(!e||e.origen!=='manual')return;
+  const a=S.asientos.find(x=>x.n===e.ref)||S.asientos.find(x=>x.folioComp===e.n);
+  if(!a){toast('⚠️ No se encontró el asiento de origen','e');return;}
+  if(!confirm(
+    `¿Anular el asiento N°${a.n}?\n\n`+
+    `"${a.glosa||'(sin glosa)'}"\n\n`+
+    `NO borra el N° ${a.n} — el correlativo queda intacto — pero sus montos\n`+
+    `dejan de sumar en el Mayor, el Balance y los auxiliares.\n\n`+
+    `Como el libro diario excluye los anulados, el comprobante deja de\n`+
+    `aparecer en esta lista. Queda visible y se puede reactivar desde\n`+
+    `"Asientos Manuales".`))return;
+  a.anulado=true;
+  window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos)).catch(()=>{});
+  logAccion('Anuló asiento',`N°${a.n} — ${a.glosa}`);
+  cerrarCmpModal();rerender();
+  toast('🚫 Asiento N°'+a.n+' anulado — reactivable desde Asientos Manuales');
 }
 
 function renderCmpModalEdit(box,e,o){
@@ -934,5 +1055,6 @@ function guardarCmpEdDte(){
 export {setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
         cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
+        eliminarComprobante, anularComprobante,
         setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
         abrirCmpEdDte, cerrarCmpEdDte, setCmpDteCampo, setCmpDteRut, cmpDteAutoTotal, guardarCmpEdDte};

@@ -49,7 +49,7 @@ import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 import {renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
         initCargaDatosListener, CD} from './cargadatos.js';
 import {renderSistema} from './sistema.js';
-import {diagnosticarSeguridad, prepararAislamiento, repararAccesos} from './seguridad.js';
+import {diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos} from './seguridad.js';
 
 // Negocio
 import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
@@ -439,7 +439,7 @@ Object.assign(window,{
   onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
   onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
   renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos, renderSistema,
-  diagnosticarSeguridad, prepararAislamiento, repararAccesos,
+  diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos,
   renderCompensacionIVA, generarAsientoIVA, setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente,
   renderPagoF29, generarAsientoPagoF29, setPagoF29Cuenta, setPagoF29Campo, setPagoF29Monto,
   togglePagoF29, resetPagoF29, usarSugeridoF29,

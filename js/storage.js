@@ -156,6 +156,55 @@ import {FS, fsStatusSet} from './firebase.js';
       snap.forEach(doc=>{total++;const d=doc.data()||{};if(d.empresa===undefined)faltan.push(doc.id);});
       return {total,faltan};
     },
+
+    // ── Verificación con las reglas endurecidas ya publicadas ──
+    // Ahí `docsSinEmpresa()` deja de funcionar a propósito: una consulta sin
+    // filtro se rechaza entera, porque Firestore no puede garantizar de antemano
+    // que todos los resultados sean legibles. Es la señal de que el aislamiento
+    // está activo, no un error.
+    //
+    // En ese modo se cuenta lo ALCANZABLE (una consulta filtrada por empresa) y
+    // se contrasta con lo que hay en este dispositivo: si algo está guardado
+    // acá pero no aparece en la nube, es un documento sin marcar que quedó
+    // fuera del alcance de las reglas.
+    async docsAlcanzables(ids){
+      if(!FS.enabled||!FS.db)throw new Error('Firestore no está disponible');
+      const porEmpresa={};let total=0;
+      for(const emp of ['_global',...(ids||[])]){
+        const snap=await FS.db.collection(COLL).where('empresa','==',emp).get();
+        const vistos=new Set();snap.forEach(d=>vistos.add(d.id));
+        porEmpresa[emp]=[...vistos];total+=vistos.size;
+      }
+      return {total,porEmpresa};
+    },
+    // Claves guardadas en este dispositivo que corresponden a esas empresas
+    clavesLocales(ids){
+      const set=new Set(ids||[]);const claves=[];
+      try{
+        for(let i=0;i<localStorage.length;i++){
+          const k=localStorage.key(i);
+          if(!k||!k.startsWith(prefix))continue;
+          const base=k.slice(prefix.length);
+          const emp=empresaDeClave(base);
+          if(emp==='_global'||set.has(emp))claves.push(base);
+        }
+      }catch(e){}
+      return claves;
+    },
+    // Repara documentos que existen en este dispositivo pero no se alcanzan en
+    // la nube: los vuelve a subir, y al subirlos quedan marcados con su empresa.
+    async repararDocs(claves,onProgreso){
+      if(!FS.enabled||!FS.db)throw new Error('Firestore no está disponible');
+      let hechos=0,fallos=0;
+      for(const clave of claves){
+        const local=getLocal(clave);
+        if(local===null||local.value===undefined){fallos++;continue;}
+        if(await setRemote(clave,local.value))hechos++;else fallos++;
+        if(onProgreso)onProgreso(hechos+fallos,claves.length);
+      }
+      return {hechos,fallos};
+    },
+
     // Estampa el campo `empresa` en los documentos que no lo tienen.
     async estamparEmpresa(ids,onProgreso){
       if(!FS.enabled||!FS.db)throw new Error('Firestore no está disponible');

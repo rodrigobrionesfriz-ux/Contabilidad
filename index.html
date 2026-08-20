@@ -58,24 +58,15 @@
 
 <header>
   <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
-  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.16-2056</span></div>
-  <div class="hdr-empresa" id="hdr-empresa">Configure los datos de empresa</div>
-  <span id="save-indicator" style="font-size:10px;color:var(--mt);white-space:nowrap"></span>
-  <button id="btn-tema" onclick="cambiarTema()" title="Cambiar tema" style="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mt);font-size:13px;cursor:pointer;padding:5px 10px;line-height:1">🌙</button>
-  <button onclick="abrirBusqueda()" title="Buscar (Ctrl+K)" style="background:none;border:1px solid var(--bd);border-radius:8px;color:var(--mt);font-size:13px;cursor:pointer;padding:5px 10px;line-height:1">🔍</button>
-  <select id="empresa-sel" onchange="onCambiarEmpresa()" title="Empresa activa" style="background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;outline:none;max-width:170px"></select>
-  <select class="year-sel" id="year-sel" onchange="changeYear(+this.value)"></select>
-  <div id="db-status" style="display:flex;align-items:center;gap:12px;margin-right:8px">
-    <span id="fs-indicator" style="font-size:11px;color:var(--mt);display:flex;align-items:center;gap:5px" title="Estado de sincronización con Firestore"></span>
-    <span id="db-indicator" style="font-size:11px;color:var(--mt);display:flex;align-items:center;gap:5px" title="Estado de sincronización con Excel"></span>
+  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.20-1923</span></div>
+  <span id="save-indicator" style="font-size:10px;color:var(--mt);white-space:nowrap;margin-left:auto"></span>
+  <!-- Los indicadores de sincronización viven ahora en Configuración → Sistema,
+       pero se mantienen en el DOM porque varios módulos escriben en ellos. -->
+  <div id="db-status" style="display:none">
+    <span id="fs-indicator" title="Estado de sincronización con Firestore"></span>
+    <span id="db-indicator" title="Estado de sincronización con Excel"></span>
   </div>
-  <button class="btn btn-s" style="font-size:11px;margin-right:6px" onclick="conectarBD()" id="btn-conectar-bd" title="Vincular carpeta para auto-guardado en Excel">🔗 Conectar BD</button>
-  <button class="btn btn-i" style="font-size:11px;margin-right:6px" onclick="fsRestoreFromCloud()" title="Descargar datos desde Firestore a este dispositivo (útil al abrir en un dispositivo nuevo)">☁️⬇</button>
-  <button class="btn btn-i" style="font-size:11px;margin-right:6px" onclick="fsBackupToCloud()" title="Subir todos los datos locales a Firestore">☁️⬆</button>
-  <button class="btn btn-i" style="font-size:11px;margin-right:6px" onclick="exportarExcelManual()" title="Descargar archivo Excel con toda la base de datos">📥 Exportar</button>
-  <button class="btn btn-i" style="font-size:11px;margin-right:6px" onclick="document.getElementById('imp-bd-file').click()" title="Restaurar datos desde un archivo Excel">📤 Importar</button>
   <input type="file" id="imp-bd-file" accept=".xlsx,.xls" style="display:none">
-  <button class="btn-save-all" onclick="saveAll()">💾 Guardar Todo</button>
   <div id="user-badge" style="display:none;align-items:center;gap:8px;margin-left:12px;padding:5px 10px;background:var(--sf);border:1px solid var(--bd);border-radius:100px;font-size:11px">
     <img id="user-avatar" src="" style="width:22px;height:22px;border-radius:50%;display:none">
     <div style="display:flex;flex-direction:column;line-height:1.15">
@@ -88,6 +79,16 @@
 <div class="layout">
 <div id="nav-overlay" onclick="toggleNav()" style="display:none"></div>
 <nav>
+  <!-- Contexto activo: qué empresa y qué ejercicio se está mirando -->
+  <div class="nav-contexto">
+    <div class="nav-ctx-lbl">Empresa activa</div>
+    <div class="nav-ctx-nombre" id="ctx-empresa-nombre">—</div>
+    <select id="empresa-sel" onchange="onCambiarEmpresa()" title="Cambiar de empresa"></select>
+    <div class="nav-ctx-anio">
+      <span class="nav-ctx-lbl" style="margin:0">Ejercicio</span>
+      <select class="year-sel" id="year-sel" onchange="changeYear(+this.value)"></select>
+    </div>
+  </div>
   <div class="nav-label">Registros</div>
   <div class="nav-item" onclick="nav('ventas')" data-s="ventas"><span class="nav-icon">🛒</span>Libro de Ventas</div>
   <div class="nav-item" onclick="nav('compras')" data-s="compras"><span class="nav-icon">🧾</span>Libro de Compras</div>
@@ -119,6 +120,7 @@
   <div class="nav-item" onclick="nav('centroscosto')" data-s="centroscosto"><span class="nav-icon">📊</span>Centros de Costo</div>
   <div class="nav-item" onclick="nav('pdc')" data-s="pdc"><span class="nav-icon">📋</span>Plan de Cuentas</div>
   <div class="nav-item" onclick="nav('cargadatos')" data-s="cargadatos"><span class="nav-icon">📥</span>Carga desde Excel</div>
+  <div class="nav-item" onclick="nav('sistema')" data-s="sistema"><span class="nav-icon">⚙️</span>Sistema y Respaldos</div>
   <div class="nav-item" onclick="nav('indicadores')" data-s="indicadores"><span class="nav-icon">📐</span>Indicadores</div>
   <div class="nav-item" onclick="nav('apertura')" data-s="apertura"><span class="nav-icon">🔰</span>Balance de Apertura</div>
   <div class="nav-item" onclick="nav('usuarios')" data-s="usuarios" id="nav-usuarios" style="display:none"><span class="nav-icon">👥</span>Usuarios</div>
@@ -128,10 +130,7 @@
     <div class="nav-label" style="padding:0 0 8px 0">Acciones</div>
     <div style="display:flex;flex-direction:column;gap:6px">
       <button class="btn btn-p" onclick="saveAll();cerrarNavMovil()" style="justify-content:flex-start">💾 Guardar Todo</button>
-      <button class="btn btn-i" onclick="exportarExcelManual();cerrarNavMovil()" style="justify-content:flex-start">📥 Exportar Excel</button>
-      <button class="btn btn-i" onclick="document.getElementById('imp-bd-file').click()" style="justify-content:flex-start">📤 Importar Excel</button>
-      <button class="btn btn-i" onclick="fsBackupToCloud();cerrarNavMovil()" style="justify-content:flex-start">☁️⬆ Subir a nube</button>
-      <button class="btn btn-i" onclick="fsRestoreFromCloud()" style="justify-content:flex-start">☁️⬇ Descargar de nube</button>
+      <button class="btn btn-i" onclick="nav('sistema');cerrarNavMovil()" style="justify-content:flex-start">⚙️ Sistema y Respaldos</button>
     </div>
   </div>
   <!-- Usuario y cerrar sesión: SIEMPRE visible al final del menú -->
@@ -267,6 +266,17 @@
   </div>
 
   <div id="pdc-content"></div>
+</section>
+
+<!-- SISTEMA Y RESPALDOS -->
+<section class="section" id="s-sistema">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">⚙️ Sistema y Respaldos</div>
+      <div class="sec-sub">Sincronización, copias de seguridad y preferencias de la aplicación</div>
+    </div>
+  </div>
+  <div id="sistema-content"></div>
 </section>
 
 <!-- CARGA DE DATOS DESDE EXCEL -->
@@ -1184,6 +1194,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=1786913762"></script>
+<script type="module" src="js/app.js?v=1787253836"></script>
 </body>
 </html>

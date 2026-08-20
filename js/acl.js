@@ -36,6 +36,10 @@ export function miembrosDe(e){
   return [...new Set(lista.filter(Boolean))];
 }
 
+// Último error de escritura, para poder explicarlo en pantalla
+export const ACL_ERR={ultimo:null};
+export const esErrorPermisos=msg=>/permission|insufficient|permisos/i.test(String(msg||''));
+
 // Escribe (o actualiza) el documento ACL de una empresa
 export async function guardarACLEmpresa(e){
   if(!aclDisponible()||!e||!e.id)return false;
@@ -47,7 +51,7 @@ export async function guardarACLEmpresa(e){
       ts:firebase.firestore.FieldValue.serverTimestamp(),
     },{merge:true});
     return true;
-  }catch(err){console.warn('ACL set',e.id,err);return false;}
+  }catch(err){console.warn('ACL set',e.id,err);ACL_ERR.ultimo=err.message||String(err);return false;}
 }
 
 export async function borrarACLEmpresa(id){
@@ -61,7 +65,9 @@ export async function borrarACLEmpresa(id){
 export async function sincronizarACL(empresas,{limpiarSobrantes=false}={}){
   if(!aclDisponible())return {escritos:0,borrados:0,error:'Firestore no está disponible'};
   let escritos=0,borrados=0;
+  ACL_ERR.ultimo=null;
   for(const e of empresas){ if(await guardarACLEmpresa(e))escritos++; }
+  if(!escritos&&empresas.length&&ACL_ERR.ultimo)return {escritos:0,borrados:0,error:ACL_ERR.ultimo};
   if(limpiarSobrantes){
     try{
       const vivos=new Set(empresas.map(e=>e.id));

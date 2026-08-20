@@ -16,7 +16,7 @@
 import {toast} from './core.js';
 import {FS} from './firebase.js';
 import {EMPRESAS, asignarDuenio} from './empresas.js';
-import {sincronizarACL, diagnosticarACL, aclDisponible} from './acl.js';
+import {sincronizarACL, diagnosticarACL, aclDisponible, esErrorPermisos} from './acl.js';
 import {esAdmin} from './auth.js';
 import {AUTH} from './state.js';
 
@@ -80,6 +80,12 @@ export async function prepararAislamiento(){
   SEG.corriendo=true;SEG.progreso='Creando fichas de acceso…';renderSeguridad();
   try{
     const acl=await sincronizarACL(EMPRESAS.todas);
+    if(acl.error&&esErrorPermisos(acl.error)){
+      SEG.corriendo=false;
+      await diagnosticarSeguridad();
+      toast('🔑 Falta abrir la colección empresas_acl en tus reglas — mira el detalle','e');
+      return;
+    }
     SEG.progreso=`Fichas de acceso: ${acl.escritos}. Revisando documentos…`;renderSeguridad();
 
     const docs=await window.storage.docsSinEmpresa();
@@ -115,6 +121,29 @@ export async function repararAccesos(){
 }
 
 // ── Vista ──
+// El huevo y la gallina: para crear las fichas de acceso hay que poder escribir
+// en `empresas_acl`, pero esa colección no existe en las reglas antiguas, así
+// que Firestore la rechaza por defecto. Se resuelve con una regla puente.
+function bloqueReglaPuente(){
+  const regla=
+`match /empresas_acl/{empresaId} {
+  allow read, write: if esUsuarioActivo();
+}`;
+  return `<div class="info-tip" style="margin-top:10px;font-size:11px;line-height:1.6;border-color:var(--warn)">
+    🔑 <strong>Falta abrir la colección <code>empresas_acl</code> en tus reglas actuales.</strong><br>
+    Es normal: esa colección es nueva y las reglas de hoy la bloquean por defecto, así que la app
+    no puede crear las fichas de acceso.<br><br>
+    <strong>1.</strong> En Firebase → Firestore Database → Reglas, agrega este bloque
+    <em>dentro</em> de <code>match /databases/{database}/documents</code>, junto a los que ya tienes,
+    y publica:
+    <pre style="background:var(--sf2);padding:10px;border-radius:6px;margin:8px 0;font-size:11px;overflow:auto;white-space:pre">${regla}</pre>
+    <strong>2.</strong> Vuelve acá y ejecuta <strong>Preparar aislamiento</strong> otra vez.<br>
+    <strong>3.</strong> Cuando quede en verde, reemplaza TODAS las reglas por el archivo
+    <code>firestore.rules</code> completo — ahí esta regla puente queda sustituida por la versión
+    estricta (sólo el dueño o un administrador modifica los miembros).
+  </div>`;
+}
+
 function lista(items,max=8){
   if(!items||!items.length)return '';
   const muestra=items.slice(0,max).join(', ');
@@ -152,11 +181,13 @@ export function bloqueSeguridad(){
       ${sobr?fila(false,`${sobr} ficha(s) de empresas que ya no existen`,lista(e.aclSobrantes)):''}
     </tbody></table>
     <div style="font-size:10px;color:var(--mt);margin-top:8px">Última revisión: ${e.fecha}</div>
+    ${esErrorPermisos(e.errorAcl)?bloqueReglaPuente():''}
     ${e.listo?`<div class="info-tip" style="margin-top:10px;font-size:11px;line-height:1.6">
         ✅ <strong>La base está lista.</strong> Ya puedes publicar <code>firestore.rules</code> en
         Firebase → Firestore Database → Reglas. Después de publicarlas, vuelve acá y ejecuta
         la verificación otra vez: si todo sigue en verde, el aislamiento quedó activo.
       </div>`
+      :esErrorPermisos(e.errorAcl)?''
       :`<div class="info-tip" style="margin-top:10px;font-size:11px;line-height:1.6;border-color:var(--warn)">
         ⚠️ <strong>Todavía no publiques las reglas.</strong> Ejecuta primero “Preparar aislamiento”:
         si publicas ahora, la app dejará de leer los documentos que están sin marcar.

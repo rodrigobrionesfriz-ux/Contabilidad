@@ -245,6 +245,58 @@ export async function eliminarEmpresa(id,borrarDatos=false){
   return {borradas:0};
 }
 
+// ── Recuperar una empresa borrada del catálogo ──
+// Eliminar sin marcar "borrar datos" sólo saca la empresa del catálogo: sus
+// claves (`<id>:ventas-2026`, `<id>:empresa`, …) siguen enteras. Esto las busca
+// y permite volver a registrarla con SU MISMO id, que es lo que hace que los
+// datos vuelvan a aparecer.
+export function empresasHuerfanas(){
+  const LS='cv:';
+  const conocidas=new Set(EMPRESAS.todas.map(e=>e.id));
+  const porId={};
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const full=localStorage.key(i);
+      if(!full||!full.startsWith(LS))continue;
+      const base=full.slice(LS.length);
+      const m=base.match(/^(emp[a-z0-9]+):(.+)$/);
+      if(!m)continue;
+      const [,id,clave]=m;
+      if(conocidas.has(id))continue;
+      (porId[id]=porId[id]||{id,claves:0,nombre:'',rut:'',anios:new Set()}).claves++;
+      // La ficha de la empresa guarda su nombre: se recupera tal cual estaba
+      if(clave==='empresa'){
+        try{
+          const d=JSON.parse(localStorage.getItem(full)||'{}');
+          porId[id].nombre=d.nombre||'';porId[id].rut=d.rut||'';
+        }catch(e){}
+      }
+      const my=clave.match(/-(\d{4})$/);
+      if(my)porId[id].anios.add(my[1]);
+    }
+  }catch(e){}
+  return Object.values(porId)
+    .map(x=>({...x,anios:[...x.anios].sort()}))
+    .sort((a,b)=>b.claves-a.claves);
+}
+
+// Vuelve a registrar una empresa huérfana conservando su id
+export async function recuperarEmpresa(id,nombre,rut){
+  if(EMPRESAS.todas.some(e=>e.id===id))return false;
+  EMPRESAS.todas.push({
+    id,
+    nombre:nombre||'Empresa recuperada',
+    rut:rut||'',
+    marco:'tributaria',
+    creada:new Date().toISOString(),
+    creadoPor:emailActual()||'',
+    compartidaCon:[],
+    recuperada:new Date().toISOString(),
+  });
+  await guardarCatalogo();
+  return true;
+}
+
 export async function actualizarEmpresa(id,campos){
   const e=EMPRESAS.todas.find(x=>x.id===id);
   if(!e)return;

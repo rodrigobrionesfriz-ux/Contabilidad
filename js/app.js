@@ -13,7 +13,8 @@ import {EMPRESAS, MARCOS, marcoInfo, cargarEmpresas, empresaActiva, crearEmpresa
         aplicarVisibilidad, puedeVerEmpresa} from './empresas.js';
 import {renderEmpresas, abrirFormEmpresa, cerrarFormEmpresa, editarEmpresaCat,
         guardarEmpresaCat, seleccionarEmpresa, borrarEmpresa, onMarcoChange,
-        abrirCompartir, cerrarCompartir, guardarCompartir, reclamarEmpresa} from './empresas-ui.js';
+        abrirCompartir, cerrarCompartir, guardarCompartir, reclamarEmpresa,
+        restaurarEmpresa} from './empresas-ui.js';
 
 // Sistema
 import {initAuth, puedeVer, puedeEditar, esAdmin, ROLES, SECCIONES, permisosDeRol,
@@ -472,7 +473,7 @@ Object.assign(window,{
   abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda, irAResultado,
   cambiarTema, aplicarTema, onCambiarEmpresa, renderSelectorEmpresa, recargarEmpresaActiva,
   renderEmpresas, abrirFormEmpresa, cerrarFormEmpresa, editarEmpresaCat, guardarEmpresaCat,
-  abrirCompartir, cerrarCompartir, guardarCompartir, reclamarEmpresa, aplicarVisibilidad,
+  abrirCompartir, cerrarCompartir, guardarCompartir, reclamarEmpresa, restaurarEmpresa, aplicarVisibilidad,
   seleccionarEmpresa, borrarEmpresa, onMarcoChange,
   exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud, importarExcelBD,
 });

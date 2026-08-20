@@ -4,7 +4,8 @@ import {esAdmin} from './auth.js';
 import {logAccion} from './firebase.js';
 import {EMPRESAS, MARCOS, marcoInfo, empresaActiva, crearEmpresa,
         eliminarEmpresa, actualizarEmpresa, activarEmpresa,
-        compartirEmpresa, asignarDuenio, empresaSinDuenio, esDuenioDeEmpresa} from './empresas.js';
+        compartirEmpresa, asignarDuenio, empresaSinDuenio, esDuenioDeEmpresa,
+        empresasHuerfanas, recuperarEmpresa} from './empresas.js';
 import {AUTH} from './state.js';
 import {US} from './usuarios.js';
 
@@ -14,6 +15,29 @@ let EMPC={id:null};   // empresa cuyo panel de compartir está abierto
 const miEmail=()=>((AUTH.user&&AUTH.user.email)||'').toLowerCase();
 // Usuarios del sistema con los que se puede compartir (todos menos yo)
 const otrosUsuarios=()=>(US.usuarios||[]).filter(u=>String(u.email).toLowerCase()!==miEmail());
+
+// Empresas que se sacaron del catálogo pero cuyos datos siguen enteros.
+// Pasa al eliminar sin marcar "borrar datos" — incluido el caso de quien
+// cancelaba en la segunda pregunta creyendo que abortaba la operación.
+function bloqueHuerfanas(){
+  const h=empresasHuerfanas();
+  if(!h.length)return '';
+  const filas=h.map(x=>`<tr>
+    <td class="tl" style="font-size:13px"><strong>${x.nombre||'(sin nombre guardado)'}</strong>
+      <div style="font-size:10px;color:var(--mt);font-family:var(--mono)">${x.id}${x.rut?' · '+x.rut:''}</div></td>
+    <td class="tl" style="font-size:11px;color:var(--mt)">${x.claves} registro${x.claves===1?'':'s'}${x.anios.length?' · ejercicios '+x.anios.join(', '):''}</td>
+    <td style="text-align:right"><button class="btn btn-p" style="font-size:11px" onclick="restaurarEmpresa('${x.id}')">↩️ Recuperar</button></td>
+  </tr>`).join('');
+  return `<div class="card" style="margin-top:14px;border-color:var(--warn)">
+    <div class="card-title">↩️ Empresas recuperables</div>
+    <div style="font-size:11px;color:var(--mt);margin-bottom:10px;line-height:1.6">
+      Estas empresas ya no están en el listado, pero sus datos siguen guardados en este equipo.
+      Se eliminaron del catálogo sin borrar la información. Al recuperarlas vuelven con su
+      <strong>mismo identificador</strong>, así que reaparecen con todos sus libros intactos.
+    </div>
+    <div class="tw"><table><tbody>${filas}</tbody></table></div>
+  </div>`;
+}
 
 export function renderEmpresas(){
   const el=document.getElementById('empresas-content');
@@ -66,6 +90,7 @@ export function renderEmpresas(){
     <tbody>${filas}</tbody>
   </table></div></div>
   <button class="btn btn-p" onclick="abrirFormEmpresa()">+ Nueva empresa</button>
+  ${bloqueHuerfanas()}
 
   <div class="card" id="emp-form" style="display:none;margin-top:14px">
     <div class="card-title" id="empf-title">Nueva empresa</div>
@@ -142,6 +167,26 @@ export async function seleccionarEmpresa(id){
   toast('🏢 Empresa activa: '+e.nombre);
 }
 
+export async function restaurarEmpresa(id){
+  const x=empresasHuerfanas().find(y=>y.id===id);
+  if(!x){toast('⚠️ Ya no está disponible para recuperar','e');renderEmpresas();return;}
+  const nombre=prompt(
+`↩️ RECUPERAR EMPRESA
+
+Vuelve al listado con su mismo identificador (${id}), así que recupera todos sus datos.
+
+Confirma o corrige el nombre:`, x.nombre||'Empresa recuperada');
+  if(nombre===null)return;
+  try{
+    const ok=await recuperarEmpresa(id,String(nombre).trim(),x.rut);
+    if(!ok){toast('⚠️ Esa empresa ya está en el catálogo','e');return;}
+    toast(`↩️ "${String(nombre).trim()}" recuperada con sus ${x.claves} registros`);
+    logAccion('Recuperó empresa',`${nombre} (${id})`);
+    renderEmpresas();
+    if(window.renderSelectorEmpresa)window.renderSelectorEmpresa();
+  }catch(e){toast('❌ '+e.message,'e');}
+}
+
 export async function borrarEmpresa(id){
   // Solo administradores pueden eliminar empresas
   if(!esAdmin()){
@@ -160,14 +205,22 @@ Vas a eliminar "${nombre}" del catálogo.
 Esto NO se puede deshacer desde la aplicación. ¿Continuar?`);
   if(!c1)return;
 
-  // Segundo paso: preguntar si además borrar todos los datos
+  // Segundo paso: preguntar si además borrar todos los datos.
+  //
+  // OJO: acá "Cancelar" NO abortaba la operación — sólo significaba "no borres
+  // los datos" — y la empresa se eliminaba igual del catálogo. Quien apretaba
+  // Cancelar creyendo que se echaba atrás perdía la empresa del listado.
+  // Ahora el texto lo dice explícitamente Y hay una confirmación final donde
+  // Cancelar sí aborta todo.
   const c2=confirm(
 `🗑 ¿Borrar TAMBIÉN los datos de "${nombre}"?
 
-• SÍ  = Se eliminan todos los libros, asientos, indicadores y configuración de esta empresa (solo del navegador local; la nube no se toca).
-• NO = Se elimina del listado pero los datos quedan huérfanos (podrían recuperarse manualmente).
+Esta pregunta es SÓLO sobre los datos. La empresa se elimina del listado en los dos casos.
 
-Recomendación para "empezar de cero": SÍ.`);
+• Aceptar  = se borran además libros, asientos, indicadores y configuración (solo de este navegador; la nube no se toca).
+• Cancelar = los datos se conservan y la empresa se puede recuperar después.
+
+⚠️ Para echarte atrás por completo, cancela en la pregunta que viene a continuación.`);
 
   // Tercer paso: para el borrado destructivo, pedir escribir el nombre
   if(c2){
@@ -182,6 +235,16 @@ ${nombre}`);
       return;
     }
   }
+
+  // Último paso: la salida de emergencia. Acá Cancelar SIEMPRE aborta todo.
+  const c3=confirm(
+`❓ ÚLTIMA CONFIRMACIÓN
+
+Se va a eliminar "${nombre}" del listado${c2?` Y BORRAR TODOS SUS DATOS`:`, conservando sus datos`}.
+
+• Aceptar  = proceder
+• Cancelar = no hacer nada`);
+  if(!c3){toast('Operación cancelada — no se eliminó nada');return;}
 
   try{
     const {borradas}=await eliminarEmpresa(id,c2);

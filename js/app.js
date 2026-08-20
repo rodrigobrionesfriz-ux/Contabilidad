@@ -46,6 +46,7 @@ import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borr
 import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 import {renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
         initCargaDatosListener, CD} from './cargadatos.js';
+import {renderSistema} from './sistema.js';
 
 // Negocio
 import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
@@ -271,6 +272,7 @@ function renderSec(s){
   else if(s==='centroscosto')renderCentrosCosto();
   else if(s==='pdc')renderPDC();
   else if(s==='cargadatos')renderCargaDatos();
+  else if(s==='sistema')renderSistema();
   else if(s==='indicadores')renderIndicadores();
   else if(s==='apertura')renderApertura();
   else if(s==='usuarios')renderUsuarios();
@@ -305,9 +307,18 @@ function rerender(){updateHdr();renderSec(getCurSec());}
 function renderSelectorEmpresa(){
   const sel=document.getElementById('empresa-sel');
   if(!sel)return;
-  sel.innerHTML=EMPRESAS.lista.map(e=>
+  // Si el catálogo aún no está cargado, al menos mostrar la empresa en curso
+  const lista=EMPRESAS.lista.length?EMPRESAS.lista:[{id:EMPRESAS.activa||'',nombre:S.empresa.nombre||'(sin empresa)'}];
+  sel.innerHTML=lista.map(e=>
     `<option value="${e.id}" ${e.id===EMPRESAS.activa?'selected':''}>${e.nombre}</option>`
   ).join('')+'<option value="__gestionar">⚙️ Gestionar empresas…</option>';
+  // Nombre visible del contexto: el de la empresa activa del catálogo, y si
+  // aún no hay catálogo, el de la ficha cargada.
+  const ctx=document.getElementById('ctx-empresa-nombre');
+  if(ctx){
+    const act=EMPRESAS.lista.find(e=>e.id===EMPRESAS.activa);
+    ctx.textContent=(act&&act.nombre)||S.empresa.nombre||'Configura los datos de empresa';
+  }
 }
 
 async function onCambiarEmpresa(){
@@ -424,7 +435,7 @@ Object.assign(window,{
   renderDiario, setDiarioQ, renderMayor, renderBalance, onCmpYear, renderResultados,
   onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
   onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
-  renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
+  renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos, renderSistema,
   renderCompensacionIVA, generarAsientoIVA, setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente,
   renderPagoF29, generarAsientoPagoF29, setPagoF29Cuenta, setPagoF29Campo, setPagoF29Monto,
   togglePagoF29, resetPagoF29, usarSugeridoF29,

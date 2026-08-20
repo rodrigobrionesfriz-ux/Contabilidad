@@ -15,6 +15,8 @@ export function aplicarTema(id){
   try{localStorage.setItem(KEY,t.id);}catch(e){}
   const btn=document.getElementById('btn-tema');
   if(btn){btn.textContent=t.ico;btn.title='Tema: '+t.nm+' (clic para cambiar)';}
+  // La sección Sistema muestra el tema vigente: refrescarla si está a la vista
+  if(window.getCurSec&&window.getCurSec()==='sistema'&&window.renderSistema)window.renderSistema();
 }
 
 // Alterna al siguiente tema de la lista

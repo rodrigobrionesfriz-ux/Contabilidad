@@ -14,7 +14,7 @@ function fillEmpresaForm(){
 async function saveEmpresa(){
   try{
     S.empresa={anio:+document.getElementById('e-anio').value||new Date().getFullYear(),nombre:document.getElementById('e-nombre').value.trim(),rut:document.getElementById('e-rut').value.trim(),domicilio:document.getElementById('e-domicilio').value.trim(),giro:document.getElementById('e-giro').value.trim(),codigo:document.getElementById('e-codigo').value.trim(),ciudad:document.getElementById('e-ciudad').value.trim(),comuna:document.getElementById('e-comuna').value.trim(),rep:document.getElementById('e-rep').value.trim(),rutrep:document.getElementById('e-rutrep').value.trim(),tasaRenta:+document.getElementById('e-tasarenta').value||25,tasaPPM:+document.getElementById('e-tasappm').value||0,regimen:'14D3'};
-    document.getElementById('year-sel').value=S.empresa.anio;
+    const ys=document.getElementById('year-sel');if(ys)ys.value=S.empresa.anio;
     updateHdr();
     await window.storage.set('empresa',JSON.stringify(S.empresa));
     toast('✅ Empresa guardada');
@@ -24,7 +24,12 @@ async function saveEmpresa(){
   }
 }
 function updateHdr(){
-  document.getElementById('hdr-empresa').innerHTML=S.empresa.nombre?`<span>${S.empresa.nombre}</span> &nbsp;|&nbsp; Año ${S.empresa.anio}`:'Configure los datos de empresa';
+  // El nombre de la empresa se muestra en el bloque de contexto de la barra
+  // lateral (antes estaba en el header, que ahora sólo lleva título y usuario).
+  const ctx=document.getElementById('ctx-empresa-nombre');
+  if(ctx)ctx.textContent=S.empresa.nombre||'Configura los datos de empresa';
+  const hdr=document.getElementById('hdr-empresa');
+  if(hdr)hdr.innerHTML=S.empresa.nombre?`<span>${S.empresa.nombre}</span> &nbsp;|&nbsp; Año ${S.empresa.anio}`:'Configure los datos de empresa';
   const vs=document.getElementById('ventas-sub');if(vs)vs.textContent='Registro por documento — '+S.empresa.anio;
   const cs=document.getElementById('compras-sub');if(cs)cs.textContent='Registro por documento — '+S.empresa.anio;
   const nba=document.getElementById('nb-as');if(nba)nba.textContent=S.asientos.length||'0';

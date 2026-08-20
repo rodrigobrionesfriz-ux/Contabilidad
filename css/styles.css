@@ -51,6 +51,15 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);padding:0 20px;hei
 .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px;white-space:nowrap}
 .logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--logo1),var(--logo2));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px}
 .hdr-empresa{flex:1;text-align:center;color:var(--mt);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Bloque de contexto de la barra lateral: empresa activa + ejercicio */
+.nav-contexto{padding:12px 14px;border-bottom:1px solid var(--bd);background:var(--sf2)}
+.nav-ctx-lbl{font-size:9px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+.nav-ctx-nombre{font-size:13px;font-weight:700;color:var(--tx);line-height:1.25;margin-bottom:8px;word-break:break-word}
+.nav-contexto select{width:100%;background:var(--bg);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:6px 8px;font-size:12px;cursor:pointer;outline:none}
+.nav-contexto select:hover{border-color:var(--ac)}
+.nav-ctx-anio{display:flex;align-items:center;gap:8px;margin-top:8px}
+.nav-ctx-anio .nav-ctx-lbl{white-space:nowrap}
+.nav-ctx-anio select{flex:1;font-family:var(--mono)}
 .hdr-empresa span{color:var(--tx);font-weight:600}
 .year-sel{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:5px 9px;font-family:var(--mono);font-size:13px;cursor:pointer;outline:none}
 .year-sel:hover{border-color:var(--ac)}
@@ -388,7 +397,7 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
   header .logo span{display:none} /* solo el ícono del logo en móvil */
   .hdr-empresa{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
   /* Header: ocultar botones de utilidad; quedan accesibles desde el nav */
-  header #db-status,header #btn-conectar-bd{display:none}
+  .nav-contexto{padding:10px 12px}
   .btn-save-all{font-size:11px;padding:6px 10px}
   #user-badge{display:none!important} /* el usuario/logout vive en el nav en móvil */
   #nav-user-block-m{margin-top:16px}

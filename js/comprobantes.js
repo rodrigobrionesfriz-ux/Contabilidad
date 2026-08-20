@@ -287,6 +287,29 @@ function cmpNumeroElegir(n){
   if(idx>=0)setTimeout(()=>abrirCmpModal(idx),100);
 }
 
+// ── Abrir el comprobante de un registro cualquiera ──
+// Lo usa el buscador global: da lo mismo si el resultado es una factura, un
+// asiento manual o la apertura — lo que interesa es ver su comprobante.
+//
+// Se resuelve a través del N° y se reutiliza `cmpNumeroElegir`, porque sin
+// filtro la lista sólo cachea los 5 comprobantes más recientes y el buscado
+// podría no estar entre ellos.
+function abrirComprobantePor(criterio){
+  const entries=genDiario();
+  const e=entries.find(x=>{
+    if(criterio.docId)return x.docId===criterio.docId;
+    if(criterio.asientoN!=null)return x.origen==='manual'&&+x.ref===+criterio.asientoN;
+    if(criterio.apertura)return x.origen==='apertura';
+    if(criterio.honorariosMes!=null)return x.fuente==='honorarios'&&+x.mes===+criterio.honorariosMes;
+    return false;
+  });
+  if(!e)return false;
+  nav('comprobantes');
+  // Un respiro para que la sección esté visible antes de abrir el modal
+  setTimeout(()=>cmpNumeroElegir(e.n),60);
+  return true;
+}
+
 function limpiarCmpFiltro(){
   CMP_FILTRO={mes:'',origen:'',texto:'',numero:''};
   renderCmpNumeroList([]);
@@ -1052,7 +1075,8 @@ function guardarCmpEdDte(){
   toast('✅ Datos del documento actualizados');
 }
 
-export {setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
+export {abrirComprobantePor,
+        setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
         cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         eliminarComprobante, anularComprobante,

@@ -4,6 +4,7 @@ import {S, AUTH} from './state.js';
 import {todosDocsVentas, todosDocsCompras, editarAsiento} from './asientos.js';
 import {puedeVer, permiso} from './auth.js';
 import {nav} from './ui.js';
+import {abrirComprobantePor} from './comprobantes.js';
 
 let SEARCH_SEL=0;
 
@@ -22,14 +23,14 @@ function construirIndiceBusqueda(){
   const items=[];
   // Ventas
   todosDocsVentas().forEach(d=>{
-    items.push({tipo:'Venta',ico:'🛒',sec:'ventas',
+    items.push({tipo:'Venta',ico:'🛒',sec:'ventas',docId:d.id,
       titulo:`${d.razonSocial||'(sin razón)'} — DTE ${d.tipoDTE} N°${d.numero||''}`,
       sub:`${d.fecha} · ${fmtC(d.total)} · ${rutFmt(d.rutCodigo,d.rutDV)}`,
       texto:`${d.razonSocial} ${d.rutCodigo} ${d.numero} ${d.total} ${d.fecha}`.toLowerCase()});
   });
   // Compras
   todosDocsCompras().forEach(d=>{
-    items.push({tipo:'Compra',ico:'🧾',sec:'compras',
+    items.push({tipo:'Compra',ico:'🧾',sec:'compras',docId:d.id,
       titulo:`${d.razonSocial||'(sin razón)'} — DTE ${d.tipoDTE} N°${d.numero||''}`,
       sub:`${d.fecha} · ${fmtC(d.total)} · ${rutFmt(d.rutCodigo,d.rutDV)}`,
       texto:`${d.razonSocial} ${d.rutCodigo} ${d.numero} ${d.total} ${d.fecha}`.toLowerCase()});
@@ -37,14 +38,14 @@ function construirIndiceBusqueda(){
   // Asientos manuales
   S.asientos.forEach(a=>{
     const total=a.movs.reduce((s,m)=>s+(m.debe||0),0);
-    items.push({tipo:'Asiento',ico:'✏️',sec:'asientos',id:a.id,
+    items.push({tipo:'Asiento',ico:'✏️',sec:'asientos',id:a.id,asientoN:a.n,
       titulo:`N°${a.n} — ${a.glosa||'(sin glosa)'}`,
       sub:`${a.fecha} · ${fmtC(total)}${a.anulado?' · ANULADO':''}`,
       texto:`${a.n} ${a.glosa} ${a.fecha} ${a.movs.map(m=>m.cd+' '+(m.nm||'')).join(' ')}`.toLowerCase()});
   });
   // Honorarios
   S.honorarios.forEach(h=>{
-    items.push({tipo:'Honorario',ico:'📝',sec:'honorarios',
+    items.push({tipo:'Honorario',ico:'📝',sec:'honorarios',honMes:h.mes,
       titulo:`${h.profesional||h.nombre||'(sin nombre)'}`,
       sub:`${MESES[(h.mes||1)-1]||''} · ${fmtC(h.bruto||0)} bruto`,
       texto:`${h.profesional||h.nombre} ${h.rut} ${h.bruto}`.toLowerCase()});
@@ -90,6 +91,7 @@ function ejecutarBusqueda(){
       <div style="font-size:11px;color:var(--mt)">${it.sub}</div>
     </div>
     <span style="font-size:9px;color:var(--mt);text-transform:uppercase;border:1px solid var(--bd);border-radius:4px;padding:2px 6px">${it.tipo}</span>
+    ${criterioComprobante(it)?`<span style="font-size:10px;color:var(--mt)" title="Se abre su comprobante">📄</span>`:''}
   </div>`).join('');
 }
 function navBusqueda(e){
@@ -106,13 +108,35 @@ function actualizarSeleccion(){
     if(i===SEARCH_SEL)el.scrollIntoView({block:'nearest'});
   });
 }
+// Al elegir un resultado se abre SU COMPROBANTE, que es la vista que muestra el
+// registro completo con su asiento contable. Antes sólo se navegaba a la
+// sección: si el documento era de otro mes —o si ya estabas en esa sección— no
+// pasaba nada visible y parecía que el clic se perdía.
+//
+// Para lo que no tiene comprobante (cuentas del plan, trabajadores, activos) se
+// navega a su sección, como siempre.
+function criterioComprobante(it){
+  if(it.docId)return {docId:it.docId};
+  if(it.asientoN!=null)return {asientoN:it.asientoN};
+  if(it.tipo==='Honorario'&&it.honMes!=null)return {honorariosMes:it.honMes};
+  return null;
+}
+
 function irAResultado(i){
   const res=window._searchRes||[];
   const it=res[i];if(!it)return;
   cerrarBusqueda();
+
+  const crit=criterioComprobante(it);
+  if(crit&&puedeVer('comprobantes')){
+    if(abrirComprobantePor(crit))return;
+    // Sin comprobante propio (por ejemplo un DTE que vive dentro de un asiento):
+    // se cae a la sección de origen en vez de dejar el clic sin efecto.
+    toast('Ese registro no tiene un comprobante propio — te llevo a su libro');
+  }
+
   if(!puedeVer(it.sec)){toast('⚠️ No tienes permiso para ver esa sección','e');return;}
   nav(it.sec);
-  // Si es un asiento, abrirlo para editar
   if(it.tipo==='Asiento'&&it.id){setTimeout(()=>{if(typeof editarAsiento==='function')editarAsiento(it.id);},150);}
 }
 // Atajo de teclado global Ctrl+K / Cmd+K

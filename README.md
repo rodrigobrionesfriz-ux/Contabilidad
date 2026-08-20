@@ -123,6 +123,13 @@ Capa 6  app  (orquestador)
 ## Sesión y seguridad
 
 - **Persistencia SESSION**: la sesión sobrevive a recargas (F5) pero se pierde al cerrar la pestaña o el navegador
+- **Botón 💾 en la barra superior**: se pone amarillo y late cuando hay cambios sin guardar
+- **Guardado automático** (`js/autoguardado.js`): cada 30 s / 1 / 2 / 5 min a elección, al cambiar de
+  pestaña o minimizar, y como último recurso en `pagehide` (ahí sólo alcanza localStorage, pero el
+  dato no se pierde y sube en el próximo arranque). Se activa y configura en Configuración → Sistema;
+  la preferencia es por dispositivo
+- **Salida que ofrece guardar**: al cerrar sesión con trabajo pendiente, Aceptar guarda y sale;
+  Cancelar se queda. Si el guardado falla, recién ahí pregunta si quiere salir perdiendo los cambios
 - **Aviso al salir**: si hay cambios sin guardar, avisa antes de cerrar, recargar o cerrar sesión
 - **Botón atrás (Android)**: cierra modales → vuelve a la pantalla inicial → pregunta si salir
 - **Indicador en el encabezado**: "● Sin guardar" o "✓ Guardado HH:MM"
@@ -183,10 +190,11 @@ elimina una empresa. `js/storage.js` estampa el campo `empresa` en cada escritur
    Si aparecen documentos que este equipo tiene y la nube ya no deja leer
    (quedaron sin marcar), el botón **🛠 Reparar documentos** los vuelve a subir
    —hazlo desde el equipo con la información más al día.
-5. **Cierra la escotilla.** En `firestore.rules`, dentro de la función `miembro()`,
-   borra la línea `|| !hayAcl(emp)` y vuelve a publicar. Hasta ese momento, una
-   empresa sin ficha de acceso sigue siendo visible para cualquier usuario activo
-   (así nada se rompe durante la migración).
+`firestore.rules` viene en su **versión estricta**: una empresa sin ficha de
+acceso queda fuera del alcance de todos menos los administradores. Si hay que
+migrar una base desde cero y el paso 1 no puede completarse con las reglas ya
+publicadas, agrega temporalmente `|| !hayAcl(emp)` como tercera condición de la
+función `miembro()` y bórralo apenas el panel quede en verde.
 
 Si compartes una empresa y el otro usuario no la ve, usa **Reparar accesos** en
 el mismo panel: reescribe las fichas desde el catálogo.

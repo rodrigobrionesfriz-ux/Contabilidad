@@ -283,3 +283,37 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
   Antes, un fallo de lectura en el móvil creaba "Mi Empresa" y la **guardaba**, pisando en la
   nube el catálogo real de todos los equipos. `guardarCatalogo` tampoco escribe si el
   catálogo no se pudo leer primero.
+- **Candado contra la pérdida silenciosa** (`storage.js`): toda lectura que falla se parece
+  a "no hay datos" — la sección aparece vacía y el primer guardado escribe ese vacío encima
+  del dato bueno. Ahora `leerConEstado(clave)` distingue el error y **bloquea la escritura**
+  de esa clave hasta que se lea bien. El candado vive en storage a propósito: protege a
+  todos los módulos, al `saveAll` y al autoguardado sin que cada uno tenga que acordarse.
+  El botón de la barra superior pasa a **🚫 Guardado bloqueado** y explica qué claves y por
+  qué. Se libera solo en cuanto la lectura vuelve a funcionar (basta recargar).
+- **Identidad de dispositivo** (`js/dispositivo.js`): cada navegador donde se abre la app
+  recibe un id permanente y un nombre editable ("PC oficina", "Celular Rodrigo"), visible en
+  Configuración → Sistema. Firma cada escritura en la nube.
+- **Versión por documento y fusión** (`storage.js`): cada documento lleva `rev` (contador) y
+  el dispositivo que lo escribió. Guardar abre una **transacción**: si la rev de la nube ya
+  no es la que se leyó, otro equipo escribió en el intermedio y NO se sobrescribe.
+  Los libros son listas de registros con `id`, así que se **fusionan por id** — lo del otro
+  equipo se conserva, lo propio se agrega, y en empates gana la edición local. Lo que no es
+  una lista con id (ficha de empresa, indicadores) no se puede fusionar solo: se frena, no
+  se escribe nada y se avisa a quién pertenece la versión de la nube.
+  Detalle honesto: en una fusión, un registro borrado localmente que el otro equipo todavía
+  tenía **revive**. Es el mal menor frente a perder su trabajo completo, y se avisa.
+  La condición de conflicto mira SÓLO la revisión, no el id del dispositivo: dos pestañas
+  del mismo navegador comparten id y se habrían pisado igual.
+- **Lápidas** (`storage.js`): fusionar por id tenía un agujero — un registro borrado acá que
+  el otro equipo todavía tenía **revivía**, porque "no está en mi lista" no distingue entre
+  "nunca lo tuve" y "lo borré". Ahora cada documento guarda un mapa `borrados` {id: fecha}
+  que viaja con él, y la fusión excluye esos ids vengan de donde vengan. Se detecta solo:
+  `baseline` recuerda los ids de la última lectura o escritura buena, y lo que desaparece de
+  una escritura a la siguiente es un borrado — ningún módulo tiene que avisar nada. Si un id
+  con lápida se vuelve a crear a propósito, la lápida se levanta (y no la resucita la unión
+  con las lápidas de la nube).
+- **Cruce al iniciar sesión**: antes de dejar trabajar, la app lee de la nube TODAS las
+  claves de la empresa activa, con una pantalla de progreso. Demora un poco la apertura a
+  cambio de atacar la causa de fondo: un equipo que arranca con una foto vieja es el que
+  después genera conflictos. Al terminar, cada clave queda con su revisión, su baseline de
+  ids y sus lápidas al día. Si alguna no se pudo leer, avisa y deja el guardado bloqueado.

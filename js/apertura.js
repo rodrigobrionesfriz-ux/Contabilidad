@@ -3,6 +3,7 @@ import {toast, fmtC, fmt, pn, today, pdcNm, PDC, CUENTAS_SEL, rutParse, rutFmt, 
 import {CUENTAS_AUX, esAux, cuentasOpts} from './asientos.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {S} from './state.js';
+import {bloqueAperturaAux, initAperturaAuxListener} from './aperturaaux.js';
 import {rerender} from './ui.js';
 import './storage.js';
 
@@ -63,7 +64,8 @@ function renderApertura(){
         <div style="text-align:right;font-family:var(--mono)">${fmtC(tH)}</div>
       </div>
     </div>
-  </div>`;
+  </div>`+bloqueAperturaAux();
+  initAperturaAuxListener();
 }
 
 function abrirApertura(){

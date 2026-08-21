@@ -61,6 +61,9 @@ import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, ap
         apLVal, apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura,
         eliminarApertura, initBalanceImportListener, abrirImpBalModal, cerrarImpBalModal,
         toggleAllBal, confirmarImportBalance, renderImpBalModal, APF, IMB} from './apertura.js';
+import {abrirAperturaAux, cerrarAperturaAux, renderAperturaAux, apxAddDoc, apxDelDoc,
+        apxCampo, apxRut, apxAuxElegido, apxActualizarCuadre, guardarAperturaAux,
+        descargarPlantillaAperturaAux, initAperturaAuxListener, APX} from './aperturaaux.js';
 import {onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerrarVF,
         vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, setVfCuenta,
         eliminarVenta, VF, abrirImportSIIVentas, handleFileImportVentas,
@@ -506,6 +509,9 @@ Object.assign(window,{
   renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,
   apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura,
   abrirImpBalModal, cerrarImpBalModal, toggleAllBal, confirmarImportBalance, renderImpBalModal,
+  abrirAperturaAux, cerrarAperturaAux, renderAperturaAux, apxAddDoc, apxDelDoc,
+  apxCampo, apxRut, apxAuxElegido, apxActualizarCuadre, guardarAperturaAux,
+  descargarPlantillaAperturaAux, APX,
   // ventas
   onMesChangeV, limpiarFiltrosV, renderVentas, abrirVF, editarVenta, cerrarVF,
   vfRutInput, vfCheckDup, vfCalcTotals, vfAutoCalc, guardarVenta, setVfCuenta, eliminarVenta,

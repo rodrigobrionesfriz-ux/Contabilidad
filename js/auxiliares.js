@@ -3,6 +3,7 @@ import {toast, fmtC, fmt, MESES, pdcNm, rutFmt, dteV, dteC, rutDV, rutParse, tod
 import {S} from './state.js';
 import {todosDocsVentas, todosDocsCompras, CUENTAS_AUX, esAux, abrirAsientoDesde} from './asientos.js';
 import {fichaAux, fichasAux, guardarFichasAux} from './importadoraux.js';
+import {docsApertura, tipoDeCuenta} from './aperturaaux.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {ccOpts} from './centroscosto.js';
 import {logAccion} from './firebase.js';
@@ -78,6 +79,28 @@ function renderAuxiliares(){
     proveedores[k].docs.push({tipo:'doc',origen:d.origen,asientoId:d.asientoId,asientoN:d.asientoN,docOriginalId:d.origen==='libro'?d.id:null,fecha:d.fecha,fechaVencimiento:d.fechaVencimiento,tipoDTE:d.tipoDTE,numero:d.numero,neto:d.neto,iva:d.iva,total:d.total,dist:d.dist,montoSigno:tot,debe:tot<0?-tot:0,haber:tot>0?tot:0});
     proveedores[k].total+=tot;
     if(d.razonSocial)proveedores[k].razonSocial=d.razonSocial;
+  });
+
+  // 2.5) Documentos históricos capturados en el Balance de Apertura
+  //
+  // Son las facturas anteriores al sistema que seguían pendientes al 1 de enero.
+  // Entran como documentos normales del auxiliar —con su fecha real de emisión,
+  // no la del asiento de apertura— para que el aging los clasifique por su
+  // antigüedad verdadera y Pagos y Cobros pueda imputar contra ellos.
+  docsApertura().forEach(d=>{
+    const tipo=tipoDeCuenta(d.cd);
+    if(!tipo)return;
+    const bucket=tipo==='cliente'?clientes:proveedores;
+    const k=d.rutCodigo;if(!k)return;
+    if(!bucket[k])bucket[k]={rutCodigo:k,rutDV:d.rutDV,razonSocial:d.razonSocial||'',docs:[],total:0};
+    const tot=+d.saldo||0;   // el saldo pendiente, no el monto original
+    bucket[k].docs.push({tipo:'doc',origen:'apertura',fecha:d.fecha,
+      fechaVencimiento:d.fechaVencimiento,tipoDTE:d.tipoDTE,numero:d.numero,
+      total:d.monto||tot,montoSigno:tot,
+      debe:tipo==='cliente'?tot:0,haber:tipo==='cliente'?0:tot,
+      esApertura:true});
+    bucket[k].total+=tot;
+    if(d.razonSocial)bucket[k].razonSocial=d.razonSocial;
   });
 
   // 3) Movimientos manuales SIN DTE (pagos, ajustes) — solo los que NO tienen .dte

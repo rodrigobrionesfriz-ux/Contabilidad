@@ -93,6 +93,34 @@ import {FS, fsStatusSet} from './firebase.js';
     },
 
     // ── API sin prefijo (catálogo de empresas, config global) ──
+    // Lectura global que DISTINGUE "no existe" de "no se pudo leer".
+    //
+    // `getGlobal` devuelve null en los dos casos, y eso es peligroso para el
+    // catálogo de empresas: si la nube falla al abrir en un equipo nuevo, el
+    // catálogo se ve vacío, la app crea una empresa por defecto y la guarda —
+    // pisando en la nube el catálogo real de todos los equipos.
+    //
+    // fuente: 'nube' | 'local' | 'vacio' | 'error'
+    async leerGlobalConEstado(key){
+      const local=getLocal(key);
+      const vLocal=local?local.value:null;
+      if(!FS.enabled||!FS.db){
+        return {value:vLocal,fuente:vLocal!==null?'local':'vacio',huboNube:false};
+      }
+      try{
+        const doc=await FS.db.collection(COLL).doc(key).get();
+        if(doc.exists){
+          const d=doc.data();
+          if(d&&d.value!==undefined){setLocal(key,d.value);return {value:d.value,fuente:'nube',huboNube:true};}
+        }
+        // La nube respondió y de verdad no hay nada
+        return {value:vLocal,fuente:vLocal!==null?'local':'vacio',huboNube:true};
+      }catch(e){
+        console.warn('FS getGlobal',key,e);
+        return {value:vLocal,fuente:'error',huboNube:true,error:e.message||String(e)};
+      }
+    },
+
     async getGlobal(key){
       const local=getLocal(key);
       if(FS.enabled){

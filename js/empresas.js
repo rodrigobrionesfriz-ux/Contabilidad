@@ -31,9 +31,10 @@ export const marcoInfo=id=>MARCOS.find(m=>m.id===id)||MARCOS[0];
 // permiten leerlos a cualquier usuario activo. Para aislamiento real hay que
 // endurecer las reglas (ver README).
 export const EMPRESAS={
-  lista:[],      // visibles para el usuario en sesión
-  todas:[],      // catálogo completo (lo que se persiste)
+  lista:[],        // visibles para el usuario en sesión
+  todas:[],        // catálogo completo (lo que se persiste)
   activa:null,
+  errorCarga:null, // por qué no se pudo leer el catálogo (null = todo bien)
 };
 
 const emailActual=()=>((AUTH.user&&AUTH.user.email)||'').toLowerCase();
@@ -108,10 +109,30 @@ export async function migrarSiHaceFalta(){
 
 // ── Catálogo ──
 export async function cargarEmpresas(){
-  try{
-    const r=await window.storage.getGlobal('_empresas');
-    EMPRESAS.todas=r?JSON.parse(r.value):[];
-  }catch(e){EMPRESAS.todas=[];}
+  // ── Por qué esto es tan cuidadoso ──
+  // Al abrir en un equipo NUEVO (el móvil, por ejemplo) no hay nada en local:
+  // todo tiene que venir de la nube. Si esa lectura falla —reglas, red, sesión
+  // a medio iniciar— el catálogo se ve vacío. La versión anterior creaba
+  // entonces una empresa "Mi Empresa" y la GUARDABA, pisando en la nube el
+  // catálogo real y llevándose el problema de vuelta al PC.
+  //
+  // Ahora se distingue "la nube dice que no hay nada" de "no pude leer la
+  // nube". En el segundo caso no se crea ni se guarda NADA: se marca el error
+  // y la interfaz lo muestra en vez de fabricar una empresa vacía.
+  EMPRESAS.errorCarga=null;
+  const rc=await window.storage.leerGlobalConEstado('_empresas');
+  if(rc.fuente==='error'){
+    EMPRESAS.errorCarga=rc.error||'No se pudo leer el catálogo de empresas';
+    EMPRESAS.todas=[];
+    try{EMPRESAS.todas=rc.value?JSON.parse(rc.value):[];}catch(e){}
+    aplicarVisibilidad();
+    console.error('No se pudo cargar el catálogo de empresas:',rc.error);
+    return EMPRESAS;   // sin tocar la nube
+  }
+  try{EMPRESAS.todas=rc.value?JSON.parse(rc.value):[];}catch(e){EMPRESAS.todas=[];}
+  // Nunca crear el catálogo por defecto sin haber confirmado la nube: si hay
+  // Firestore activo y no respondió, preferimos no escribir.
+  const nubeConfirmada=!rc.huboNube||rc.fuente!=='error';
   // Empresa activa: primero la del usuario, si no la global (compatibilidad)
   EMPRESAS.activa=null;
   try{
@@ -125,7 +146,7 @@ export async function cargarEmpresas(){
     }catch(e){}
   }
   // Si no hay ninguna, crear la empresa por defecto (migración desde monoempresa)
-  if(!EMPRESAS.todas.length){
+  if(!EMPRESAS.todas.length&&nubeConfirmada){
     const def={id:'emp1',nombre:'Mi Empresa',rut:'',marco:'tributaria',
       creada:new Date().toISOString(),creadoPor:emailActual()||'',compartidaCon:[]};
     EMPRESAS.todas=[def];
@@ -133,6 +154,11 @@ export async function cargarEmpresas(){
     await guardarCatalogo();
   }
   aplicarVisibilidad();
+  // Sin catálogo y sin poder confirmar la nube: no se inventa nada.
+  if(!EMPRESAS.todas.length&&!nubeConfirmada){
+    EMPRESAS.errorCarga='No se pudo confirmar el catálogo en la nube';
+    return EMPRESAS;
+  }
   // Si el usuario no puede ver la empresa activa, cae a la primera visible.
   // Si no tiene ninguna visible, se le crea una propia: nunca queda sin trabajar.
   if(!EMPRESAS.activa||!EMPRESAS.lista.find(e=>e.id===EMPRESAS.activa)){
@@ -164,6 +190,12 @@ async function refrescarACL(){
 }
 
 export async function guardarCatalogo(){
+  // Salvaguarda: si el catálogo no se pudo leer, escribirlo pisaría en la nube
+  // el de todos los equipos con lo poco que tengamos en memoria.
+  if(EMPRESAS.errorCarga){
+    console.warn('No se guarda el catálogo: no se pudo leer primero');
+    return;
+  }
   // Se persiste el catálogo COMPLETO: si se guardara sólo lo visible, un
   // usuario borraría del catálogo las empresas de los demás sin querer.
   await window.storage.setGlobal('_empresas',JSON.stringify(EMPRESAS.todas));

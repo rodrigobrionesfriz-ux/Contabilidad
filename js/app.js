@@ -204,6 +204,13 @@ async function initApp(){
   // ANTES de leer cualquier dato (si no, se leería con el prefijo equivocado).
   await migrarSiHaceFalta();
   await cargarEmpresas();
+  // Si el catálogo no se pudo leer, avisar fuerte y NO seguir cargando datos
+  // con un prefijo equivocado (se leería vacío y parecería que no hay nada).
+  if(EMPRESAS.errorCarga){
+    toast('🚫 No se pudo leer el catálogo desde la nube — revisa Empresas','e');
+    nav('empresas');
+    return;
+  }
   window.storage.setPrefijo(EMPRESAS.activa);
   renderSelectorEmpresa();
 

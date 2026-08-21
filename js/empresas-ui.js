@@ -6,6 +6,7 @@ import {EMPRESAS, MARCOS, marcoInfo, empresaActiva, crearEmpresa,
         eliminarEmpresa, actualizarEmpresa, activarEmpresa,
         compartirEmpresa, asignarDuenio, empresaSinDuenio, esDuenioDeEmpresa,
         empresasHuerfanas, recuperarEmpresa} from './empresas.js';
+import {FS} from './firebase.js';
 import {AUTH} from './state.js';
 import {US} from './usuarios.js';
 
@@ -15,6 +16,28 @@ let EMPC={id:null};   // empresa cuyo panel de compartir está abierto
 const miEmail=()=>((AUTH.user&&AUTH.user.email)||'').toLowerCase();
 // Usuarios del sistema con los que se puede compartir (todos menos yo)
 const otrosUsuarios=()=>(US.usuarios||[]).filter(u=>String(u.email).toLowerCase()!==miEmail());
+
+// Cuando el catálogo no se pudo LEER, no se inventa nada: se dice qué pasó.
+// Es el caso de abrir en un equipo nuevo (el móvil) y que la nube no responda.
+function bannerErrorCatalogo(){
+  if(!EMPRESAS.errorCarga)return '';
+  return `<div class="info-tip" style="margin-bottom:14px;border-color:var(--err);line-height:1.6">
+    🚫 <strong>No se pudo leer el catálogo de empresas desde la nube.</strong>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--mt);margin:6px 0">${EMPRESAS.errorCarga}</div>
+    Tus datos <strong>no se han perdido</strong>: siguen en Firestore. La app prefiere no mostrar nada
+    antes que inventar una empresa vacía y sobrescribir el catálogo real.
+    <div style="margin-top:8px">Qué revisar, en orden:</div>
+    <div style="margin-top:4px">
+      1. Que este equipo tenga conexión y que hayas entrado con <strong>el mismo correo</strong> del PC.<br>
+      2. Que en Firebase las reglas publicadas sean las del archivo <code>firestore.rules</code>.<br>
+      3. Configuración → Sistema → 🔒 Aislamiento por empresa → <strong>Verificar</strong>, que dice
+         exactamente qué está rechazando la nube.
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="location.reload()">🔄 Reintentar</button>
+    </div>
+  </div>`;
+}
 
 // Empresas que se sacaron del catálogo pero cuyos datos siguen enteros.
 // Pasa al eliminar sin marcar "borrar datos" — incluido el caso de quien
@@ -77,7 +100,7 @@ export function renderEmpresas(){
 
   const ocultas=EMPRESAS.todas.length-EMPRESAS.lista.length;
 
-  el.innerHTML=`<div class="info-tip" style="margin-bottom:14px">🏢 Cada empresa tiene sus datos <strong>completamente separados</strong>: plan de cuentas, libros, asientos e indicadores propios. Cambia de empresa con el selector del menú lateral.</div>
+  el.innerHTML=`${bannerErrorCatalogo()}<div class="info-tip" style="margin-bottom:14px">🏢 Cada empresa tiene sus datos <strong>completamente separados</strong>: plan de cuentas, libros, asientos e indicadores propios. Cambia de empresa con el selector del menú lateral.</div>
   <div class="info-tip" style="margin-bottom:14px;font-size:11px;line-height:1.6">
     👤 <strong>Cada usuario ve sólo sus empresas.</strong> La empresa queda a nombre de quien la crea; el dueño puede
     compartirla con otros usuarios desde el botón 👥. ${esAdmin()?'Como administrador ves <strong>todo el catálogo</strong>, con el dueño de cada una.':''}

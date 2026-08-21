@@ -382,3 +382,20 @@ auxiliares".
   fecha real de emisión** (no la del asiento de apertura), así que el aging los clasifica por
   su antigüedad verdadera y Pagos y Cobros puede imputar contra facturas anteriores al
   sistema.
+
+## Publicar una versión (`_release.py`)
+
+`index.html` cargaba `js/app.js?v=<epoch>`, pero app.js importa los otros ~50 módulos con
+rutas estáticas **sin versión**. El navegador se quedaba con la copia vieja de cada uno: se
+publicaba un arreglo en `apertura.js` y el usuario seguía ejecutando el de ayer, sin ningún
+indicio de que algo iba mal. Fue exactamente lo que pasó con la tarjeta de auxiliares — el
+código estaba publicado, el navegador servía el módulo anterior.
+
+`_release.py` lo resuelve sin build: genera un **import map** que apunta cada módulo a su URL
+con la versión. Los import maps aceptan especificadores tipo URL, así que `./core.js` dentro
+de app.js queda redirigido a `./js/core.js?v=<epoch>`.
+
+    python3 _release.py v2026.08.22-0130
+
+Actualiza el import map, el `?v=` de app.js y la versión visible en la barra superior. Hay que
+correrlo **en cada publicación**; si no, el problema vuelve.

@@ -72,6 +72,9 @@ header{background:var(--sf);border-bottom:1px solid var(--bd);padding:0 20px;hei
 .btn-save-all:hover{background:var(--sf);color:var(--tx)}
 .btn-save-all.pendiente{background:var(--warn);color:#1b1200;border-color:var(--warn);animation:latido 2s ease-in-out infinite}
 .btn-save-all.pendiente:hover{filter:brightness(1.08);background:var(--warn);color:#1b1200}
+/* Guardado bloqueado por una lectura fallida: no es un aviso, es un freno */
+.btn-save-all.bloqueado{background:var(--err);color:#fff;border-color:var(--err);cursor:help}
+.btn-save-all.bloqueado:hover{filter:brightness(1.08);background:var(--err);color:#fff}
 @keyframes latido{0%,100%{opacity:1}50%{opacity:.72}}
 @media (prefers-reduced-motion:reduce){.btn-save-all.pendiente{animation:none}}
 .layout{display:flex;flex:1;overflow:hidden}

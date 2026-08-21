@@ -1,5 +1,5 @@
 // asientos.js — Asientos manuales, modal DTE, documentos unificados
-import {toast, fmtC, pn, today, IVA, pdcNm, CUENTAS_SEL, rutParse, rutFmt, dteV, dteC, rutDV} from './core.js';
+import {toast, fmtC, pn, today, IVA, pdcNm, PDC, CUENTAS_SEL, rutParse, rutFmt, dteV, dteC, rutDV} from './core.js';
 import {updateHdr} from './empresa.js';
 import {nav, rerender} from './ui.js';
 import {cuentasGastoOpts, dteComprasOpts} from './compras.js';
@@ -27,6 +27,22 @@ const CUENTAS_AUX={
   '3202019':'honorario',   // HONORARIOS PROFESIONALES
 };
 const esAux=cd=>!!CUENTAS_AUX[cd];
+
+// ── ¿Esta cuenta admite centro de costo? ──
+// Sólo las de RESULTADO: gastos/costos (tp 'C', prefijo 3) e ingresos (tp 'I',
+// prefijo 4). Un centro de costo responde "¿dónde se gastó / de dónde vino
+// esto?", una pregunta que no tiene sentido sobre un banco, un proveedor o el
+// capital: el activo y el pasivo son saldos, no consumo.
+//
+// Se mira el `tp` del plan de cuentas y, si la cuenta no está en el plan
+// (cargada desde Excel, por ejemplo), se cae al prefijo del código.
+export function aceptaCentroCosto(cd){
+  const c=String(cd||'');
+  if(c.length<1)return false;
+  const cta=PDC.find(x=>x.cd===c);
+  if(cta&&cta.tp)return cta.tp==='C'||cta.tp==='I';
+  return c[0]==='3'||c[0]==='4';
+}
 
 function renderAsientos(){
   updateHdr();
@@ -138,7 +154,9 @@ function renderLineas(){
     return `<div class="linea-row">
       <div class="linea-num">${i+1}</div>
       <div>${inputCuenta({id:`ln-cd-${i}`,value:l.cd,onPick:`lCd(${i},'%CD%')`,placeholder:'Código o nombre…'})}</div>
-      <div>${inputCC({id:`ln-cc-${i}`,value:l.cc||'',onPick:`AF.lineas[${i}].cc='%CC%'`,placeholder:'Buscar centro…'})}</div>
+      <div>${aceptaCentroCosto(l.cd)
+        ? inputCC({id:`ln-cc-${i}`,value:l.cc||'',onPick:`AF.lineas[${i}].cc='%CC%'`,placeholder:'Buscar centro…'})
+        : `<input type="text" class="linea-inp" disabled title="${l.cd?'El centro de costo sólo aplica a cuentas de gasto o ingreso':'Elige primero la cuenta'}" placeholder="${l.cd?'—':''}" style="opacity:.45">`}</div>
       <div><input type="text" class="linea-num-inp ${digitsClass(l.debe)}" inputmode="numeric" placeholder="0" value="${l.debe?new Intl.NumberFormat('es-CL').format(Math.round(l.debe)):''}" oninput="lValFmt(this,${i},'debe')" onblur="lValFmtBlur(this,${i},'debe')" onfocus="this.select()"></div>
       <div><input type="text" class="linea-num-inp ${digitsClass(l.haber)}" inputmode="numeric" placeholder="0" value="${l.haber?new Intl.NumberFormat('es-CL').format(Math.round(l.haber)):''}" oninput="lValFmt(this,${i},'haber')" onblur="lValFmtBlur(this,${i},'haber')" onfocus="this.select()"></div>
       <div><input type="text" class="linea-inp" placeholder="Descripción libre" maxlength="120" value="${(l.desc||'').replace(/"/g,'&quot;')}" oninput="AF.lineas[${i}].desc=this.value"></div>
@@ -152,6 +170,9 @@ function lCd(i,cd){
   AF.lineas[i].cd=cd;
   AF.lineas[i].nm=pdcNm(cd);
   if(!esAux(cd)){delete AF.lineas[i].rutCodigo;delete AF.lineas[i].rutDV;delete AF.lineas[i].razonSocial;delete AF.lineas[i].dte;}
+  // Si la cuenta nueva no admite centro de costo, el que hubiera queda sin
+  // sentido: se descarta en vez de arrastrarse invisible hasta el guardado.
+  if(!aceptaCentroCosto(cd))delete AF.lineas[i].cc;
   renderLineas();
 }
 function lRut(i,val){
@@ -830,7 +851,7 @@ function guardarAsiento(){
 
   const movsClean=lineas.map(l=>{
     const m={cd:l.cd,nm:l.nm||pdcNm(l.cd),desc:l.desc||'',debe:l.debe||0,haber:l.haber||0};
-    if(l.cc)m.cc=l.cc; // centro de costo (predio/cuartel)
+    if(l.cc&&aceptaCentroCosto(l.cd))m.cc=l.cc; // centro de costo (predio/cuartel)
     if(esAux(l.cd)){
       m.rutCodigo=l.rutCodigo;m.rutDV=l.rutDV;m.razonSocial=String(l.razonSocial||'').trim();
       if(l.dte)m.dte={...l.dte};

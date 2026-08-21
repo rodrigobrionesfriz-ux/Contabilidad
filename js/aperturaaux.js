@@ -388,7 +388,20 @@ export function parsearFilasApertura(filas,cd){
 export function bloqueAperturaAux(){
   if(!S.apertura)return '';
   const cuentas=resumenAperturaAux();
-  if(!cuentas.length)return '';
+  // Silenciar el bloque cuando no aplica dejaba a la gente buscando una tarjeta
+  // que nunca iba a salir. Mejor decir por qué.
+  if(!cuentas.length){
+    return `<div class="card" style="margin-top:14px">
+      <div class="card-title">📒 Detalle de auxiliares de la apertura</div>
+      <div style="font-size:11px;color:var(--mt);line-height:1.6">
+        Tu apertura no tiene saldos en cuentas con auxiliar
+        (${Object.keys(CUENTAS_AUX).map(c=>`<code>${c}</code>`).join(', ')}),
+        así que no hay documentos históricos que capturar.<br>
+        Si esperabas ver clientes o proveedores acá, revisa que el asiento de apertura
+        incluya esas cuentas con su saldo.
+      </div>
+    </div>`;
+  }
   const filas=cuentas.map(c=>`<tr>
     <td class="tl" style="font-size:12px">
       <span style="font-family:var(--mono);font-size:10px;color:var(--mt)">${c.cd}</span> ${c.nm}

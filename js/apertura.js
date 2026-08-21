@@ -19,9 +19,19 @@ function renderApertura(){
     btnElim.style.display='none';
     btnAbrir.textContent='+ Configurar Apertura';
     document.getElementById('ap-sub').textContent='Sin balance de apertura configurado';
+    // Sin apertura no hay contra qué cuadrar el detalle de auxiliares, pero sí
+    // conviene anunciarlo: si no, el paso queda invisible y nadie sabe que existe.
     cont.innerHTML=`<div class="empty"><div class="ei">🔰</div>
       No hay Balance de Apertura para el año ${S.empresa.anio}.<br><br>
-      Usa <strong>"+ Configurar Apertura"</strong> para cargar los saldos iniciales.</div>`;
+      Usa <strong>"+ Configurar Apertura"</strong> para cargar los saldos iniciales,
+      o <strong>"📥 Importar desde Balance"</strong> si tienes el balance al 31-12 en Excel.</div>
+      <div class="info-tip" style="margin-top:14px;font-size:11px;line-height:1.6">
+        📒 <strong>Después de cargar la apertura</strong> va a aparecer acá el
+        <strong>Detalle de auxiliares</strong>: sirve para capturar los documentos históricos
+        pendientes de cada cliente, proveedor y honorario, de modo que el auxiliar y el aging
+        arranquen con la historia real y los pagos se puedan imputar contra facturas anteriores
+        al sistema. Necesita la apertura primero, porque el detalle tiene que cuadrar con ella.
+      </div>`;
     return;
   }
 

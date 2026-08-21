@@ -317,3 +317,11 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
   cambio de atacar la causa de fondo: un equipo que arranca con una foto vieja es el que
   después genera conflictos. Al terminar, cada clave queda con su revisión, su baseline de
   ids y sus lápidas al día. Si alguna no se pudo leer, avisa y deja el guardado bloqueado.
+- **Claves globales compartidas**: `_empresas` es el único documento que escriben TODOS los
+  usuarios, y cada uno guarda el catálogo COMPLETO. Dos personas creando su empresa a la vez
+  se borraban la del otro del listado (los datos sobrevivían, pero la empresa desaparecía).
+  Ahora `setGlobal(clave,valor,{fusionar:true})` le aplica el mismo control de versión y
+  fusión por id que a los libros, y `guardarCatalogo` adopta el catálogo fusionado para que
+  la pantalla muestre también lo que creó el otro. Las demás claves globales son de un solo
+  usuario (`_empresaActiva:<email>`) o se escriben una vez: ahí gana la última escritura,
+  que es lo correcto para una preferencia.

@@ -275,3 +275,11 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
   perderse. Funciona para ventas, compras, asientos manuales, honorarios y apertura; los
   resultados que tienen comprobante se marcan con 📄. Las cuentas del plan, trabajadores y
   activos siguen navegando a su sección.
+- **Abrir en un equipo nuevo (móvil)**: ahí no hay nada en local y todo tiene que venir de
+  Firestore. `storage.leerGlobalConEstado(clave)` distingue **"la nube dice que no hay nada"**
+  de **"no pude leer la nube"** — `getGlobal` devolvía `null` en ambos casos. Con esa
+  distinción, `cargarEmpresas` ya no crea una empresa por defecto cuando la lectura falla:
+  marca `EMPRESAS.errorCarga`, la sección Empresas muestra qué pasó y no se escribe nada.
+  Antes, un fallo de lectura en el móvil creaba "Mi Empresa" y la **guardaba**, pisando en la
+  nube el catálogo real de todos los equipos. `guardarCatalogo` tampoco escribe si el
+  catálogo no se pudo leer primero.

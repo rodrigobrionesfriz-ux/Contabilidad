@@ -358,3 +358,27 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
   (es la contrapartida de la línea del proveedor). El modal la trae de ahí, recordando de
   qué línea salió, y si en el modal se elige otra cuenta, **se actualiza la línea del
   asiento** — son el mismo hecho económico y no pueden quedar discrepando.
+
+## Detalle de auxiliares del Balance de Apertura (`js/aperturaaux.js`)
+
+El asiento de apertura dice "Facturas por Cobrar: $4.859.531.273". Ese número cuadra el
+balance, pero no sirve para trabajar: no se sabe qué facturas lo componen, de qué clientes,
+ni cuáles están vencidas — y cuando llega un pago, no hay documento contra el cual imputarlo.
+
+Este módulo captura ese detalle documento por documento (RUT, razón social, tipo de DTE,
+número, emisión, vencimiento, monto y **saldo pendiente**), para clientes, proveedores y
+honorarios por pagar. Vive en la sección **Apertura**, en la tarjeta "📒 Detalle de
+auxiliares".
+
+- **La regla que lo mantiene honesto**: la suma de los saldos capturados de una cuenta debe
+  ser igual al monto de esa cuenta en el asiento de apertura. La diferencia se muestra en
+  vivo y guardar sin cuadrar exige una confirmación explícita.
+- **Dónde viven los datos**: `S.apertura.auxDocs`, dentro del propio asiento de apertura,
+  para que viajen con él al exportar, importar y respaldar.
+- **Carga**: fila a fila con el buscador dinámico de auxiliares, o desde Excel con plantilla
+  descargable. El importador tolera variantes de nombres de columna, fechas `dd-mm-aaaa`,
+  `aaaa-mm-dd` y seriales de Excel, y reporta las filas con problemas sin abortar el resto.
+- **Para qué sirve**: los documentos entran al auxiliar como documentos normales **con su
+  fecha real de emisión** (no la del asiento de apertura), así que el aging los clasifica por
+  su antigüedad verdadera y Pagos y Cobros puede imputar contra facturas anteriores al
+  sistema.

@@ -58,7 +58,7 @@
 
 <header>
   <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
-  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.21-2150</span></div>
+  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.22-0015</span></div>
   <span id="save-indicator" style="font-size:10px;color:var(--mt);white-space:nowrap;margin-left:auto"></span>
   <button class="btn-save-all" id="btn-guardar-todo" onclick="guardarTodoAhora()" title="Guardar todo">💾 Guardar</button>
   <!-- Los indicadores de sincronización viven ahora en Configuración → Sistema,
@@ -896,6 +896,21 @@
 </div>
 
 <!-- BÚSQUEDA GLOBAL (Ctrl+K) -->
+<!-- Detalle de auxiliares del balance de apertura -->
+<div class="modal-bkd" id="apx-modal">
+  <div class="modal-box" style="max-width:1100px">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">📒 Documentos históricos del auxiliar</div>
+        <div class="modal-sub">Detalle que compone el saldo de apertura de esta cuenta</div>
+      </div>
+      <button class="modal-close" onclick="cerrarAperturaAux()">✕</button>
+    </div>
+    <div id="apx-body"></div>
+    <input type="file" id="apx-file" accept=".xlsx,.xls" style="display:none">
+  </div>
+</div>
+
 <div id="search-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;padding-top:10vh" onclick="if(event.target===this)cerrarBusqueda()">
   <div style="max-width:640px;margin:0 auto;background:var(--sf);border:1px solid var(--bd);border-radius:12px;box-shadow:0 12px 48px rgba(0,0,0,.5);overflow:hidden">
     <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--bd)">
@@ -1195,6 +1210,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=1787316787"></script>
+<script type="module" src="js/app.js?v=1787318365"></script>
 </body>
 </html>

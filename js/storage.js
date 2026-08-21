@@ -2,6 +2,8 @@
 // Instala window.storage. Depende de firebase (FS).
 
 import {FS, fsStatusSet} from './firebase.js';
+import {DISPOSITIVO, initDispositivo} from './dispositivo.js';
+initDispositivo();
 
 // ═══ SHIM DE STORAGE — Firestore + localStorage fallback ═══
 // Estrategia: siempre escribir a AMBOS (localStorage para velocidad + Firestore para nube).
@@ -20,7 +22,14 @@ import {FS, fsStatusSet} from './firebase.js';
     if(!FS.enabled||!FS.db)return null;
     try{
       const doc=await FS.db.collection(COLL).doc(key).get();
-      if(doc.exists){const d=doc.data();return d&&d.value!==undefined?{key,value:d.value}:null;}
+      if(doc.exists){
+        const d=doc.data();
+        revs.set(key,+((d||{}).rev)||0);
+        if(d&&d.borrados)tumbas.set(key,{...(tumbas.get(key)||{}),...d.borrados});
+        if(d&&d.value!==undefined)fijarBaseline(key,d.value);
+        return d&&d.value!==undefined?{key,value:d.value}:null;
+      }
+      revs.set(key,0);
       return null;
     }catch(e){console.warn('FS get',key,e);return null;}
   }
@@ -63,6 +72,228 @@ import {FS, fsStatusSet} from './firebase.js';
   let empresaId='emp1';
   const K=key=>empresaId+':'+key;   // clave con prefijo de empresa
 
+  // ── Candado de seguridad contra la pérdida silenciosa ──
+  //
+  // Toda lectura que falla se parece a "no hay datos": la app muestra la
+  // sección vacía y, en cuanto se guarda cualquier cosa, escribe ese vacío
+  // encima de lo que sí existía en la nube. Un problema de red de dos segundos
+  // se convierte en borrar un libro entero.
+  //
+  // Por eso, cuando una clave NO se pudo leer, queda bloqueada para escritura
+  // hasta que se lea bien. Es a nivel de storage a propósito: así protege a
+  // todos los módulos y al autoguardado sin que cada uno tenga que acordarse.
+  const bloqueadas=new Map();   // clave con prefijo → motivo
+  const marcarNoLeida=(k,motivo)=>bloqueadas.set(k,motivo||'no se pudo leer');
+  const liberar=k=>bloqueadas.delete(k);
+
+  // ── Versión por documento: que un equipo no pise a otro ──
+  //
+  // El candado de arriba cubre "no pude leer". Falta el otro caso, más
+  // silencioso todavía: dos equipos que SÍ leyeron bien y guardan encima el uno
+  // del otro. Como cada documento guarda el libro COMPLETO (`ventas-2026` es el
+  // arreglo entero), el último en guardar borraba el trabajo del primero sin
+  // que nadie se enterara.
+  //
+  // Solución: cada documento lleva `rev` (un contador) y el `dispositivo` que
+  // lo escribió. Al guardar se abre una transacción: si la rev de la nube ya no
+  // es la que leímos, otro equipo escribió en el intermedio y NO se sobrescribe
+  // — se FUSIONA.
+  //
+  // Fusión: los libros son listas de registros con `id`, así que se unen por id.
+  // Lo que está sólo en la nube se conserva, lo que está sólo acá se agrega, y
+  // si un id está en ambos gana la versión local (es lo que el usuario acaba de
+  // editar). Nota honesta: si borraste un registro acá y el otro equipo lo
+  // tenía, la fusión lo revive. Es el mal menor frente a perder el trabajo
+  // completo del otro equipo, y se avisa para que se pueda volver a borrar.
+  //
+  // Lo que no es una lista con id (la ficha de empresa, los indicadores) no se
+  // puede fusionar solo: ahí se frena y se le pregunta al usuario.
+  const revs=new Map();         // clave con prefijo → rev que leímos
+
+  const esListaConId=v=>Array.isArray(v)&&v.length>0&&v.every(x=>x&&typeof x==='object'&&x.id!=null);
+
+  // ── Lápidas: para que fusionar no reviva lo que se borró ──
+  //
+  // Fusionar por id tiene un agujero: si borraste una factura acá y el otro
+  // equipo todavía la tenía, la unión la devuelve a la vida. El problema es que
+  // "no está en mi lista" no distingue entre "nunca la tuve" y "la borré".
+  //
+  // Solución clásica: dejar constancia del borrado. Cada documento guarda un
+  // mapa `borrados` {id: fecha}. Al fusionar, esos ids se excluyen aunque el
+  // otro equipo los traiga.
+  //
+  // Y se detecta solo: `baseline` recuerda los ids que tenía el documento la
+  // última vez que se leyó o guardó bien; lo que desaparece de una escritura a
+  // la siguiente es, por definición, un borrado. Así ningún módulo tiene que
+  // acordarse de avisar que borró.
+  const baseline=new Map();     // clave con prefijo → Set de ids conocidos
+  const tumbas=new Map();       // clave con prefijo → {id: fechaISO}
+  const resucitados=new Map();  // clave con prefijo → Set de ids recreados a propósito
+
+  function idsDe(valor){
+    try{
+      const v=JSON.parse(valor);
+      if(!Array.isArray(v))return null;
+      if(!v.length)return new Set();
+      if(!v.every(x=>x&&typeof x==='object'&&x.id!=null))return null;
+      return new Set(v.map(x=>String(x.id)));
+    }catch(e){return null;}
+  }
+
+  // Registra como borrados los ids que estaban en la baseline y ya no vienen
+  function detectarBorrados(k,valorNuevo){
+    const previos=baseline.get(k);
+    const ahora=idsDe(valorNuevo);
+    if(!previos||!ahora)return;
+    const t=tumbas.get(k)||{};
+    let nuevas=0;
+    previos.forEach(id=>{if(!ahora.has(id)&&!t[id]){t[id]=new Date().toISOString();nuevas++;}});
+    // Si un id vuelve a aparecer, se recreó a propósito: su lápida deja de
+    // aplicar. Hay que recordarlo aparte, porque al guardar se unen las lápidas
+    // de la nube y, si no, la lápida de allá lo volvería a enterrar.
+    const revividos=resucitados.get(k)||new Set();
+    ahora.forEach(id=>{if(t[id]){delete t[id];revividos.add(id);}});
+    if(revividos.size)resucitados.set(k,revividos);
+    if(nuevas||Object.keys(t).length)tumbas.set(k,t);
+  }
+
+  const fijarBaseline=(k,valor)=>{const s=idsDe(valor);if(s)baseline.set(k,s);};
+
+  function fusionar(valorNube,valorMio,borradosNube,borradosMios){
+    let a,b;
+    try{a=JSON.parse(valorNube);b=JSON.parse(valorMio);}catch(e){return {ok:false};}
+    // Un id con lápida en CUALQUIERA de los dos lados no vuelve
+    const muertos=new Set([...Object.keys(borradosNube||{}),...Object.keys(borradosMios||{})]);
+    if(Array.isArray(a)&&Array.isArray(b)){
+      // Un arreglo vacío a cualquiera de los dos lados no aporta información
+      if(!a.length)return {ok:true,value:JSON.stringify(b),agregados:0};
+      if(!b.length)return {ok:true,value:JSON.stringify(a),agregados:a.length};
+      if(!esListaConId(a)||!esListaConId(b))return {ok:false};
+      const porId=new Map();
+      let sepultados=0;
+      a.forEach(x=>{                                  // primero lo de la nube
+        if(muertos.has(String(x.id))){sepultados++;return;}   // lo borrado no revive
+        porId.set(String(x.id),x);
+      });
+      let agregados=0;
+      b.forEach(x=>{                                  // lo local manda en empates
+        if(muertos.has(String(x.id)))return;
+        if(!porId.has(String(x.id)))agregados++;
+        porId.set(String(x.id),x);
+      });
+      const unidos=[...porId.values()];
+      const revividos=Math.max(0,unidos.length-b.filter(x=>!muertos.has(String(x.id))).length);
+      return {ok:true,value:JSON.stringify(unidos),agregados,revividos,sepultados};
+    }
+    return {ok:false};
+  }
+
+  // Escritura con detección de concurrencia
+  async function setRemoteVersionado(k,value){
+    if(!FS.enabled||!FS.db)return {ok:false,motivo:'sin-nube'};
+    const ref=FS.db.collection(COLL).doc(k);
+    let salida={ok:true,fusionado:false};
+    try{
+      FS.pendingWrites++;fsStatusSet('syncing');
+      await FS.db.runTransaction(async t=>{
+        const snap=await t.get(ref);
+        const actual=snap.exists?(snap.data()||{}):null;
+        const revNube=actual?(+actual.rev||0):0;
+        const revMia=revs.has(k)?revs.get(k):null;
+        let aGuardar=value;
+
+        // Hay conflicto si leímos una versión y la nube ya avanzó. La condición
+        // es SÓLO la revisión, a propósito: comparar además el id del
+        // dispositivo parecía más fino, pero fallaba justo cuando más importa
+        // —dos pestañas del mismo navegador comparten el id y se habrían
+        // pisado igual—. El id sirve para redactar el aviso, no para decidir.
+        const otroEscribio=actual&&revMia!==null&&revNube!==revMia;
+        if(otroEscribio&&actual.value!==undefined){
+          const vivosDeNuevo=resucitados.get(k)||new Set();
+          const filtrar=o=>{const r={...(o||{})};vivosDeNuevo.forEach(id=>delete r[id]);return r;};
+          const f=fusionar(actual.value,value,filtrar(actual.borrados),filtrar(tumbas.get(k)));
+          if(!f.ok){
+            salida={ok:false,motivo:'conflicto',otro:actual.dispositivoNm||actual.dispositivo};
+            throw new Error('__CONFLICTO__');
+          }
+          aGuardar=f.value;
+          salida.fusionado=true;
+          salida.agregados=f.agregados;
+          salida.revividos=f.revividos;
+          salida.otro=actual.dispositivoNm||actual.dispositivo;
+          salida.value=aGuardar;
+        }
+        // Las lápidas viajan con el documento: unión de las de ambos lados,
+        // menos lo que se recreó a propósito en este equipo.
+        const lapidas={...((actual&&actual.borrados)||{}),...(tumbas.get(k)||{})};
+        (resucitados.get(k)||new Set()).forEach(id=>{delete lapidas[id];});
+        tumbas.set(k,lapidas);
+
+        const nuevaRev=revNube+1;
+        t.set(ref,{value:aGuardar,empresa:empresaDeClave(k),rev:nuevaRev,
+          borrados:lapidas,
+          dispositivo:DISPOSITIVO.id,dispositivoNm:DISPOSITIVO.nombre,
+          ts:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+        revs.set(k,nuevaRev);
+        fijarBaseline(k,aGuardar);                  // nueva referencia de borrados
+        if(salida.fusionado)setLocal(k,aGuardar);   // el equipo queda al día
+      });
+      FS.pendingWrites--;FS.lastSaveTs=Date.now();
+      if(FS.pendingWrites===0)fsStatusSet('saved');
+      return salida;
+    }catch(e){
+      FS.pendingWrites--;
+      if(e&&e.message==='__CONFLICTO__'){
+        fsStatusSet('error','conflicto entre equipos');
+        return salida;
+      }
+      fsStatusSet('error',e.code||e.message);
+      console.warn('FS set',k,e);
+      return {ok:false,motivo:e.message||String(e)};
+    }
+  }
+
+    // ── Cruce al iniciar sesión ──
+  // Lee de la nube TODAS las claves de la empresa activa antes de que el
+  // usuario empiece a trabajar. Suena a puro retraso, pero es lo que evita el
+  // problema de raíz: un equipo que arranca con una foto vieja es el que
+  // después genera conflictos y resucita registros borrados. Al terminar,
+  // cada clave queda con su revisión, su baseline de ids y sus lápidas al
+  // día, que es la base sobre la que funciona todo lo demás.
+  async function cruzarConLaNube(claves,onProgreso){
+    const res={leidas:0,fallidas:[],actualizadas:[],total:claves.length};
+    for(let i=0;i<claves.length;i++){
+      const clave=claves[i];
+      const antes=getLocal(K(clave));
+      const r=await window.storage.leerConEstado(clave);
+      if(r.fuente==='error')res.fallidas.push({clave,motivo:r.error});
+      else{
+        res.leidas++;
+        if(r.fuente==='nube'&&antes&&antes.value!==r.value)res.actualizadas.push(clave);
+        else if(r.fuente==='nube'&&!antes&&r.value)res.actualizadas.push(clave);
+      }
+      if(onProgreso)onProgreso(i+1,claves.length,clave);
+    }
+    return res;
+  }
+
+  // Claves que vale la pena cruzar: las conocidas del ejercicio más lo que ya
+  // exista en este equipo (por si hay algo de otro año o de un módulo nuevo).
+  function clavesDeLaEmpresa(anio){
+    const fijas=['empresa','pdc','pdc_v','activos','trabajadores','centros','cierresCC',
+                 'comprobantesTipo','fichasAux','indicadores','previsional','libroRem'];
+    const delAnio=['ventas-','compras-','honorarios-','asientos-','apertura-'].map(p=>p+anio);
+    const set=new Set([...fijas,...delAnio]);
+    try{
+      const pref=prefix+empresaId+':';
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);
+        if(k&&k.startsWith(pref))set.add(k.slice(pref.length));
+      }
+    }catch(e){}
+    return [...set];
+  }
+
   window.storage={
     // Cambia la empresa activa (lo llama empresas.js)
     setPrefijo(id){empresaId=id||'emp1';},
@@ -80,17 +311,83 @@ import {FS, fsStatusSet} from './firebase.js';
     },
     async set(key,value){
       const k=K(key);
+      if(bloqueadas.has(k)){
+        // Nunca sobrescribir algo que no pudimos leer: sería escribir el vacío
+        // que la app está mostrando por error encima del dato bueno.
+        const motivo=bloqueadas.get(k);
+        console.error('Escritura BLOQUEADA en',k,'—',motivo);
+        try{window.__avisarBloqueo&&window.__avisarBloqueo(key,motivo);}catch(e){}
+        return {key,bloqueada:true,motivo};
+      }
+      detectarBorrados(k,value);   // lo que desapareció desde la última lectura
       setLocal(k,value);
-      setRemote(k,value);
+      // Escritura versionada: detecta si otro equipo guardó en el intermedio
+      const r=await setRemoteVersionado(k,value);
+      if(r.motivo==='conflicto'){
+        try{window.__avisarConflicto&&window.__avisarConflicto(key,r.otro);}catch(e){}
+        return {key,value,conflicto:true,otro:r.otro};
+      }
+      if(r.fusionado){
+        try{window.__avisarFusion&&window.__avisarFusion(key,r);}catch(e){}
+      }
       // Avisar al control de salida que se guardó (si está cargado)
       try{ if(window.__marcarGuardado)window.__marcarGuardado(); }catch(e){}
-      return {key,value};
+      return {key,value,fusionado:!!r.fusionado};
     },
     async delete(key){
       const k=K(key);
       delLocal(k);delRemote(k);
       return {key,deleted:true};
     },
+
+    // Lectura de una clave de la empresa que distingue "no hay" de "no pude
+    // leer". Si falla, la clave queda bloqueada para escritura.
+    async leerConEstado(key){
+      const k=K(key);
+      const local=getLocal(k);
+      const vLocal=local?local.value:null;
+      if(!FS.enabled||!FS.db){
+        liberar(k);
+        return {value:vLocal,fuente:vLocal!==null?'local':'vacio',huboNube:false};
+      }
+      try{
+        const doc=await FS.db.collection(COLL).doc(k).get();
+        if(doc.exists){
+          const d=doc.data();
+          revs.set(k,+((d||{}).rev)||0);   // versión sobre la que trabajamos
+          if(d&&d.borrados)tumbas.set(k,{...(tumbas.get(k)||{}),...d.borrados});
+          if(d&&d.value!==undefined){
+            setLocal(k,d.value);liberar(k);fijarBaseline(k,d.value);
+            return {value:d.value,fuente:'nube',huboNube:true,rev:revs.get(k),
+                    dispositivo:d.dispositivoNm||d.dispositivo||''};
+          }
+        }else{
+          revs.set(k,0);                   // no existe: partimos de cero
+        }
+        liberar(k);   // la nube respondió: de verdad no hay nada
+        return {value:vLocal,fuente:vLocal!==null?'local':'vacio',huboNube:true};
+      }catch(e){
+        const motivo=e.message||String(e);
+        marcarNoLeida(k,motivo);
+        console.warn('FS get',k,e);
+        return {value:vLocal,fuente:'error',huboNube:true,error:motivo};
+      }
+    },
+
+    // Estado del candado, para que la interfaz pueda explicarlo
+    cruzarConLaNube(claves,onProgreso){return cruzarConLaNube(claves,onProgreso);},
+    clavesDeLaEmpresa(anio){return clavesDeLaEmpresa(anio);},
+    lapidas(){const pref=empresaId+':';const o={};
+      [...tumbas.entries()].forEach(([k,v])=>{if(k.startsWith(pref))o[k.slice(pref.length)]=Object.keys(v).length;});
+      return o;},
+
+    clavesBloqueadas(){
+      const pref=empresaId+':';
+      return [...bloqueadas.entries()]
+        .filter(([k])=>k.startsWith(pref))
+        .map(([k,motivo])=>({clave:k.slice(pref.length),motivo}));
+    },
+    hayBloqueos(){return this.clavesBloqueadas().length>0;},
 
     // ── API sin prefijo (catálogo de empresas, config global) ──
     // Lectura global que DISTINGUE "no existe" de "no se pudo leer".

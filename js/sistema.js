@@ -13,6 +13,7 @@ import {S, AUTH} from './state.js';
 import {TEMAS} from './tema.js';
 import {bloqueSeguridad} from './seguridad.js';
 import {AG, OPCIONES_INTERVALO, etiquetaIntervalo} from './autoguardado.js';
+import {DISPOSITIVO} from './dispositivo.js';
 
 // Lee el texto que los módulos de sincronización dejaron en los indicadores
 function estadoTexto(id,fallback){
@@ -72,6 +73,20 @@ function renderSistema(){
             ? `Guarda cada <strong>${etiquetaIntervalo(AG.segundos)}</strong> si hay algo pendiente${AG.ultimo?` · último automático a las ${AG.ultimo.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}`:''}.`
             : 'Con el automático apagado, el botón 💾 de la barra superior se pone <strong>amarillo</strong> cuando hay algo sin guardar.'}
           <br>Al cerrar sesión o cerrar la pestaña con trabajo pendiente, el sistema ofrece guardarlo antes de salir.
+        </div>`)}
+
+      ${tarjeta('🖥','Este dispositivo',
+        'Cada equipo donde abres la app tiene su propia identidad. Firma lo que guarda, para que dos equipos no se pisen sin que nadie se entere.',
+        `<table><tbody>
+          <tr><td class="tl" style="font-size:12px">Nombre</td><td style="text-align:right;font-size:12px"><strong>${DISPOSITIVO.nombre}</strong></td></tr>
+          <tr><td class="tl" style="font-size:12px">Identificador</td><td style="text-align:right;font-size:11px;font-family:var(--mono);color:var(--mt)">${DISPOSITIVO.id}</td></tr>
+        </tbody></table>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn btn-g" onclick="renombrarEsteDispositivo()">✏️ Ponerle nombre</button>
+        </div>
+        <div style="font-size:10px;color:var(--mt);margin-top:10px;line-height:1.6">
+          Ponle un nombre reconocible —"PC oficina", "Celular Rodrigo"— y los avisos de
+          cambios simultáneos se van a entender de una.
         </div>`)}
 
       ${tarjeta('☁️','Respaldo en la nube',

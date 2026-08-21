@@ -52,6 +52,7 @@ import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 import {renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
         initCargaDatosListener, CD} from './cargadatos.js';
 import {renderSistema} from './sistema.js';
+import {DISPOSITIVO, renombrarDispositivo} from './dispositivo.js';
 import {diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos} from './seguridad.js';
 
 // Negocio
@@ -158,36 +159,100 @@ async function saveAll({silencioso=false}={}){
   actualizarBotonGuardar();
   return ok;
 }
+// Carga los datos del ejercicio.
+//
+// Cada lectura que falla se ve EXACTAMENTE igual que "no hay datos": la sección
+// aparece vacía. Antes eso se tragaba en silencio (`catch(e){}`) y, al primer
+// guardado, la app escribía ese vacío encima del dato bueno de la nube.
+//
+// Ahora se distingue el error y se registra: storage bloquea la escritura de
+// esas claves y `S.cargaFallida` deja constancia para avisar en pantalla.
+// Pantalla de espera del cruce: es corta, pero conviene decir qué está pasando
+function pantallaCruce(txt,detalle){
+  let el=document.getElementById('cruce-overlay');
+  if(!el){
+    el=document.createElement('div');
+    el.id='cruce-overlay';
+    el.style.cssText='position:fixed;inset:0;background:var(--bg,#0d1117);z-index:9000;display:flex;'+
+      'flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:24px';
+    document.body.appendChild(el);
+  }
+  el.innerHTML=`<div style="font-size:34px">☁️</div>
+    <div style="font-size:15px;font-weight:700">${txt}</div>
+    <div style="font-size:12px;color:var(--mt);font-family:var(--mono);min-height:18px">${detalle||''}</div>`;
+  return el;
+}
+const cerrarPantallaCruce=()=>{const el=document.getElementById('cruce-overlay');if(el)el.remove();};
+
+async function cruzarAlIniciar(){
+  if(!FS.enabled){return null;}
+  const claves=window.storage.clavesDeLaEmpresa(S.empresa.anio||new Date().getFullYear());
+  pantallaCruce('Sincronizando con la nube…',`0 de ${claves.length}`);
+  let r;
+  try{
+    r=await window.storage.cruzarConLaNube(claves,(hechas,total,clave)=>{
+      pantallaCruce('Sincronizando con la nube…',`${hechas} de ${total} · ${clave}`);
+    });
+  }catch(e){
+    cerrarPantallaCruce();
+    console.error('Cruce con la nube:',e);
+    return null;
+  }
+  cerrarPantallaCruce();
+  if(r.fallidas.length){
+    toast(`🚫 ${r.fallidas.length} registro(s) no se pudieron leer — el guardado quedó bloqueado para protegerlos`,'e');
+    console.error('Cruce incompleto:',r.fallidas);
+  }else if(r.actualizadas.length){
+    toast(`☁️ ${r.actualizadas.length} registro(s) actualizados desde la nube`);
+    console.log('Actualizados en el cruce:',r.actualizadas);
+  }
+  return r;
+}
+
+function renombrarEsteDispositivo(){
+  const n=prompt('Nombre de este equipo\n\nSirve para reconocerlo en los avisos de cambios simultáneos.',DISPOSITIVO.nombre);
+  if(n===null)return;
+  if(renombrarDispositivo(n)){toast('🖥 Ahora este equipo se llama "'+DISPOSITIVO.nombre+'"');renderSistema();}
+}
+
 async function loadYear(y){
   S.ventas=[];S.compras=[];S.honorarios=[];S.asientos=[];S.apertura=null;S.activos=[];S.trabajadores=[];
+  S.cargaFallida=[];
+
+  const leer=async(clave,aplicar)=>{
+    const r=await window.storage.leerConEstado(clave);
+    if(r.fuente==='error'){
+      S.cargaFallida.push({clave,motivo:r.error});
+      console.error('No se pudo cargar',clave,'—',r.error);
+      return;
+    }
+    if(r.value==null)return;
+    try{aplicar(JSON.parse(r.value));}
+    catch(e){
+      S.cargaFallida.push({clave,motivo:'contenido ilegible'});
+      console.error('Contenido ilegible en',clave,e);
+    }
+  };
+
   for(const[k,d] of [['ventas-'+y,'ventas'],['compras-'+y,'compras'],['honorarios-'+y,'honorarios'],['asientos-'+y,'asientos']]){
-    try{
-      const r=await window.storage.get(k);
-      if(r){
-        const parsed=JSON.parse(r.value);
-        if(Array.isArray(parsed)&&parsed.length>0&&(d==='ventas'||d==='compras')&&parsed[0]&&'mes' in parsed[0]&&!('tipoDTE' in parsed[0])){
-          S[d]=[];
-        }else if(Array.isArray(parsed)){
-          S[d]=parsed;
-        }
+    await leer(k,parsed=>{
+      if(Array.isArray(parsed)&&parsed.length>0&&(d==='ventas'||d==='compras')&&parsed[0]&&'mes' in parsed[0]&&!('tipoDTE' in parsed[0])){
+        S[d]=[];   // formato antiguo por mes: se ignora
+      }else if(Array.isArray(parsed)){
+        S[d]=parsed;
       }
-    }catch(e){}
+    });
   }
-  // Cargar asiento de apertura del año
-  try{
-    const r=await window.storage.get('apertura-'+y);
-    if(r)S.apertura=JSON.parse(r.value);
-  }catch(e){}
-  // Activos fijos: clave GLOBAL (los bienes persisten entre años; la depreciación se calcula por año activo)
-  try{
-    const r=await window.storage.get('activos');
-    if(r){const p=JSON.parse(r.value);if(Array.isArray(p))S.activos=p;}
-  }catch(e){}
-  // Trabajadores: clave GLOBAL (persisten entre meses/años)
-  try{
-    const r=await window.storage.get('trabajadores');
-    if(r){const p=JSON.parse(r.value);if(Array.isArray(p))S.trabajadores=p;}
-  }catch(e){}
+  await leer('apertura-'+y,p=>{S.apertura=p;});
+  // Activos fijos y trabajadores: claves GLOBALES de la empresa (persisten entre años)
+  await leer('activos',p=>{if(Array.isArray(p))S.activos=p;});
+  await leer('trabajadores',p=>{if(Array.isArray(p))S.trabajadores=p;});
+
+  if(S.cargaFallida.length){
+    toast(`🚫 No se pudieron cargar ${S.cargaFallida.length} registro(s) — el guardado quedó bloqueado para protegerlos`,'e');
+  }
+  try{actualizarBotonGuardar();}catch(e){}
+  return S.cargaFallida;
 }
 async function changeYear(y){S.empresa.anio=y;await loadYear(y);rerender();}
 async function init(){
@@ -213,6 +278,12 @@ async function initApp(){
   }
   window.storage.setPrefijo(EMPRESAS.activa);
   renderSelectorEmpresa();
+
+  // ── Cruce con la nube ANTES de dejar trabajar ──
+  // Arrancar con una foto vieja es la causa de fondo de los conflictos y de que
+  // una fusión reviva registros borrados. Este paso demora un poco la apertura
+  // a cambio de que el equipo empiece sincronizado.
+  await cruzarAlIniciar();
 
   const ys=document.getElementById('year-sel');
   const cy=new Date().getFullYear();
@@ -469,6 +540,7 @@ Object.assign(window,{
   onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
   renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos, renderSistema,
   diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos,
+  renombrarEsteDispositivo,
   renderCompensacionIVA, generarAsientoIVA, setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente,
   renderPagoF29, generarAsientoPagoF29, setPagoF29Cuenta, setPagoF29Campo, setPagoF29Monto,
   togglePagoF29, resetPagoF29, usarSugeridoF29,
@@ -499,5 +571,28 @@ function abrirImportFichasActual(){abrirImportFichas(tipoAuxActual());}
 // ═══ ARRANQUE ═══
 initTema();
 initAvisoSalida();   // aviso si se cierra con cambios sin guardar
-initAutoguardado();  // temporizador + guardado al dejar la pestaña o cerrar   // aplicar tema guardado antes de renderizar
+initAutoguardado();  // temporizador + guardado al dejar la pestaña o cerrar
+// storage llama esto cuando frena una escritura sobre una clave no leída
+let _avisoBloqueo=0;
+// Otro equipo escribió el mismo libro: se fusionó, hay que avisarlo
+window.__avisarFusion=(clave,r)=>{
+  const de=r.otro?` de ${r.otro}`:'';
+  let msg=`🔀 "${clave}" se fusionó con los cambios${de}`;
+  if(r.agregados)msg+=` · ${r.agregados} registro(s) tuyos agregados`;
+  if(r.revividos>0)msg+=` · ${r.revividos} venían del otro equipo`;
+  toast(msg+' — recarga para verlo completo');
+  console.warn('Fusión en',clave,r);
+};
+// No se pudo fusionar solo (no es una lista de registros): decide el usuario
+window.__avisarConflicto=(clave,otro)=>{
+  toast(`⚠️ "${clave}" fue modificado desde ${otro||'otro equipo'} — no se guardó para no pisarlo. Recarga y vuelve a aplicar tu cambio.`,'e');
+  console.error('Conflicto sin fusión posible en',clave,'—',otro);
+};
+window.__avisarBloqueo=(clave,motivo)=>{
+  try{actualizarBotonGuardar();}catch(e){}
+  const ahora=Date.now();
+  if(ahora-_avisoBloqueo<8000)return;      // no repetir en cada tecla
+  _avisoBloqueo=ahora;
+  toast(`🚫 No se guardó "${clave}": no se pudo leer desde la nube (${motivo}). Recarga la página.`,'e');
+};   // aplicar tema guardado antes de renderizar
 init();

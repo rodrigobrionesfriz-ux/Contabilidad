@@ -37,7 +37,10 @@ function grabarPreferencia(){
 }
 
 // ¿Tiene sentido guardar ahora?
-const procede=()=>!!(AUTH.user&&haySinGuardar()&&!AG.guardando&&window.saveAll);
+// Con claves bloqueadas por una lectura fallida NO se guarda nada automático:
+// el autoguardado es justamente el que convertiría el error en pérdida.
+const procede=()=>!!(AUTH.user&&haySinGuardar()&&!AG.guardando&&window.saveAll
+                     &&!(window.storage&&window.storage.hayBloqueos&&window.storage.hayBloqueos()));
 
 // Guardado silencioso: sin toast, salvo que falle
 export async function guardarAuto(motivo){
@@ -74,6 +77,18 @@ export const OPCIONES_INTERVALO=OPCIONES;
 // Guardar ahora desde la barra superior
 export async function guardarTodoAhora(){
   if(!window.saveAll)return;
+  const bloq=(window.storage&&window.storage.clavesBloqueadas)?window.storage.clavesBloqueadas():[];
+  if(bloq.length){
+    alert(
+      '🚫 GUARDADO BLOQUEADO\n\n'+
+      'No se pudieron leer estos registros desde la nube:\n'+
+      bloq.map(b=>'  · '+b.clave+' — '+b.motivo).join('\n')+'\n\n'+
+      'La app los está mostrando vacíos, y guardar ahora escribiría ese vacío\n'+
+      'encima de tus datos reales. Por eso no se guarda nada.\n\n'+
+      'Recarga la página cuando vuelva la conexión: si se leen bien, el\n'+
+      'guardado se desbloquea solo.');
+    return;
+  }
   if(!haySinGuardar()){toast('✓ No hay cambios pendientes');return;}
   await window.saveAll();
 }
@@ -82,6 +97,17 @@ export async function guardarTodoAhora(){
 export function actualizarBotonGuardar(){
   const btn=document.getElementById('btn-guardar-todo');
   if(!btn)return;
+  // Guardado bloqueado: es más importante decirlo que mostrar el estado normal
+  const bloq=(window.storage&&window.storage.clavesBloqueadas)?window.storage.clavesBloqueadas():[];
+  if(bloq.length){
+    btn.classList.remove('pendiente');
+    btn.classList.add('bloqueado');
+    btn.innerHTML='🚫 Guardado bloqueado';
+    btn.title='No se pudieron leer '+bloq.length+' registro(s) desde la nube ('+bloq.map(b=>b.clave).join(', ')+
+      '). No se guarda nada para no sobrescribirlos. Recarga la página cuando vuelva la conexión.';
+    return;
+  }
+  btn.classList.remove('bloqueado');
   const sucio=haySinGuardar();
   btn.classList.toggle('pendiente',sucio);
   btn.title=sucio

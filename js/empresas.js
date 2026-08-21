@@ -198,7 +198,13 @@ export async function guardarCatalogo(){
   }
   // Se persiste el catálogo COMPLETO: si se guardara sólo lo visible, un
   // usuario borraría del catálogo las empresas de los demás sin querer.
-  await window.storage.setGlobal('_empresas',JSON.stringify(EMPRESAS.todas));
+  // fusionar:true — dos usuarios creando su empresa a la vez no se pisan
+  const r=await window.storage.setGlobal('_empresas',JSON.stringify(EMPRESAS.todas),{fusionar:true});
+  // Si hubo fusión, el catálogo bueno es el que volvió: adoptarlo para que la
+  // pantalla muestre también la empresa que creó el otro usuario.
+  if(r&&r.fusionado&&r.value){
+    try{EMPRESAS.todas=JSON.parse(r.value);}catch(e){}
+  }
   if(EMPRESAS.activa)await window.storage.setGlobal(claveActiva(),EMPRESAS.activa);
   aplicarVisibilidad();
   refrescarACL();   // en segundo plano: no debe frenar el guardado

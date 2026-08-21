@@ -102,9 +102,7 @@ initDispositivo();
   // Fusión: los libros son listas de registros con `id`, así que se unen por id.
   // Lo que está sólo en la nube se conserva, lo que está sólo acá se agrega, y
   // si un id está en ambos gana la versión local (es lo que el usuario acaba de
-  // editar). Nota honesta: si borraste un registro acá y el otro equipo lo
-  // tenía, la fusión lo revive. Es el mal menor frente a perder el trabajo
-  // completo del otro equipo, y se avisa para que se pueda volver a borrar.
+  // editar). Lo que se borró NO revive: para eso están las lápidas, más abajo.
   //
   // Lo que no es una lista con id (la ficha de empresa, los indicadores) no se
   // puede fusionar solo: ahí se frena y se le pregunta al usuario.
@@ -408,7 +406,14 @@ initDispositivo();
         const doc=await FS.db.collection(COLL).doc(key).get();
         if(doc.exists){
           const d=doc.data();
-          if(d&&d.value!==undefined){setLocal(key,d.value);return {value:d.value,fuente:'nube',huboNube:true};}
+          revs.set(key,+((d||{}).rev)||0);
+          if(d&&d.borrados)tumbas.set(key,{...(tumbas.get(key)||{}),...d.borrados});
+          if(d&&d.value!==undefined){
+            setLocal(key,d.value);fijarBaseline(key,d.value);
+            return {value:d.value,fuente:'nube',huboNube:true,rev:revs.get(key)};
+          }
+        }else{
+          revs.set(key,0);
         }
         // La nube respondió y de verdad no hay nada
         return {value:vLocal,fuente:vLocal!==null?'local':'vacio',huboNube:true};
@@ -426,8 +431,29 @@ initDispositivo();
       }
       return local;
     },
-    async setGlobal(key,value){
-      setLocal(key,value);setRemote(key,value);
+    // `fusionar:true` para las claves globales que escriben TODOS los usuarios.
+    // El caso concreto es `_empresas`: cada usuario guarda el catálogo COMPLETO,
+    // así que dos personas creando su empresa a la vez se borraban la del otro
+    // del listado (los datos sobrevivían, pero la empresa desaparecía de la
+    // lista). Con versión + fusión por id, se conservan las dos.
+    //
+    // Las demás claves globales son de un solo usuario (`_empresaActiva:<email>`)
+    // o se escriben una vez (`_migrado_multiempresa`): ahí gana la última
+    // escritura, que es lo correcto para una preferencia.
+    async setGlobal(key,value,opciones){
+      const fusionar=!!(opciones&&opciones.fusionar);
+      setLocal(key,value);
+      if(!fusionar){setRemote(key,value);return {key,value};}
+      detectarBorrados(key,value);
+      const r=await setRemoteVersionado(key,value);
+      if(r.motivo==='conflicto'){
+        try{window.__avisarConflicto&&window.__avisarConflicto(key,r.otro);}catch(e){}
+        return {key,value,conflicto:true,otro:r.otro};
+      }
+      if(r.fusionado){
+        try{window.__avisarFusion&&window.__avisarFusion(key,r);}catch(e){}
+        return {key,value:r.value,fusionado:true};
+      }
       return {key,value};
     },
 

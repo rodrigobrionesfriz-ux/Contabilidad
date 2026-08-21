@@ -346,3 +346,15 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
   descarta —para que no viaje invisible hasta el guardado— y `guardarAsiento` lo vuelve a
   comprobar como red de seguridad. `aceptaCentroCosto(cd)` mira el `tp` del plan y cae al
   prefijo del código si la cuenta no está en el plan (cargada desde Excel, por ejemplo).
+- **Modal DTE al terminar el monto, no al primer dígito**: la apertura automática vivía en
+  `oninput`, así que saltaba con la primera tecla y tapaba el campo mientras se escribía.
+  Se movió a `lValFmtBlur` — se abre al salir del campo (tab o clic fuera), con el monto ya
+  completo.
+- **Buscador dinámico de auxiliares** (`inputAux` en `buscadorcuentas.js`): el RUT del
+  cliente/proveedor se escribía a mano. Ahora se busca por código o por nombre sobre las
+  fichas cargadas, muestra el giro y al elegir rellena RUT, dígito verificador y razón
+  social. Un RUT sin ficha sigue siendo válido: sólo no hay nada que autocompletar.
+- **Distribución del gasto tomada del asiento**: la cuenta de gasto ya está en el asiento
+  (es la contrapartida de la línea del proveedor). El modal la trae de ahí, recordando de
+  qué línea salió, y si en el modal se elige otra cuenta, **se actualiza la línea del
+  asiento** — son el mismo hecho económico y no pueden quedar discrepando.

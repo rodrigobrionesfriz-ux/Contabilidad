@@ -240,3 +240,102 @@ export function ccAcCerrarDif(id){
     else if(inp.value&&!ccId)inp.value='';
   },160);
 }
+
+// ═══ BUSCADOR DINÁMICO DE AUXILIARES (clientes / proveedores) ═══
+//
+// Antes el RUT del auxiliar se escribía a mano y sólo se validaba el dígito
+// verificador. Con las fichas cargadas desde Excel ya existe el dato: se puede
+// buscar por código o por nombre y traer razón social, giro y dirección de una.
+//
+// Ejemplo:
+//   inputAux({id:'ln-rut-0', tipo:'proveedor', value:'77999888',
+//             onPick:"lAuxElegido(0,'%RUT%')"})
+import {S as _SAX} from './state.js';
+
+let AX_RES=[], AX_SEL=0;
+
+const fichasDe=tipo=>((_SAX.fichasAux||{})[tipo])||{};
+
+export function auxNombre(tipo,rutCodigo){
+  const f=fichasDe(tipo)[rutCodigo];
+  return f?(f.razonSocial||f.nombre||''):'';
+}
+
+function buscarAux(tipo,q){
+  const fichas=fichasDe(tipo);
+  const todos=Object.keys(fichas).map(rut=>({rut,...fichas[rut]}));
+  if(!q||!q.trim())return todos.slice(0,40);
+  const t=q.toLowerCase().trim().replace(/[.\-\s]/g,'');
+  return todos.filter(f=>
+    String(f.rut).toLowerCase().includes(t)||
+    String(f.razonSocial||f.nombre||'').toLowerCase().includes(q.toLowerCase().trim())
+  ).slice(0,40);
+}
+
+export function inputAux({id,tipo='proveedor',value='',onPick='',placeholder='RUT o nombre…',clase='linea-inp'}){
+  const op=String(onPick).replace(/"/g,'&quot;');
+  return `<div class="ac-wrap" style="position:relative">
+    <input type="text" id="${id}" class="${clase}" value="${String(value||'').replace(/"/g,'&quot;')}"
+      placeholder="${placeholder}" autocomplete="off"
+      data-tipo="${tipo}" data-onpick="${op}"
+      oninput="axAcBuscar('${id}')" onfocus="axAcBuscar('${id}')"
+      onkeydown="axAcTecla(event,'${id}')" onblur="axAcCerrar('${id}')">
+    <div id="${id}-ac" class="ac-lista" style="display:none;min-width:280px"></div>
+  </div>`;
+}
+
+export function axAcBuscar(id){
+  const inp=document.getElementById(id);
+  const box=document.getElementById(id+'-ac');
+  if(!inp||!box)return;
+  const tipo=inp.dataset.tipo||'proveedor';
+  AX_RES=buscarAux(tipo,inp.value);
+  AX_SEL=0;
+  if(!AX_RES.length){
+    box.innerHTML=`<div class="ac-item" style="color:var(--mt)">
+      ${Object.keys(fichasDe(tipo)).length
+        ? 'Sin coincidencias — puedes escribir el RUT igual'
+        : 'No hay fichas de '+tipo+' cargadas · Configuración → Carga desde Excel'}
+    </div>`;
+    box.style.display='block';return;
+  }
+  pintarListaAux(id,box);
+}
+
+function pintarListaAux(id,box){
+  box.innerHTML=AX_RES.map((f,i)=>`
+    <div class="ac-item${i===AX_SEL?' sel':''}" onmousedown="axAcElegir('${id}','${f.rut}')">
+      <span style="font-family:var(--mono);color:var(--ac);font-size:11px">${f.rut}</span>
+      <span style="margin-left:8px">${f.razonSocial||f.nombre||''}</span>
+      ${f.giro?`<div style="font-size:10px;color:var(--mt);margin-left:2px">${f.giro}</div>`:''}
+    </div>`).join('');
+  box.style.display='block';
+}
+
+export function axAcTecla(ev,id){
+  const box=document.getElementById(id+'-ac');
+  if(!box||box.style.display==='none')return;
+  if(ev.key==='ArrowDown'){ev.preventDefault();AX_SEL=Math.min(AX_SEL+1,AX_RES.length-1);pintarListaAux(id,box);}
+  else if(ev.key==='ArrowUp'){ev.preventDefault();AX_SEL=Math.max(AX_SEL-1,0);pintarListaAux(id,box);}
+  else if(ev.key==='Enter'&&AX_RES[AX_SEL]){ev.preventDefault();axAcElegir(id,AX_RES[AX_SEL].rut);}
+  else if(ev.key==='Escape'){box.style.display='none';}
+}
+
+export function axAcElegir(id,rut){
+  const inp=document.getElementById(id);
+  const box=document.getElementById(id+'-ac');
+  if(!inp)return;
+  inp.value=rut;
+  if(box){box.style.display='none';}
+  const op=inp.dataset.onpick;
+  if(op){try{ (new Function(op.replace(/%RUT%/g,rut)))(); }catch(e){console.warn('onPick aux',e);} }
+}
+
+// Al salir, cerrar la lista sin borrar lo escrito: un RUT que no está en las
+// fichas sigue siendo válido, sólo que no tiene datos que autocompletar.
+export function axAcCerrar(id){
+  setTimeout(()=>{
+    const box=document.getElementById(id+'-ac');
+    if(box)box.style.display='none';
+  },160);
+}

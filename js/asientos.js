@@ -8,7 +8,8 @@ import {logAccion} from './firebase.js';
 import {foliosMensuales, dteVentasOpts} from './helpers.js';
 import {retencionHonorarios} from './indicadores.js';
 import {ccOpts} from './centroscosto.js';
-import {inputCuenta, inputCC} from './buscadorcuentas.js';
+import {inputCuenta, inputCC, inputAux} from './buscadorcuentas.js';
+import {fichaAux} from './importadoraux.js';
 import './storage.js';
 
 // Estado del formulario de asientos (interno del módulo; se reasigna al abrir/editar)
@@ -141,7 +142,9 @@ function renderLineas(){
           <div></div>
           <div class="linea-aux-lbl">RUT ${tipoAux}</div>
           <div class="rut-wrap">
-            <input type="text" class="linea-inp" placeholder="Sin puntos ni guión" value="${rutVal}" oninput="lRut(${i},this.value)">
+            ${inputAux({id:`ln-rut-${i}`,tipo:tipoAux==='cliente'?'cliente':'proveedor',
+                        value:rutVal,onPick:`lAuxElegido(${i},'%RUT%')`,
+                        placeholder:'RUT o nombre…'})}
             <span class="${dvCls}" id="ln-dv-${i}">${dvHtml}</span>
           </div>
           <div style="display:flex;gap:6px">
@@ -175,6 +178,24 @@ function lCd(i,cd){
   if(!aceptaCentroCosto(cd))delete AF.lineas[i].cc;
   renderLineas();
 }
+// Elegir un auxiliar del buscador: trae RUT, dígito verificador y razón social
+// desde la ficha. Si el RUT no tiene ficha, igual queda registrado — sólo que
+// sin datos que autocompletar.
+function lAuxElegido(i,rut){
+  const l=AF.lineas[i];
+  const tipo=CUENTAS_AUX[l.cd]==='cliente'?'cliente':'proveedor';
+  l.rutCodigo=String(rut||'');
+  l.rutDV=rutDV(l.rutCodigo)||'';
+  const f=fichaAux(tipo,l.rutCodigo);
+  if(f){
+    l.razonSocial=f.razonSocial||f.nombre||'';
+    if(f.giro)l.giro=f.giro;
+  }
+  renderLineas();
+  // Dejar el foco donde el usuario va a seguir escribiendo
+  setTimeout(()=>{const el=document.getElementById('ln-rut-'+i);if(el)el.blur();},0);
+}
+
 function lRut(i,val){
   const r=rutParse(val);
   AF.lineas[i].rutCodigo=r.codigo||'';
@@ -208,12 +229,8 @@ function lVal(i,side,val){
   if(side==='debe'&&v>0)AF.lineas[i].haber=0;
   if(side==='haber'&&v>0)AF.lineas[i].debe=0;
   updCuadre();
-  // Auto-abrir modal si: cuenta auxiliable + monto ingresado + no hay DTE ya asociado + no se ha consultado en esta sesión
-  const l=AF.lineas[i];
-  if(esAux(l.cd)&&v>0&&!l.dte&&!l._promptedDte){
-    l._promptedDte=true;
-    setTimeout(()=>abrirDteModal(i),150);
-  }
+  // La apertura del modal vive en `lValFmtBlur`: al terminar de escribir, no
+  // en cada tecla.
 }
 // Input formateado con separador de miles.
 // Mientras se escribe, quitamos los puntos, guardamos el número puro y
@@ -256,12 +273,9 @@ function lValFmt(inp,i,side){
     }
   }
   updCuadre();
-  // Auto-abrir DTE modal para cuentas auxiliares
-  const l=AF.lineas[i];
-  if(esAux(l.cd)&&num>0&&!l.dte&&!l._promptedDte){
-    l._promptedDte=true;
-    setTimeout(()=>abrirDteModal(i),150);
-  }
+  // El modal del DTE ya NO se abre acá: `oninput` dispara con el primer dígito
+  // y arrancaba la ventana en la cara mientras se escribía el monto. Ahora se
+  // abre al SALIR del campo (blur / tab), cuando el monto ya está completo.
 }
 function lValFmtBlur(inp,i,side){
   const num=+AF.lineas[i][side]||0;
@@ -269,6 +283,12 @@ function lValFmtBlur(inp,i,side){
   inp.classList.remove('digs-10','digs-13','digs-15');
   const cls=digitsClass(num);
   if(cls)inp.classList.add(cls);
+  // Recién ahora, con el monto terminado, se ofrece asociar el documento.
+  const l=AF.lineas[i];
+  if(esAux(l.cd)&&num>0&&!l.dte&&!l._promptedDte){
+    l._promptedDte=true;
+    setTimeout(()=>abrirDteModal(i),120);
+  }
 }
 function quitarDte(i){
   if(!confirm('¿Quitar el DTE asociado a esta línea?\n(El asiento contable se mantiene, solo se retira el documento del libro/auxiliar)'))return;
@@ -354,6 +374,35 @@ function folioPreviewDte(dte,cuenta,lineaIdx){
 // ═══ MODAL DTE ═══
 let DM={open:false,lineaIdx:null,dist:[]};
 
+// Líneas del asiento que representan el gasto: cuentas de resultado con monto,
+// excluyendo la propia línea del proveedor.
+function lineasDeGasto(exceptoIdx){
+  return AF.lineas.map((l,idx)=>({l,idx}))
+    .filter(({l,idx})=>idx!==exceptoIdx&&l.cd&&aceptaCentroCosto(l.cd)&&((l.debe||0)+(l.haber||0))>0)
+    .map(({l,idx})=>({idx,cd:l.cd,monto:l.debe||l.haber||0}));
+}
+
+// Si en el modal se cambió la cuenta de una fila que vino del asiento, el
+// asiento manda menos que lo que el usuario acaba de elegir acá: se actualiza
+// la línea para que no queden discrepando.
+function sincronizarCuentasConAsiento(){
+  const cambios=[];
+  DM.dist.forEach(d=>{
+    if(d._linea==null||!d.cuenta)return;
+    const l=AF.lineas[d._linea];
+    if(!l||l.cd===d.cuenta)return;
+    cambios.push({antes:l.cd,ahora:d.cuenta});
+    l.cd=d.cuenta;
+    l.nm=pdcNm(d.cuenta);
+    if(!aceptaCentroCosto(d.cuenta))delete l.cc;
+  });
+  if(cambios.length){
+    renderLineas();
+    toast(`✏️ Se actualizó la cuenta del asiento: ${cambios.map(c=>c.antes+' → '+c.ahora).join(', ')}`);
+  }
+  return cambios;
+}
+
 function abrirDteModal(lineaIdx){
   const l=AF.lineas[lineaIdx];if(!l||!esAux(l.cd))return;
   DM.open=true;DM.lineaIdx=lineaIdx;
@@ -401,8 +450,19 @@ function abrirDteModal(lineaIdx){
   document.getElementById('dtm-iva').value=d.iva||'';
   document.getElementById('dtm-otros').value=d.otrosImpuestos||'';
   document.getElementById('dtm-total').value=d.total||montoLinea||'';
-  // Dist
-  DM.dist=d.dist?d.dist.map(x=>({...x})):[{cuenta:'',monto:d.neto||0}];
+  // ── Distribución del gasto ──
+  // La cuenta de gasto YA está en el asiento: es la contrapartida de la línea
+  // del proveedor. Pedirla otra vez era hacer escribir dos veces lo mismo y
+  // abría la puerta a que quedaran distintas. Se trae de ahí, recordando de qué
+  // línea salió (`_linea`) para poder sincronizarlas al guardar.
+  if(d.dist&&d.dist.length){
+    DM.dist=d.dist.map(x=>({...x}));
+  }else{
+    const delAsiento=lineasDeGasto(DM.lineaIdx);
+    DM.dist=delAsiento.length
+      ? delAsiento.map(x=>({cuenta:x.cd,monto:x.monto,_linea:x.idx}))
+      : [{cuenta:'',monto:d.neto||0}];
+  }
   document.getElementById('dtm-dv').textContent='';
   document.getElementById('dtm-dup-warn').style.display='none';
   document.getElementById('dtm-btn-remover').style.display=l.dte?'':'none';
@@ -538,7 +598,8 @@ function dtmRenderDist(){
   if(!DM.dist.length)DM.dist=[{cuenta:'',monto:0}];
   box.innerHTML=DM.dist.map((l,i)=>`<div class="dist-row">
     <div class="dist-num">${i+1}</div>
-    <div>${inputCuenta({id:`dm-cd-${i}`,value:l.cuenta,onPick:`DM.dist[${i}].cuenta='%CD%';dtmUpdDistCheck()`,placeholder:'Cuenta de gasto…',clase:'dist-inp'})}</div>
+    <div>${inputCuenta({id:`dm-cd-${i}`,value:l.cuenta,onPick:`DM.dist[${i}].cuenta='%CD%';dtmUpdDistCheck()`,placeholder:'Cuenta de gasto…',clase:'dist-inp'})}
+      ${l._linea!=null?`<div style="font-size:9px;color:var(--mt);margin-top:2px">↔ línea ${l._linea+1} del asiento</div>`:''}</div>
     <div><input type="number" class="dist-num-inp" min="0" placeholder="0" value="${l.monto||''}" oninput="DM.dist[${i}].monto=pn(this.value);dtmUpdDistCheck()"></div>
     <div style="text-align:center"><button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="dtmDelDist(${i})">✕</button></div>
   </div>`).join('');
@@ -609,11 +670,15 @@ function dtmGuardar(){
   // Distribución (solo compras)
   let dist=null;
   if(esCompra){
-    dist=DM.dist.filter(x=>x.cuenta&&x.monto>0);
+    dist=DM.dist.filter(x=>x.cuenta&&x.monto>0).map(({cuenta,monto})=>({cuenta,monto}));
     if(!dist.length){toast('⚠️ Agrega al menos una cuenta de gasto en la distribución','e');return;}
     const sumDist=dist.reduce((s,x)=>s+x.monto,0);
     if(Math.abs(sumDist-neto)>1){toast('⚠️ La distribución no cuadra con el neto','e');return;}
   }
+
+  // Si acá se eligió una cuenta de gasto distinta a la del asiento, el asiento
+  // se ajusta: son el mismo hecho económico y no pueden quedar discrepando.
+  if(esCompra)sincronizarCuentasConAsiento();
 
   // Guardar en la línea
   const dteObj={fecha,fechaVencimiento,tipoDTE,numero,rutCodigo:r.codigo,rutDV:r.dv,razonSocial,
@@ -921,4 +986,4 @@ function eliminarAsiento(id){
 }
 
 
-export {CUENTAS_AUX, esAux, renderAsientos, toggleAs, cuentasOpts, renderLineas, lCd, lRut, lVal, lValFmt, lValFmtBlur, quitarDte, delLinea, addLinea, updCuadre, todosDocsVentas, todosDocsCompras, todosDocsComprasConBorrador, todosDocsVentasConBorrador, folioPreviewDte, DM, abrirDteModal, cerrarDteModal, dtmRutInput, dtmCalcTotals, dtmRefresh, dtmCheckDup, dtmRenderDist, dtmAddDist, dtmDelDist, dtmUpdDistCheck, dtmGuardar, dtmRemover, proxFolioAsiento, proxFolioComprobante, migrarFoliosComprobante, abrirForm, editarAsiento, cerrarForm, duplicarAsiento, anularAsiento, abrirAsientoDesde, sigAsiento, limpiarFormAsiento, guardarAsiento, eliminarAsiento, AF};
+export {lAuxElegido, CUENTAS_AUX, esAux, renderAsientos, toggleAs, cuentasOpts, renderLineas, lCd, lRut, lVal, lValFmt, lValFmtBlur, quitarDte, delLinea, addLinea, updCuadre, todosDocsVentas, todosDocsCompras, todosDocsComprasConBorrador, todosDocsVentasConBorrador, folioPreviewDte, DM, abrirDteModal, cerrarDteModal, dtmRutInput, dtmCalcTotals, dtmRefresh, dtmCheckDup, dtmRenderDist, dtmAddDist, dtmDelDist, dtmUpdDistCheck, dtmGuardar, dtmRemover, proxFolioAsiento, proxFolioComprobante, migrarFoliosComprobante, abrirForm, editarAsiento, cerrarForm, duplicarAsiento, anularAsiento, abrirAsientoDesde, sigAsiento, limpiarFormAsiento, guardarAsiento, eliminarAsiento, AF};

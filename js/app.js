@@ -33,7 +33,8 @@ import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
         getIndicadores, IND, actualizarDesdeBancoCentral,
         renderIUSCTabla, setIUSC, addIUSCTramo, delIUSCTramo, restaurarIUSCTabla, setIUSCPrueba} from './indicadores.js';
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
-import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif} from './buscadorcuentas.js';
+import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif,
+        axAcBuscar, axAcTecla, axAcElegir, axAcCerrar} from './buscadorcuentas.js';
 import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './salida.js';
 import {initAutoguardado, actualizarBotonGuardar, guardarTodoAhora, setAutoguardado,
         setIntervaloAutoguardado, confirmarSalida, AG} from './autoguardado.js';
@@ -81,7 +82,7 @@ import {renderAsientos, abrirForm, cerrarForm, editarAsiento, duplicarAsiento,
         lCd, lVal, lValFmt, lValFmtBlur, lRut, toggleAs, updCuadre, limpiarFormAsiento, sigAsiento,
         abrirDteModal, cerrarDteModal, dtmGuardar, dtmRefresh, dtmCalcTotals, dtmRutInput,
         dtmCheckDup, dtmAddDist, dtmDelDist, dtmRenderDist, dtmUpdDistCheck, dtmRemover,
-        quitarDte, folioPreviewDte, abrirAsientoDesde, cuentasOpts,
+        quitarDte, folioPreviewDte, abrirAsientoDesde, cuentasOpts, lAuxElegido,
         proxFolioAsiento, proxFolioComprobante, migrarFoliosComprobante, AF} from './asientos.js';
 import {renderActivoFijo, abrirFormAF, onCatAF, cerrarFormAF, previewAF, guardarAF,
         editarAF, eliminarAF, generarAsientoDepreciacion, AFB} from './activofijo.js';
@@ -482,6 +483,7 @@ Object.assign(window,{
   verDetalleCC, abrirCapitalizar, confirmarCapitalizar, ccOpts, ccNombre,
   onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual, revertirCierreMensual,
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif,
+  axAcBuscar, axAcTecla, axAcElegir, axAcCerrar, lAuxElegido,
   marcarGuardado, marcarSucio, haySinGuardar,
   actualizarBotonGuardar, guardarTodoAhora, setAutoguardado, setIntervaloAutoguardado, confirmarSalida, AG,
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,

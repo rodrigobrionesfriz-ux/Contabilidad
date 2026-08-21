@@ -337,3 +337,12 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
   abandona la página; y usaba `confirm()` dentro de `popstate`, que Android Chrome ignora
   con frecuencia. La centinela ahora se repone SIEMPRE y de inmediato.
   `initAvisoSalida` es idempotente: dos manejadores harían dos cosas por cada toque.
+- **Centro de costo sólo en cuentas de resultado**: en los asientos manuales, la columna de
+  centro de costo aparece únicamente cuando la cuenta es de **gasto/costo** (`tp:'C'`,
+  prefijo 3) o de **ingreso** (`tp:'I'`, prefijo 4). Un centro de costo responde "¿dónde se
+  gastó / de dónde vino esto?", pregunta que no aplica a un banco, un proveedor o el capital:
+  activo y pasivo son saldos, no consumo. En esas cuentas el campo queda desactivado y
+  explica por qué. Si se cambia la cuenta a una que no admite centro, el que hubiera se
+  descarta —para que no viaje invisible hasta el guardado— y `guardarAsiento` lo vuelve a
+  comprobar como red de seguridad. `aceptaCentroCosto(cd)` mira el `tp` del plan y cae al
+  prefijo del código si la cuenta no está en el plan (cargada desde Excel, por ejemplo).

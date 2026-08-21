@@ -325,3 +325,15 @@ El DOM real, los eventos y Firebase. Antes de dar por buena una versión, prueba
   la pantalla muestre también lo que creó el otro. Las demás claves globales son de un solo
   usuario (`_empresaActiva:<email>`) o se escriben una vez: ahí gana la última escritura,
   que es lo correcto para una preferencia.
+- **Botón atrás en el móvil** (`js/salida.js`): en el celular el atrás es EL botón que se
+  usa, y cerrar la pestaña de un toque obliga a iniciar sesión de nuevo. Ahora escala por
+  capas: cierra el modal abierto → cierra el buscador o el menú → cierra el formulario en
+  pantalla → vuelve a la pantalla inicial → y sólo entonces **pregunta** si salir, con un
+  diálogo propio de la página que ofrece "Seguir trabajando", "Guardar y salir" (si hay
+  cambios pendientes) y "Salir".
+  Tres motivos por los que antes se cerraba igual: los modales se buscaban por
+  `style.display` pero se abren con la clase `open` (nunca se detectaban); varios caminos
+  salían sin reponer la entrada centinela del historial, y sin centinela el siguiente atrás
+  abandona la página; y usaba `confirm()` dentro de `popstate`, que Android Chrome ignora
+  con frecuencia. La centinela ahora se repone SIEMPRE y de inmediato.
+  `initAvisoSalida` es idempotente: dos manejadores harían dos cosas por cada toque.

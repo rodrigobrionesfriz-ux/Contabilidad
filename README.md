@@ -408,3 +408,17 @@ correrlo **en cada publicación**; si no, el problema vuelve.
   abría en una sección invisible. `renderAsientos()` sobrevive con un guard —varios flujos la
   llaman tras guardar— y `renderSec('asientos')` redirige a Comprobantes por si queda algún
   enlace viejo.
+- **Desbordes en móvil**: tres causas distintas, arregladas de raíz en vez de con más
+  breakpoints.
+  1. `.bal-layout` usaba `1fr 1fr` con un breakpoint por ancho de pantalla. En el móvil con
+     "vista de escritorio" el viewport es ancho pero la pantalla no, así que el breakpoint no
+     disparaba y la columna de pasivos quedaba fuera. Ahora es
+     `repeat(auto-fit,minmax(330px,1fr))`: colapsa cuando NO CABE, sin depender del viewport.
+  2. `tbody td.tl` lleva `white-space:nowrap` para las tablas de listado, pero en el balance
+     eso hacía que el nombre de la cuenta empujara la tabla y sacara los montos de la
+     pantalla. En `.bal-layout` el nombre envuelve y el monto es el que nunca se parte.
+  3. Las líneas del asiento tienen columnas fijas que suman ~900px y empujaban la página
+     entera. Ahora van dentro de `.lineas-scroll`, que scrollea horizontalmente sólo esa caja
+     (y se desactiva bajo 720px, donde ya existe la vista apilada).
+  Más una red de seguridad: `main{overflow-x:hidden}` y `min-width:0` en secciones y tarjetas
+  —lo que permite a un hijo de grid/flex encogerse en vez de fijar el mínimo por su contenido.

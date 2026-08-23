@@ -119,6 +119,9 @@ import {renderF29, renderPPM, IVAC, renderCompensacionIVA, generarAsientoIVA,
         setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente,
         PAGOF29, renderPagoF29, generarAsientoPagoF29, setPagoF29Cuenta, setPagoF29Campo,
         setPagoF29Monto, togglePagoF29, resetPagoF29, usarSugeridoF29} from './tributario.js';
+import {renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
+        addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,
+        resetRenta} from './renta.js';
 import {setFCView, renderFlujoCaja} from './flujocaja.js';
 import {renderConciliacion, onSaldoBancoChange, toggleConciliado,
         marcarTodosConciliados, cargarCartola, autoConciliarCartola} from './conciliacion.js';
@@ -223,6 +226,7 @@ function renombrarEsteDispositivo(){
 async function loadYear(y){
   S.ventas=[];S.compras=[];S.honorarios=[];S.asientos=[];S.apertura=null;S.activos=[];S.trabajadores=[];
   S.cargaFallida=[];
+  resetRenta(); // los ajustes del F22 son por empresa+año: se recargan al entrar a la sección
 
   const leer=async(clave,aplicar)=>{
     const r=await window.storage.leerConEstado(clave);
@@ -401,6 +405,7 @@ function renderSec(s){
   else if(s==='pagos')renderPagos();
   else if(s==='f29')renderF29();
   else if(s==='ppm')renderPPM();
+  else if(s==='renta')renderRenta();
   else if(s==='activofijo')renderActivoFijo();
   else if(s==='provisiones')renderProvisiones();
   else if(s==='correccion')renderCorreccion();
@@ -558,6 +563,9 @@ Object.assign(window,{
   togglePagoF29, resetPagoF29, usarSugeridoF29,
   setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux, renderAuxiliares, toggleAgingDetalle,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
+  // declaración de renta (F22)
+  renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
+  addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,
   cargarCartola, autoConciliarCartola,
   // búsqueda / backup

@@ -56,6 +56,7 @@ const SECCIONES=[
   {id:'auditlog',lbl:'Registro de Actividad'},
   {id:'f29',lbl:'Formulario 29'},
   {id:'ppm',lbl:'PPM'},
+  {id:'renta',lbl:'Declaración de Renta'},
   {id:'activofijo',lbl:'Activos Fijos'},
   {id:'provisiones',lbl:'Provisiones'},
   {id:'correccion',lbl:'Corrección Monetaria'},

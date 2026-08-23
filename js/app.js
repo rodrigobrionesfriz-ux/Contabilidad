@@ -60,7 +60,8 @@ import {diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocum
 import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
         apLVal, apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura,
         eliminarApertura, initBalanceImportListener, abrirImpBalModal, cerrarImpBalModal,
-        toggleAllBal, confirmarImportBalance, renderImpBalModal, APF, IMB} from './apertura.js';
+        toggleAllBal, confirmarImportBalance, renderImpBalModal,
+        descargarPlantillaBalance, APF, IMB} from './apertura.js';
 import {abrirAperturaAux, cerrarAperturaAux, renderAperturaAux, apxAddDoc, apxDelDoc,
         apxCampo, apxRut, apxAuxElegido, apxActualizarCuadre, guardarAperturaAux,
         descargarPlantillaAperturaAux, initAperturaAuxListener, APX} from './aperturaaux.js';
@@ -386,7 +387,9 @@ function renderSec(s){
   else if(s==='compras')renderCompras();
   else if(s==='honorarios')renderHon();
   else if(s==='remuneraciones')renderRemuneraciones();
-  else if(s==='asientos')renderAsientos();
+  // 'asientos' dejó de ser un módulo: los manuales viven dentro de Comprobantes.
+  // Se mantiene el caso por si algún enlace viejo todavía navega ahí.
+  else if(s==='asientos')renderComprobantes();
   else if(s==='auxiliares')renderAuxiliares();
   else if(s==='diario')renderDiario();
   else if(s==='mayor')renderMayor();
@@ -509,6 +512,7 @@ Object.assign(window,{
   renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,
   apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura,
   abrirImpBalModal, cerrarImpBalModal, toggleAllBal, confirmarImportBalance, renderImpBalModal,
+  descargarPlantillaBalance,
   abrirAperturaAux, cerrarAperturaAux, renderAperturaAux, apxAddDoc, apxDelDoc,
   apxCampo, apxRut, apxAuxElegido, apxActualizarCuadre, guardarAperturaAux,
   descargarPlantillaAperturaAux, APX,

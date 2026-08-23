@@ -235,6 +235,62 @@ async function eliminarApertura(){
 // ═══ IMPORTADOR DE BALANCE (para Asiento de Apertura) ═══
 let IMB={lineas:[]};
 
+// ── Plantilla del balance de apertura ──
+// El importador espera un balance de DOS bloques: código-nombre-saldo a la
+// izquierda para el activo, lo mismo a la derecha para pasivo y patrimonio.
+// Ese formato no se adivina, así que se entrega hecho.
+function descargarPlantillaBalance(){
+  if(typeof XLSX==='undefined'){toast('⚠️ Librería Excel no cargada','e');return;}
+  const anio=(S.empresa.anio||new Date().getFullYear())-1;
+  const filas=[
+    [`BALANCE GENERAL AL 31 DE DICIEMBRE DE ${anio}`,'','','','',''],
+    ['Saldos iniciales para el Asiento de Apertura','','','','',''],
+    ['Llena sólo las filas de datos. Los códigos van de 7 dígitos, como en tu Plan de Cuentas.','','','','',''],
+    ['ACTIVOS','','','PASIVOS Y PATRIMONIO','',''],
+    ['CÓDIGO','CUENTA','SALDO','CÓDIGO','CUENTA','SALDO'],
+    ['1101201','BANCO ESTADO',31115136,'2102001','PROVEEDORES NACIONALES',4249356120],
+    ['1104001','FACTURAS POR COBRAR',4859531273,'2102006','HONORARIOS POR PAGAR',1800000],
+    ['1108002','IVA CRÉDITO FISCAL',2450000,'2103003','IVA DÉBITO FISCAL',3120000],
+    ['1202003','MAQUINARIAS Y EQUIPOS',79688237,'2301001','CAPITAL SOCIAL',718508526],
+  ];
+  // Filas en blanco para completar
+  for(let i=0;i<50;i++)filas.push(['','','','','','']);
+
+  const ws=XLSX.utils.aoa_to_sheet(filas);
+  ws['!cols']=[{wch:11},{wch:40},{wch:16},{wch:11},{wch:40},{wch:16}];
+  ws['!merges']=[{s:{r:3,c:0},e:{r:3,c:2}},{s:{r:3,c:3},e:{r:3,c:5}}];
+
+  const inst=XLSX.utils.aoa_to_sheet([
+    ['CÓMO USAR ESTA PLANTILLA'],[''],
+    ['1. Columnas A-B-C → cuentas de ACTIVO · Columnas D-E-F → PASIVO y PATRIMONIO.'],[''],
+    ['2. El CÓDIGO debe tener exactamente 7 dígitos (ej: 1101201). Los códigos de 1, 2'],
+    ['   o 4 dígitos son títulos y subtítulos: no los incluyas, se calculan solos.'],[''],
+    ['3. El SALDO va SIEMPRE POSITIVO, en la columna que corresponde. El lado del'],
+    ['   balance define el signo, no el número: un activo en la columna C queda al'],
+    ['   DEBE, un pasivo en la columna F queda al HABER. Usa negativo sólo si la'],
+    ['   cuenta está "en rojo" de verdad (un banco sobregirado, por ejemplo).'],[''],
+    ['4. NO incluyas cuentas de resultado (códigos que empiezan con 3 o 4): los gastos'],
+    ['   e ingresos del año anterior ya están en el resultado acumulado.'],[''],
+    ['5. Los ACTIVOS deben sumar lo mismo que PASIVOS + PATRIMONIO.'],[''],
+    ['6. En la app: Balance de Apertura → "📥 Importar desde Balance". Verás una vista'],
+    ['   previa con casillas para elegir qué cuentas importar; nada se guarda hasta'],
+    ['   que confirmes.'],[''],
+    ['BORRA LAS FILAS DE EJEMPLO antes de subir el archivo.'],[''],
+    ['DESPUÉS DE CARGAR LA APERTURA'],
+    ['Aparece la tarjeta "Detalle de auxiliares": ahí se capturan las facturas'],
+    ['históricas pendientes de cada cliente, proveedor y honorario, para que el'],
+    ['auxiliar y el aging arranquen con la historia real. Ese detalle tiene que sumar'],
+    ['exactamente lo mismo que la cuenta correspondiente de este balance.'],
+  ]);
+  inst['!cols']=[{wch:82}];
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Balance');
+  XLSX.utils.book_append_sheet(wb,inst,'Instrucciones');
+  XLSX.writeFile(wb,`plantilla-balance-apertura-${anio}.xlsx`);
+  toast('📄 Plantilla descargada — borra las filas de ejemplo antes de subirla');
+}
+
 function initBalanceImportListener(){
   const inp=document.getElementById('imp-balance-file');
   if(inp&&!inp._listenerAttached){
@@ -258,12 +314,18 @@ function initBalanceImportListener(){
 function procesarBalanceXLSX(rows){
   const cuentas=[];
   const esAnalitico=(v)=>{const s=String(v||'').trim();return /^\d{7}$/.test(s);};
+  // Un código de cuenta viene SIEMPRE seguido de su nombre. Sin esta condición,
+  // cualquier monto de siete dígitos —$2.450.000, por ejemplo— se leía como si
+  // fuera una cuenta, y se colaba una cuenta fantasma que descuadraba la
+  // apertura. Que el nombre tenga al menos una letra los distingue: los montos
+  // van seguidos de otro número o de nada.
+  const tieneNombre=(v)=>/[A-Za-zÁÉÍÓÚÑáéíóúñ]/.test(String(v||''));
 
   rows.forEach(row=>{
     if(!Array.isArray(row))return;
     for(let i=0;i<row.length-1;i++){
       const v=row[i];
-      if(esAnalitico(v)){
+      if(esAnalitico(v)&&tieneNombre(row[i+1])){
         const cd=String(v).trim();
         const nm=String(row[i+1]||'').trim();
         let saldo=null;
@@ -391,4 +453,4 @@ async function confirmarImportBalance(){
 }
 
 
-export {APF, renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal, apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura, IMB, initBalanceImportListener, procesarBalanceXLSX, abrirImpBalModal, cerrarImpBalModal, renderImpBalModal, toggleAllBal, confirmarImportBalance};
+export {descargarPlantillaBalance, APF, renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal, apDelLinea, apAddLinea, apPrellenar, apUpdCuadre, guardarApertura, eliminarApertura, IMB, initBalanceImportListener, procesarBalanceXLSX, abrirImpBalModal, cerrarImpBalModal, renderImpBalModal, toggleAllBal, confirmarImportBalance};

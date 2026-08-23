@@ -47,7 +47,11 @@ export function aceptaCentroCosto(cd){
 
 function renderAsientos(){
   updateHdr();
+  // El listado de asientos manuales desapareció como módulo: ahora todos los
+  // comprobantes —apertura, automáticos y manuales— se ven en Comprobantes.
+  // La función sobrevive porque varios flujos la llaman tras guardar.
   const el=document.getElementById('as-list');
+  if(!el)return;
   if(!S.asientos.length){
     el.innerHTML=`<div class="empty"><div class="ei">✏️</div>No hay asientos manuales.<br><br><button class="btn btn-p" onclick="abrirForm()">+ Crear primer asiento</button></div>`;return;
   }
@@ -768,7 +772,19 @@ function migrarFoliosComprobante(){
   return items.length;
 }
 
+// Lleva a Comprobantes salvo que ya estemos ahí (evita re-render innecesario)
+function irAComprobantes(){
+  try{
+    const sec=window.getCurSec&&window.getCurSec();
+    if(sec!=='comprobantes'&&window.nav)window.nav('comprobantes');
+  }catch(e){}
+}
+
 function abrirForm(){
+  // El formulario vive dentro de la sección Comprobantes. Si se llega desde
+  // otra parte (un botón del Diario, el buscador), primero hay que llevar al
+  // usuario ahí; si no, el formulario se abre en una sección invisible.
+  irAComprobantes();
   AF={editId:null,lineas:[{cd:'',nm:'',desc:'',debe:0,haber:0},{cd:'',nm:'',desc:'',debe:0,haber:0}]};
   const f=document.getElementById('as-form');f.style.display='block';f.classList.remove('editing');
   document.getElementById('af-title').textContent='Nuevo Asiento Contable';
@@ -783,6 +799,7 @@ function abrirForm(){
 
 function editarAsiento(id){
   const a=S.asientos.find(x=>x.id===id);if(!a)return;
+  irAComprobantes();
   AF={editId:id,lineas:a.movs.map(m=>({...m}))};
   const f=document.getElementById('as-form');f.style.display='block';f.classList.add('editing');
   document.getElementById('af-title').textContent='Editando Asiento';
@@ -795,9 +812,14 @@ function editarAsiento(id){
 }
 
 function cerrarForm(){
-  document.getElementById('as-form').style.display='none';
-  document.getElementById('af-last-saved').textContent='';
+  const f=document.getElementById('as-form');
+  if(f)f.style.display='none';
+  const ls=document.getElementById('af-last-saved');
+  if(ls)ls.textContent='';
   AF={editId:null,lineas:[]};
+  // Volver a dibujar la lista: si se acaba de guardar, el comprobante nuevo
+  // tiene que aparecer sin que el usuario tenga que navegar de nuevo.
+  try{ if(window.renderComprobantes)window.renderComprobantes(); }catch(e){}
 }
 
 // Duplicar un asiento como plantilla: clona líneas (sin DTE), crea como NUEVO
@@ -809,6 +831,7 @@ function duplicarAsiento(id){
     if(esAux(m.cd)){l.rutCodigo=m.rutCodigo;l.rutDV=m.rutDV;l.razonSocial=m.razonSocial;}
     return l; // sin l.dte
   });
+  irAComprobantes();
   AF={editId:null,lineas};
   const f=document.getElementById('as-form');f.style.display='block';f.classList.remove('editing');
   document.getElementById('af-title').textContent='Nuevo Asiento (duplicado)';

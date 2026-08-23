@@ -18,7 +18,7 @@ export const setOnAuthReady=fn=>{_onAuthReady=fn;};
 //     empresa: 'none'|'read'|'write',
 //     pdc: '...', apertura: '...',
 //     ventas: '...', compras: '...', honorarios: '...',
-//     asientos: '...', auxiliares: '...',
+//     auxiliares: '...',
 //     diario: '...', mayor: '...', balance: '...', resultados: '...'
 //   }
 // }
@@ -44,7 +44,6 @@ const SECCIONES=[
   {id:'compras',lbl:'Libro de Compras'},
   {id:'honorarios',lbl:'Honorarios'},
   {id:'remuneraciones',lbl:'Remuneraciones'},
-  {id:'asientos',lbl:'Asientos Manuales'},
   {id:'auxiliares',lbl:'Auxiliares'},
   {id:'pagos',lbl:'Pagos y Cobros'},
   {id:'diario',lbl:'Libro Diario'},

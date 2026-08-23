@@ -399,3 +399,12 @@ de app.js queda redirigido a `./js/core.js?v=<epoch>`.
 
 Actualiza el import map, el `?v=` de app.js y la versión visible en la barra superior. Hay que
 correrlo **en cada publicación**; si no, el problema vuelve.
+- **Asientos manuales dentro de Comprobantes**: "Asientos Manuales" dejó de ser un módulo
+  aparte. Tenía su propio listado de sólo los manuales, cuando Comprobantes ya muestra el
+  libro diario completo — dos listas del mismo hecho, y había que saber en cuál buscar.
+  Ahora el formulario vive dentro de la sección Comprobantes y se abre con **"+ Nuevo
+  Asiento"**. `abrirForm`, `editarAsiento` y `duplicarAsiento` navegan primero a Comprobantes
+  (`irAComprobantes()`): si no, al llamarlos desde el Diario o el buscador el formulario se
+  abría en una sección invisible. `renderAsientos()` sobrevive con un guard —varios flujos la
+  llaman tras guardar— y `renderSec('asientos')` redirige a Comprobantes por si queda algún
+  enlace viejo.

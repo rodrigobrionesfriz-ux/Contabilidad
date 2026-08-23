@@ -58,7 +58,7 @@
 
 <header>
   <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
-  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.23-1120</span></div>
+  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.23-1515</span></div>
   <span id="save-indicator" style="font-size:10px;color:var(--mt);white-space:nowrap;margin-left:auto"></span>
   <button class="btn-save-all" id="btn-guardar-todo" onclick="guardarTodoAhora()" title="Guardar todo">💾 Guardar</button>
   <!-- Los indicadores de sincronización viven ahora en Configuración → Sistema,
@@ -197,11 +197,12 @@
   <div class="card">
     <div class="card-title">Configuración Tributaria</div>
     <div class="fg">
-      <div class="grp"><label>Régimen</label><input type="text" id="e-regimen" value="14 D N°3 Pro-Pyme General" readonly style="color:var(--mt)"></div>
+      <div class="grp full"><label>Régimen tributario</label><select id="e-regimen" onchange="onRegimenEmpresaChange()"></select></div>
       <div class="grp"><label>Tasa Impuesto Renta (%)</label><input type="number" id="e-tasarenta" step="0.1" min="0" max="100" placeholder="25"></div>
       <div class="grp"><label>Tasa PPM (%)</label><input type="number" id="e-tasappm" step="0.01" min="0" max="100" placeholder="0.25"></div>
     </div>
-    <div class="info-tip" style="margin-top:10px;font-size:11px">💡 Régimen 14 D N°3 Pro-Pyme General: tasa de Primera Categoría 25%. La tasa PPM es la que fijas tú (revisa tu F22 del año anterior o usa 0,25% si estás en el tramo Pyme reducido).</div>
+    <div class="info-tip" id="e-regimen-desc" style="margin-top:10px;font-size:11px;line-height:1.6"></div>
+    <div class="info-tip" style="margin-top:10px;font-size:11px">💡 Al cambiar el régimen se proponen sus tasas legales; puedes ajustarlas a mano si tu caso difiere. La tasa PPM del régimen general es variable: revisa tu F22 del año anterior.</div>
   </div>
   <div class="save-row"><button class="btn btn-p" onclick="saveEmpresa()">💾 Guardar Empresa</button></div>
 </section>
@@ -1220,63 +1221,64 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/acl.js": "./js/acl.js?v=1787471259",
-    "./js/activofijo.js": "./js/activofijo.js?v=1787471259",
-    "./js/apertura.js": "./js/apertura.js?v=1787471259",
-    "./js/aperturaaux.js": "./js/aperturaaux.js?v=1787471259",
-    "./js/app.js": "./js/app.js?v=1787471259",
-    "./js/asientos.js": "./js/asientos.js?v=1787471259",
-    "./js/audit.js": "./js/audit.js?v=1787471259",
-    "./js/auth.js": "./js/auth.js?v=1787471259",
-    "./js/autoguardado.js": "./js/autoguardado.js?v=1787471259",
-    "./js/auxiliares.js": "./js/auxiliares.js?v=1787471259",
-    "./js/backup.js": "./js/backup.js?v=1787471259",
-    "./js/buscadorcuentas.js": "./js/buscadorcuentas.js?v=1787471259",
-    "./js/busqueda.js": "./js/busqueda.js?v=1787471259",
-    "./js/cargadatos.js": "./js/cargadatos.js?v=1787471259",
-    "./js/centroscosto-ui.js": "./js/centroscosto-ui.js?v=1787471259",
-    "./js/centroscosto.js": "./js/centroscosto.js?v=1787471259",
-    "./js/cierre.js": "./js/cierre.js?v=1787471259",
-    "./js/compras.js": "./js/compras.js?v=1787471259",
-    "./js/comprobantes.js": "./js/comprobantes.js?v=1787471259",
-    "./js/comprobantestipo-ui.js": "./js/comprobantestipo-ui.js?v=1787471259",
-    "./js/comprobantestipo.js": "./js/comprobantestipo.js?v=1787471259",
-    "./js/conciliacion.js": "./js/conciliacion.js?v=1787471259",
-    "./js/core.js": "./js/core.js?v=1787471259",
-    "./js/dispositivo.js": "./js/dispositivo.js?v=1787471259",
-    "./js/empresa.js": "./js/empresa.js?v=1787471259",
-    "./js/empresas-ui.js": "./js/empresas-ui.js?v=1787471259",
-    "./js/empresas.js": "./js/empresas.js?v=1787471259",
-    "./js/firebase.js": "./js/firebase.js?v=1787471259",
-    "./js/flujocaja.js": "./js/flujocaja.js?v=1787471259",
-    "./js/helpers.js": "./js/helpers.js?v=1787471259",
-    "./js/honorarios.js": "./js/honorarios.js?v=1787471259",
-    "./js/importadoraux.js": "./js/importadoraux.js?v=1787471259",
-    "./js/importadorsii.js": "./js/importadorsii.js?v=1787471259",
-    "./js/impresion.js": "./js/impresion.js?v=1787471259",
-    "./js/indicadores.js": "./js/indicadores.js?v=1787471259",
-    "./js/libroremuneraciones.js": "./js/libroremuneraciones.js?v=1787471259",
-    "./js/pagos.js": "./js/pagos.js?v=1787471259",
-    "./js/pdc.js": "./js/pdc.js?v=1787471259",
-    "./js/previsional-ui.js": "./js/previsional-ui.js?v=1787471259",
-    "./js/previsional.js": "./js/previsional.js?v=1787471259",
-    "./js/remuneraciones.js": "./js/remuneraciones.js?v=1787471259",
-    "./js/renta.js": "./js/renta.js?v=1787471259",
-    "./js/reportes.js": "./js/reportes.js?v=1787471259",
-    "./js/salida.js": "./js/salida.js?v=1787471259",
-    "./js/seguridad.js": "./js/seguridad.js?v=1787471259",
-    "./js/sistema.js": "./js/sistema.js?v=1787471259",
-    "./js/state.js": "./js/state.js?v=1787471259",
-    "./js/storage.js": "./js/storage.js?v=1787471259",
-    "./js/tema.js": "./js/tema.js?v=1787471259",
-    "./js/tributario.js": "./js/tributario.js?v=1787471259",
-    "./js/ui.js": "./js/ui.js?v=1787471259",
-    "./js/usuarios.js": "./js/usuarios.js?v=1787471259",
-    "./js/ventas.js": "./js/ventas.js?v=1787471259",
-    "./js/xmlsii.js": "./js/xmlsii.js?v=1787471259"
+    "./js/acl.js": "./js/acl.js?v=1787497773",
+    "./js/activofijo.js": "./js/activofijo.js?v=1787497773",
+    "./js/apertura.js": "./js/apertura.js?v=1787497773",
+    "./js/aperturaaux.js": "./js/aperturaaux.js?v=1787497773",
+    "./js/app.js": "./js/app.js?v=1787497773",
+    "./js/asientos.js": "./js/asientos.js?v=1787497773",
+    "./js/audit.js": "./js/audit.js?v=1787497773",
+    "./js/auth.js": "./js/auth.js?v=1787497773",
+    "./js/autoguardado.js": "./js/autoguardado.js?v=1787497773",
+    "./js/auxiliares.js": "./js/auxiliares.js?v=1787497773",
+    "./js/backup.js": "./js/backup.js?v=1787497773",
+    "./js/buscadorcuentas.js": "./js/buscadorcuentas.js?v=1787497773",
+    "./js/busqueda.js": "./js/busqueda.js?v=1787497773",
+    "./js/cargadatos.js": "./js/cargadatos.js?v=1787497773",
+    "./js/centroscosto-ui.js": "./js/centroscosto-ui.js?v=1787497773",
+    "./js/centroscosto.js": "./js/centroscosto.js?v=1787497773",
+    "./js/cierre.js": "./js/cierre.js?v=1787497773",
+    "./js/compras.js": "./js/compras.js?v=1787497773",
+    "./js/comprobantes.js": "./js/comprobantes.js?v=1787497773",
+    "./js/comprobantestipo-ui.js": "./js/comprobantestipo-ui.js?v=1787497773",
+    "./js/comprobantestipo.js": "./js/comprobantestipo.js?v=1787497773",
+    "./js/conciliacion.js": "./js/conciliacion.js?v=1787497773",
+    "./js/core.js": "./js/core.js?v=1787497773",
+    "./js/dispositivo.js": "./js/dispositivo.js?v=1787497773",
+    "./js/empresa.js": "./js/empresa.js?v=1787497773",
+    "./js/empresas-ui.js": "./js/empresas-ui.js?v=1787497773",
+    "./js/empresas.js": "./js/empresas.js?v=1787497773",
+    "./js/firebase.js": "./js/firebase.js?v=1787497773",
+    "./js/flujocaja.js": "./js/flujocaja.js?v=1787497773",
+    "./js/helpers.js": "./js/helpers.js?v=1787497773",
+    "./js/honorarios.js": "./js/honorarios.js?v=1787497773",
+    "./js/importadoraux.js": "./js/importadoraux.js?v=1787497773",
+    "./js/importadorsii.js": "./js/importadorsii.js?v=1787497773",
+    "./js/impresion.js": "./js/impresion.js?v=1787497773",
+    "./js/indicadores.js": "./js/indicadores.js?v=1787497773",
+    "./js/libroremuneraciones.js": "./js/libroremuneraciones.js?v=1787497773",
+    "./js/pagos.js": "./js/pagos.js?v=1787497773",
+    "./js/pdc.js": "./js/pdc.js?v=1787497773",
+    "./js/previsional-ui.js": "./js/previsional-ui.js?v=1787497773",
+    "./js/previsional.js": "./js/previsional.js?v=1787497773",
+    "./js/regimenes.js": "./js/regimenes.js?v=1787497773",
+    "./js/remuneraciones.js": "./js/remuneraciones.js?v=1787497773",
+    "./js/renta.js": "./js/renta.js?v=1787497773",
+    "./js/reportes.js": "./js/reportes.js?v=1787497773",
+    "./js/salida.js": "./js/salida.js?v=1787497773",
+    "./js/seguridad.js": "./js/seguridad.js?v=1787497773",
+    "./js/sistema.js": "./js/sistema.js?v=1787497773",
+    "./js/state.js": "./js/state.js?v=1787497773",
+    "./js/storage.js": "./js/storage.js?v=1787497773",
+    "./js/tema.js": "./js/tema.js?v=1787497773",
+    "./js/tributario.js": "./js/tributario.js?v=1787497773",
+    "./js/ui.js": "./js/ui.js?v=1787497773",
+    "./js/usuarios.js": "./js/usuarios.js?v=1787497773",
+    "./js/ventas.js": "./js/ventas.js?v=1787497773",
+    "./js/xmlsii.js": "./js/xmlsii.js?v=1787497773"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=1787471259"></script>
+<script type="module" src="js/app.js?v=1787497773"></script>
 </body>
 </html>

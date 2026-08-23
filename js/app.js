@@ -12,7 +12,7 @@ import {EMPRESAS, MARCOS, marcoInfo, cargarEmpresas, empresaActiva, crearEmpresa
         eliminarEmpresa, actualizarEmpresa, activarEmpresa, migrarSiHaceFalta,
         aplicarVisibilidad, puedeVerEmpresa} from './empresas.js';
 import {renderEmpresas, abrirFormEmpresa, cerrarFormEmpresa, editarEmpresaCat,
-        guardarEmpresaCat, seleccionarEmpresa, borrarEmpresa, onMarcoChange,
+        guardarEmpresaCat, seleccionarEmpresa, borrarEmpresa, onMarcoChange, onRegimenChange,
         abrirCompartir, cerrarCompartir, guardarCompartir, reclamarEmpresa,
         restaurarEmpresa} from './empresas-ui.js';
 
@@ -26,7 +26,8 @@ import {cargarUsuarios, renderUsuarios, abrirInvitarUsuario, editarUsuario,
 import {renderAuditLog} from './audit.js';
 
 // Configuración y datos
-import {fillEmpresaForm, saveEmpresa, updateHdr} from './empresa.js';
+import {fillEmpresaForm, saveEmpresa, updateHdr, aplicarRegimenEmpresa,
+        onRegimenEmpresaChange, pintarRegimen} from './empresa.js';
 import {savePDC, renderPDC, abrirPdcForm, editarCuenta, cerrarPdcForm,
         guardarCuenta, eliminarCuenta, resetPDC, PF} from './pdc.js';
 import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
@@ -299,6 +300,7 @@ async function initApp(){
   for(let y=cy+1;y>=cy-5;y--){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===cy)o.selected=true;ys.appendChild(o);}
 
   try{const r=await window.storage.get('empresa');if(r)S.empresa={...S.empresa,...JSON.parse(r.value)};}catch(e){}
+  aplicarRegimenEmpresa();
   const PDC_VERSION=2;
   try{
     const vr=await window.storage.get('pdc_v');
@@ -453,6 +455,7 @@ async function recargarEmpresaActiva(){
   S.empresa={...S.empresa,nombre:'',rut:'',domicilio:'',giro:'',codigo:'',ciudad:'',comuna:'',rep:'',rutrep:''};
   // Cargar datos de la nueva empresa
   try{const r=await window.storage.get('empresa');if(r)S.empresa={...S.empresa,...JSON.parse(r.value)};}catch(e){}
+  aplicarRegimenEmpresa();
   try{
     const r=await window.storage.get('pdc');
     if(r){const l=JSON.parse(r.value);if(Array.isArray(l)&&l.length){PDC.length=0;l.forEach(c=>PDC.push(c));recalcDerivadasPDC();}}
@@ -460,6 +463,7 @@ async function recargarEmpresaActiva(){
   await loadYear(S.empresa.anio);
   await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();await cargarLibroRem();
   fillEmpresaForm();updateHdr();renderSelectorEmpresa();
+  try{aplicarPermisosUI();}catch(e){}
   rerender();
 }
 
@@ -565,6 +569,7 @@ Object.assign(window,{
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   // declaración de renta (F22)
   renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
+  onRegimenEmpresaChange, pintarRegimen, onRegimenChange, aplicarPermisosUI,
   addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,
   cargarCartola, autoConciliarCartola,

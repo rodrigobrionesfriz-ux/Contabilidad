@@ -6,6 +6,7 @@ import {EMPRESAS, MARCOS, marcoInfo, empresaActiva, crearEmpresa,
         eliminarEmpresa, actualizarEmpresa, activarEmpresa,
         compartirEmpresa, asignarDuenio, empresaSinDuenio, esDuenioDeEmpresa,
         empresasHuerfanas, recuperarEmpresa} from './empresas.js';
+import {REGIMENES, regimenInfo, regimenLbl, tasaIDPC, tasaPPM, REGIMEN_DEFAULT} from './regimenes.js';
 import {FS} from './firebase.js';
 import {AUTH} from './state.js';
 import {US} from './usuarios.js';
@@ -87,6 +88,7 @@ export function renderEmpresas(){
         <div style="font-size:10px;color:var(--mt)">${e.rut||'sin RUT'}</div>
       </td>
       <td class="tl" style="font-size:11px">${m.nm}</td>
+      <td class="tl" style="font-size:11px">${regimenInfo(e.regimen).corto}<div style="font-size:10px;color:var(--mt)">${regimenInfo(e.regimen).nm}</div></td>
       <td class="tl" style="font-size:11px">${duenio} ${compBadge}</td>
       <td style="text-align:right;white-space:nowrap">
         ${activa?'':`<button class="btn btn-i" onclick="seleccionarEmpresa('${e.id}')" title="Activar">▶</button>`}
@@ -109,7 +111,7 @@ export function renderEmpresas(){
     <br><span style="color:var(--warn)">⚠️ Es separación de vista, no de acceso: los datos siguen en la misma base y un usuario con conocimientos técnicos podría alcanzarlos. Para aislamiento real hay que endurecer las reglas de Firestore.</span>
   </div>
   <div class="card-np" style="margin-bottom:14px"><div class="tw"><table>
-    <thead><tr><th class="tl">EMPRESA</th><th class="tl">MARCO CONTABLE</th><th class="tl">ACCESO</th><th></th></tr></thead>
+    <thead><tr><th class="tl">EMPRESA</th><th class="tl">MARCO CONTABLE</th><th class="tl">RÉGIMEN</th><th class="tl">ACCESO</th><th></th></tr></thead>
     <tbody>${filas}</tbody>
   </table></div></div>
   <button class="btn btn-p" onclick="abrirFormEmpresa()">+ Nueva empresa</button>
@@ -123,8 +125,12 @@ export function renderEmpresas(){
       <div class="grp"><label>Marco contable</label><select id="empf-marco" onchange="onMarcoChange()">
         ${MARCOS.map(m=>`<option value="${m.id}">${m.nm}</option>`).join('')}
       </select></div>
+      <div class="grp full"><label>Régimen tributario</label><select id="empf-regimen" onchange="onRegimenChange()">
+        ${REGIMENES.map(r=>`<option value="${r.k}">${r.corto} — ${r.nm}</option>`).join('')}
+      </select></div>
     </div>
     <div id="empf-marco-desc" class="info-tip" style="font-size:11px;margin:10px 0"></div>
+    <div id="empf-regimen-desc" class="info-tip" style="font-size:11px;margin:10px 0"></div>
     <div class="save-row" style="display:flex;gap:8px">
       <button class="btn btn-p" onclick="guardarEmpresaCat()">💾 Guardar</button>
       <button class="btn btn-g" onclick="cerrarFormEmpresa()">Cancelar</button>
@@ -138,6 +144,31 @@ export function onMarcoChange(){
   if(d)d.textContent=marcoInfo(id).desc;
 }
 
+// Muestra qué implica el régimen elegido: tasas, contabilidad, corrección
+// monetaria, depreciación y topes. Es la vista previa de lo que se guardará.
+export function onRegimenChange(){
+  const sel=document.getElementById('empf-regimen');
+  const d=document.getElementById('empf-regimen-desc');
+  if(!sel||!d)return;
+  const r=regimenInfo(sel.value);
+  const anio=new Date().getFullYear();
+  const t=tasaIDPC(r.k,anio), pp=tasaPPM(r.k,anio);
+  const pct=v=>String(v).replace('.',',');
+  const uf=v=>v?v.toLocaleString('es-CL'):'sin tope';
+  d.innerHTML=`<strong>${r.nm}</strong> · ${r.art}<br>${r.desc}
+    <div style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:11px">
+      <span>IDPC <strong style="color:var(--acc)">${pct(t)}%</strong></span>
+      <span>PPM <strong style="color:var(--acc)">${pp==null?'variable':pct(pp)+'%'}</strong></span>
+      <span>Contabilidad <strong>${r.contabilidad}</strong></span>
+      <span>Corr. monetaria <strong>${r.correccionMonetaria?'sí':'no'}</strong></span>
+      <span>Depreciación <strong>${r.deprInstantanea?'instantánea':'vida útil'}</strong></span>
+      <span>Crédito IDPC <strong>${r.creditoIDPC}%</strong></span>
+      <span>Tope ingresos <strong>${uf(r.topeIngresosUF)}${r.topeIngresosUF?' UF':''}</strong></span>
+    </div>
+    ${r.nota?`<div style="margin-top:6px;color:var(--warn)">⚠ ${r.nota}</div>`:''}
+    ${r.rentaPresunta?`<div style="margin-top:6px;color:var(--mt)">La base imponible no sale de la contabilidad: se presume en Declaración de Renta.</div>`:''}`;
+}
+
 export function abrirFormEmpresa(){
   EMPF={editId:null};
   const f=document.getElementById('emp-form');f.style.display='block';
@@ -145,7 +176,8 @@ export function abrirFormEmpresa(){
   document.getElementById('empf-nombre').value='';
   document.getElementById('empf-rut').value='';
   document.getElementById('empf-marco').value='tributaria';
-  onMarcoChange();
+  document.getElementById('empf-regimen').value=REGIMEN_DEFAULT;
+  onMarcoChange();onRegimenChange();
 }
 
 export function cerrarFormEmpresa(){
@@ -161,20 +193,22 @@ export function editarEmpresaCat(id){
   document.getElementById('empf-nombre').value=e.nombre;
   document.getElementById('empf-rut').value=e.rut||'';
   document.getElementById('empf-marco').value=e.marco||'tributaria';
-  onMarcoChange();
+  document.getElementById('empf-regimen').value=e.regimen||REGIMEN_DEFAULT;
+  onMarcoChange();onRegimenChange();
 }
 
 export async function guardarEmpresaCat(){
   const nombre=document.getElementById('empf-nombre').value.trim();
   const rut=document.getElementById('empf-rut').value.trim();
   const marco=document.getElementById('empf-marco').value;
+  const regimen=document.getElementById('empf-regimen').value;
   if(!nombre){toast('⚠️ Ingresa el nombre de la empresa','e');return;}
   if(EMPF.editId){
-    await actualizarEmpresa(EMPF.editId,{nombre,rut,marco});
+    await actualizarEmpresa(EMPF.editId,{nombre,rut,marco,regimen});
     toast('✅ Empresa actualizada');
   }else{
-    await crearEmpresa(nombre,rut,marco);
-    toast('✅ Empresa creada — actívala para empezar a cargar sus datos');
+    await crearEmpresa(nombre,rut,marco,regimen);
+    toast('✅ Empresa creada con régimen '+regimenLbl(regimen)+' — actívala para cargar sus datos');
   }
   cerrarFormEmpresa();
   renderEmpresas();

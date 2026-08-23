@@ -26,39 +26,15 @@ import {S} from './state.js';
 import {buildMayor} from './reportes.js';
 import {calcularF29Anual} from './tributario.js';
 import {logAccion} from './firebase.js';
+// El catálogo de regímenes y sus parámetros vive en regimenes.js, que es la
+// única fuente de verdad compartida con empresas.js y la ficha de empresa.
+import {REGIMENES, regimenInfo, tasaIDPC, notaTasa, REGIMEN_DEFAULT} from './regimenes.js';
 import './storage.js';
 
-// ═══════════════════════════════════════════════════════════════════════
-// PARÁMETROS DE RÉGIMEN
-// ═══════════════════════════════════════════════════════════════════════
-
-const REGIMENES=[
-  {k:'14D3', lbl:'14 D N°3 — Pro Pyme General',      tasa:25, recuadro:17, linea:53, codLinea:63,  pyme:true,  cm:false, deprInstantanea:true},
-  {k:'14D8', lbl:'14 D N°8 — Pro Pyme Transparente', tasa:0,  recuadro:22, linea:0,  codLinea:0,   pyme:true,  cm:false, deprInstantanea:true},
-  {k:'14A',  lbl:'14 A — Semi Integrado (general)',  tasa:27, recuadro:12, linea:52, codLinea:58,  pyme:false, cm:true,  deprInstantanea:false},
-];
-const regInfo=k=>REGIMENES.find(r=>r.k===k)||REGIMENES[0];
-
-// Tasa de IDPC vigente para un régimen y año comercial.
-// Para Pymes rige la rebaja transitoria de la Circular N°53/2025.
-function tasaLegal(regimen,anio){
-  const r=regInfo(regimen);
-  if(!r.pyme)return r.tasa;
-  if(r.k==='14D8')return 0;
-  if(anio>=2025&&anio<=2027)return 12.5;
-  if(anio===2028)return 15;
-  return 25;
-}
-
-// Etiqueta explicativa de la tasa aplicada
-function notaTasa(regimen,anio){
-  const r=regInfo(regimen);
-  if(r.k==='14D8')return 'La empresa no paga IDPC: la base imponible se atribuye a los dueños.';
-  if(!r.pyme)return 'Tasa general del régimen semi integrado (Art. 14 A LIR).';
-  if(anio>=2025&&anio<=2027)return 'Rebaja transitoria Pyme (Circular SII N°53/2025): 12,5% para los años comerciales 2025 a 2027, condicionada al cumplimiento del pago de cotizaciones previsionales.';
-  if(anio===2028)return 'Rebaja transitoria Pyme: 15% para el año comercial 2028.';
-  return 'Tasa permanente del régimen Pro Pyme General.';
-}
+const regInfo=regimenInfo;
+const tasaLegal=tasaIDPC;
+// Compatibilidad con el render: cada régimen se muestra como "14 D N°3 — Pro Pyme General"
+const regLbl=r=>r.corto+' — '+r.nm;
 
 // ═══════════════════════════════════════════════════════════════════════
 // ESTADO DEL MÓDULO
@@ -74,6 +50,8 @@ const RENTA_DEFAULT=()=>({
   agregados:[],            // {lbl, monto} agregados manuales
   deducciones:[],          // {lbl, monto} deducciones manuales
   creditos:{af33bis:0, sence:0, donaciones:0, otros:0},
+  basePresunta:0,          // avalúo fiscal / valor de vehículos / ventas (Art. 34)
+  pctPresuncion:null,      // % de presunción; null = el legal del régimen
   ppmManual:null,          // si se informa, reemplaza el PPM calculado del F29
   reajustePPM:0,           // % de reajuste de los PPM al 31/dic (Art. 95)
   notas:''
@@ -210,7 +188,7 @@ function calcularRenta(){
     ag.push({cod:'982', lbl:'Depreciación financiera del ejercicio (se reversa)', monto:depFin, auto:true,
              nota:'En el régimen Pro Pyme la depreciación es instantánea: se reversa la cuota financiera y se deduce el 100% del activo adquirido en el año.'});
   // 4. Corrección monetaria: las Pymes 14 D están liberadas de aplicarla
-  if(!reg.cm&&Math.abs(correccMon)>=0.5)
+  if(!reg.correccionMonetaria&&Math.abs(correccMon)>=0.5)
     ag.push({cod:'1146', lbl:'Corrección monetaria contabilizada (se reversa)', monto:correccMon, auto:true,
              nota:'Las empresas acogidas al Art. 14 D están liberadas de aplicar corrección monetaria a su capital propio.'});
   // 5. Agregados manuales
@@ -244,7 +222,19 @@ function calcularRenta(){
 
   // ── Impuesto de Primera Categoría ──
   const tasa=RENTA.tasa!=null?+RENTA.tasa:tasaLegal(RENTA.regimen,anio);
-  const baseImponible=Math.max(0,rli);
+
+  // ── Renta presunta (Art. 34) ──
+  // En estos regímenes la base NO se determina a partir del resultado contable:
+  // se presume sobre el avalúo fiscal, el valor de los vehículos o las ventas.
+  // El resultado contable se sigue mostrando como referencia y control de tope.
+  const presunta=reg.rentaPresunta?{
+    lbl:(reg.presuncion&&reg.presuncion.lbl)||'Base de la presunción',
+    valor:Math.max(0,+RENTA.basePresunta||0),
+    pct:RENTA.pctPresuncion!=null?+RENTA.pctPresuncion:((reg.presuncion&&reg.presuncion.pct)||10),
+  }:null;
+  if(presunta)presunta.renta=Math.round(presunta.valor*presunta.pct/100);
+
+  const baseImponible=reg.rentaPresunta?(presunta?presunta.renta:0):Math.max(0,rli);
   const idpc=Math.round(baseImponible*tasa/100);
 
   // ── Créditos contra el IDPC ──
@@ -281,7 +271,7 @@ function calcularRenta(){
     resultadoBalance,
     ag, de, totalAgregados, totalDeducciones,
     rliAntesPerdida, perdidaPrevia, perdidaImputada, perdidaRemanente, rli,
-    baseImponible, idpc, creditos, totalCreditos, idpcNeto,
+    baseImponible, idpc, creditos, totalCreditos, idpcNeto, presunta,
     ppmF29, ppmBase, ppmReajustado, reaj,
     saldo, aPagar, devolucion,
     depTrib, depFin, cpt, activos, pasivoExigible
@@ -309,7 +299,7 @@ async function renderRenta(){
   el.innerHTML=`
   ${bloqueCabecera(R,at)}
   <div style="display:flex;gap:8px;margin:14px 0;flex-wrap:wrap">
-    ${tab('rli','📐 Renta Líquida Imponible')}
+    ${tab('rli',R.reg.rentaPresunta?'📐 Renta Presunta':'📐 Renta Líquida Imponible')}
     ${tab('impuesto','🧾 Formulario 22')}
     ${tab('ajustes','⚙️ Ajustes y créditos')}
   </div>
@@ -329,7 +319,7 @@ function bloqueCabecera(R,at){
       <div class="grp" style="min-width:250px">
         <label>Régimen tributario</label>
         <select onchange="setRentaParam('regimen',this.value)">
-          ${REGIMENES.map(r=>`<option value="${r.k}" ${R.reg.k===r.k?'selected':''}>${r.lbl}</option>`).join('')}
+          ${REGIMENES.map(r=>`<option value="${r.k}" ${R.reg.k===r.k?'selected':''}>${esc(regLbl(r))}</option>`).join('')}
         </select>
       </div>
       <div class="grp" style="min-width:130px">
@@ -343,9 +333,22 @@ function bloqueCabecera(R,at){
       <button class="btn btn-g" onclick="restaurarTasaLegal()">↺ Tasa legal (${fmtPct(tasaLegal(RENTA.regimen,R.anio))}%)</button>
     </div>
     <div class="info-tip" style="margin-top:12px">📌 ${esc(notaTasa(RENTA.regimen,R.anio))}</div>
+    <div class="info-tip" style="margin-top:8px;font-size:11px;line-height:1.6">
+      <strong>${esc(R.reg.nm)}</strong> · ${esc(R.reg.art)}<br>${esc(R.reg.desc)}
+      <br><span style="color:var(--mt)">
+        Contabilidad ${esc(R.reg.contabilidad)} ·
+        ${R.reg.correccionMonetaria?'aplica':'liberado de'} corrección monetaria ·
+        depreciación ${R.reg.deprInstantanea?'instantánea':'según vida útil'} ·
+        crédito IDPC a los dueños ${R.reg.creditoIDPC}%${R.reg.topeIngresosUF?' · tope '+fmtC(R.reg.topeIngresosUF).replace('$ ','')+' UF de ingresos':''}
+      </span>
+      ${R.reg.nota?`<br><span style="color:var(--warn)">⚠ ${esc(R.reg.nota)}</span>`:''}
+    </div>
+    ${R.presunta?bloquePresuncion(R):''}
     <div class="bal-layout" style="margin-top:14px">
-      ${kpi('Resultado según balance',R.resultadoBalance,R.resultadoBalance>=0?'var(--ach)':'var(--err)')}
-      ${kpi(positivo?'Renta Líquida Imponible':'Pérdida tributaria',Math.abs(R.rli),positivo?'var(--acc)':'var(--err)')}
+      ${R.presunta
+        ? kpi('Base de la presunción',R.presunta.valor,'var(--mt)')+kpi('Renta presunta ('+fmtPct(R.presunta.pct)+'%)',R.presunta.renta,'var(--acc)')
+        : kpi('Resultado según balance',R.resultadoBalance,R.resultadoBalance>=0?'var(--ach)':'var(--err)')+
+          kpi(positivo?'Renta Líquida Imponible':'Pérdida tributaria',Math.abs(R.rli),positivo?'var(--acc)':'var(--err)')}
       ${transparente
         ? kpi('IDPC que paga la empresa',0,'var(--mt)')+kpi('Base atribuible a los dueños',Math.max(0,R.rli),'var(--acc)')
         : kpi('Impuesto 1ª Categoría',R.idpcNeto,'var(--warn)')+
@@ -354,6 +357,37 @@ function bloqueCabecera(R,at){
     ${transparente?`<div class="info-tip" style="margin-top:12px;background:rgba(210,153,34,.10);border-color:var(--warn)">⚠️ En el régimen <strong>14 D N°8 (Transparente)</strong> la empresa no paga Impuesto de Primera Categoría: la base imponible determinada aquí se atribuye a los dueños según su participación y ellos la declaran en su Global Complementario. Los PPM pagados también se les atribuyen.</div>`:''}
   </div>`;
 }
+// ── Datos de la presunción (sólo regímenes del Art. 34) ──
+// La renta no sale de la contabilidad: hay que informar el avalúo fiscal, el
+// valor de los vehículos o las ventas, según la actividad.
+function bloquePresuncion(R){
+  const p=R.presunta;
+  return `<div class="card-np" style="margin-top:12px;padding:14px;border:1px solid var(--acc)">
+    <div style="font-size:12px;font-weight:700;margin-bottom:10px">📐 Base de la renta presunta (${esc(R.reg.art)})</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+      <div class="grp" style="min-width:250px">
+        <label>${esc(p.lbl)}</label>
+        <input type="number" min="0" value="${p.valor}" onchange="setRentaParam('basePresunta',this.value)">
+      </div>
+      <div class="grp" style="min-width:150px">
+        <label>% de presunción</label>
+        <input type="number" step="0.1" min="0" max="100" value="${p.pct}" onchange="setRentaParam('pctPresuncion',this.value)">
+      </div>
+      <div style="padding-bottom:8px">
+        <div style="font-size:10px;color:var(--mt);text-transform:uppercase">Renta presunta</div>
+        <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:var(--acc)">${fmtC(p.renta)}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--mt);margin-top:10px;line-height:1.6">
+      La contabilidad se sigue llevando para el IVA y el control interno, pero <strong>no determina la base</strong>:
+      el impuesto se calcula sobre la renta presunta. El resultado contable del ejercicio (${fmtC(R.resultadoBalance)})
+      queda sólo como referencia y para vigilar el tope de ingresos del régimen.
+      ${R.reg.k==='34AGRI'?'<br><span style="color:var(--warn)">⚠ El 10% aplica al propietario o usufructuario del predio. Si explotas bajo otro título (arrendamiento), verifica el porcentaje que te corresponde antes de declarar.</span>':''}
+      ${R.reg.k==='34MIN'?'<br><span style="color:var(--warn)">⚠ El porcentaje va de 4% a 20% según el precio promedio anual de la libra de cobre: actualízalo cada año.</span>':''}
+    </div>
+  </div>`;
+}
+
 function kpi(lbl,val,color){
   return `<div class="card-np" style="padding:12px 14px">
     <div style="font-size:10px;color:var(--mt);letter-spacing:.5px;text-transform:uppercase">${esc(lbl)}</div>
@@ -363,6 +397,21 @@ function kpi(lbl,val,color){
 
 // ── Pestaña 1: determinación de la RLI ──
 function bloqueRLI(R){
+  if(R.reg.rentaPresunta)return `<div class="card">
+    <div class="sec-title" style="font-size:14px;margin-bottom:4px">Renta Presunta — ${esc(R.reg.nm)}</div>
+    <div style="font-size:11px;color:var(--mt);margin-bottom:14px">${esc(R.reg.art)} · ejercicio comercial ${R.anio}</div>
+    <div style="overflow-x:auto"><table style="width:100%;min-width:460px"><tbody>
+      <tr><td class="tl" style="padding:6px 12px;font-size:12px">${esc(R.presunta.lbl)}</td>
+          <td style="font-family:var(--mono);text-align:right;white-space:nowrap">${fmtC(R.presunta.valor)}</td></tr>
+      <tr><td class="tl" style="padding:6px 12px;font-size:12px">× Porcentaje de presunción</td>
+          <td style="font-family:var(--mono);text-align:right;white-space:nowrap">${fmtPct(R.presunta.pct)}%</td></tr>
+      <tr style="background:rgba(46,160,67,.12)"><td class="tl" style="padding:9px 12px;font-weight:700;font-size:13px">RENTA PRESUNTA (base imponible)</td>
+          <td style="font-family:var(--mono);text-align:right;font-weight:700;color:var(--ach);white-space:nowrap">${fmtC(R.presunta.renta)}</td></tr>
+    </tbody></table></div>
+    <div class="info-tip" style="margin-top:14px">📊 <strong>Control del tope del régimen.</strong> Ingresos del giro registrados en ${R.anio}: <strong>${fmtC(R.ingresos)}</strong>.
+      El límite para permanecer en este régimen es de ${R.reg.topeIngresosUF} UF de ventas netas anuales, sumando las de las empresas relacionadas. Compáralo con la UF de cierre de tu tabla de indicadores.</div>
+    <div class="info-tip" style="margin-top:10px;font-size:11px">🧾 Resultado contable del ejercicio: ${fmtC(R.resultadoBalance)} — no determina el impuesto en este régimen, pero sirve de control interno y para el Balance General.</div>
+  </div>`;
   const fila=(lbl,monto,opts={})=>`<tr${opts.bg?` style="background:${opts.bg}"`:''}>
     <td style="font-family:var(--mono);font-size:10px;color:var(--mt);width:52px">${opts.cod||''}</td>
     <td class="tl" style="padding:${opts.fuerte?'9px 12px':'6px 12px'};font-size:${opts.fuerte?'13':'12'}px;font-weight:${opts.fuerte?'700':'400'}">
@@ -381,8 +430,8 @@ function bloqueRLI(R){
     <div class="sec-title" style="font-size:14px;margin-bottom:4px">Determinación de la Renta Líquida Imponible</div>
     <div style="font-size:11px;color:var(--mt);margin-bottom:14px">Recuadro N°${R.reg.recuadro} del F22 · ejercicio comercial ${R.anio}</div>
     <div style="overflow-x:auto"><table style="width:100%;min-width:520px"><tbody>
-      ${fila('Ingresos del giro y otros ingresos',R.ingresos,{cod:R.reg.pyme?'1545':'1698',color:'var(--ach)'})}
-      ${fila('Costos y gastos del ejercicio',R.gastos,{cod:R.reg.pyme?'1546':'1717',signo:'−',color:'var(--err)'})}
+      ${fila('Ingresos del giro y otros ingresos',R.ingresos,{cod:R.reg.cod.ingresos,color:'var(--ach)'})}
+      ${fila('Costos y gastos del ejercicio',R.gastos,{cod:R.reg.cod.gastos,signo:'−',color:'var(--err)'})}
       ${fila('RESULTADO SEGÚN BALANCE (antes de impuesto)',R.resultadoBalance,{cod:'645',fuerte:true,bg:'rgba(88,166,255,.08)'})}
       <tr><td colspan="3" style="padding:12px 12px 4px;font-size:11px;font-weight:700;color:var(--warn);letter-spacing:.5px">AGREGADOS</td></tr>
       ${filasAg}
@@ -393,7 +442,7 @@ function bloqueRLI(R){
       ${fila('Subtotal antes de pérdidas de arrastre',R.rliAntesPerdida,{fuerte:true,bg:'rgba(88,166,255,.06)'})}
       ${R.perdidaPrevia>0?fila('Pérdida tributaria de ejercicios anteriores imputada (Art. 31 N°3)',R.perdidaImputada,{cod:'634',signo:'−',color:'var(--ach)',nota:'Disponible: '+fmtC(R.perdidaPrevia)+'. Sólo se imputa hasta absorber la renta positiva del ejercicio.'}):''}
       ${fila(R.rli>=0?'RENTA LÍQUIDA IMPONIBLE':'PÉRDIDA TRIBUTARIA DEL EJERCICIO',Math.abs(R.rli),
-        {cod:R.reg.pyme?'1728':'643',fuerte:true,bg:R.rli>=0?'rgba(46,160,67,.12)':'rgba(248,81,73,.12)',color:R.rli>=0?'var(--ach)':'var(--err)'})}
+        {cod:R.reg.cod.base,fuerte:true,bg:R.rli>=0?'rgba(46,160,67,.12)':'rgba(248,81,73,.12)',color:R.rli>=0?'var(--ach)':'var(--err)'})}
     </tbody></table></div>
     ${R.perdidaRemanente>0?`<div class="info-tip" style="margin-top:12px;background:rgba(210,153,34,.10);border-color:var(--warn)">⚠️ Queda una <strong>pérdida tributaria de arrastre de ${fmtC(R.perdidaRemanente)}</strong> para imputar en ejercicios siguientes. Anótala en el campo "Pérdida de arrastre" de la declaración del año ${R.anio+1}.</div>`:''}
     <div class="info-tip" style="margin-top:12px">🧮 <strong>Capital Propio Tributario referencial:</strong> ${fmtC(R.cpt)} &nbsp;·&nbsp; activos ${fmtC(R.activos)} − pasivo exigible ${fmtC(R.pasivoExigible)}. Es una aproximación contable: el CPT tributario puede diferir si hay activos o pasivos con valorización tributaria distinta.</div>
@@ -418,7 +467,7 @@ function bloqueF22(R,at){
     <div style="overflow-x:auto"><table style="width:100%;min-width:560px">
       <thead><tr><th class="tl" style="width:44px">LÍN.</th><th class="tl" style="width:48px">CÓD.</th><th class="tl">CONCEPTO</th><th style="text-align:right">MONTO</th></tr></thead>
       <tbody>
-      ${ln('',R.reg.pyme?'1728':'643','Base Imponible de Primera Categoría',R.baseImponible,{fuerte:true,bg:'rgba(88,166,255,.08)'})}
+      ${ln('',R.reg.cod.base,'Base Imponible de Primera Categoría',R.baseImponible,{fuerte:true,bg:'rgba(88,166,255,.08)'})}
       ${transparente
         ? `<tr><td colspan="4" style="padding:10px;font-size:12px;color:var(--warn)">Régimen transparente: la base imponible se atribuye a los dueños. La empresa no determina IDPC.</td></tr>`
         : ln(String(R.reg.linea),String(R.reg.codLinea),`Impuesto Primera Categoría (${fmtPct(R.tasa)}% sobre la base)`,R.idpc,{color:'var(--err)'})}
@@ -532,6 +581,8 @@ function setRentaParam(k,v){
     RENTA.tasa=null; // al cambiar de régimen se vuelve a la tasa legal
   }else if(k==='tasa'){
     RENTA.tasa=v===''||v==null?null:+v;
+  }else if(k==='pctPresuncion'){
+    RENTA.pctPresuncion=(v===''||v==null)?null:+v;
   }else if(k==='ppmManual'){
     RENTA.ppmManual=(v===''||v==null)?null:+v;
   }else if(k==='notas'){
@@ -581,11 +632,11 @@ function exportRentaXLSX(){
     push('','Empresa: '+(S.empresa.nombre||''),'');
     push('','RUT: '+(S.empresa.rut||''),'');
     push('','Ejercicio comercial '+R.anio+' · Año Tributario '+at,'');
-    push('','Régimen: '+R.reg.lbl+' · Tasa IDPC '+fmtPct(R.tasa)+'%','');
+    push('','Régimen: '+regLbl(R.reg)+' ('+R.reg.art+')'+' · Tasa IDPC '+fmtPct(R.tasa)+'%','');
     push('','','');
     push('','DETERMINACIÓN DE LA RENTA LÍQUIDA IMPONIBLE','');
-    push(R.reg.pyme?'1545':'1698','Ingresos del giro y otros ingresos',R.ingresos);
-    push(R.reg.pyme?'1546':'1717','Costos y gastos del ejercicio',-R.gastos);
+    push(R.reg.cod.ingresos,'Ingresos del giro y otros ingresos',R.ingresos);
+    push(R.reg.cod.gastos,'Costos y gastos del ejercicio',-R.gastos);
     push('645','RESULTADO SEGÚN BALANCE (antes de impuesto)',R.resultadoBalance);
     push('','AGREGADOS','');
     R.ag.forEach(a=>push(a.cod,'  '+a.lbl,a.monto));
@@ -595,10 +646,10 @@ function exportRentaXLSX(){
     push('','Total deducciones',-R.totalDeducciones);
     push('','Subtotal antes de pérdidas de arrastre',R.rliAntesPerdida);
     if(R.perdidaPrevia>0)push('634','Pérdida tributaria de arrastre imputada',-R.perdidaImputada);
-    push(R.reg.pyme?'1728':'643',R.rli>=0?'RENTA LÍQUIDA IMPONIBLE':'PÉRDIDA TRIBUTARIA DEL EJERCICIO',R.rli);
+    push(R.reg.cod.base,R.rli>=0?'RENTA LÍQUIDA IMPONIBLE':'PÉRDIDA TRIBUTARIA DEL EJERCICIO',R.rli);
     push('','','');
     push('','FORMULARIO 22 — AT '+at,'');
-    push(R.reg.pyme?'1728':'643','Base Imponible de Primera Categoría',R.baseImponible);
+    push(R.reg.cod.base,'Base Imponible de Primera Categoría',R.baseImponible);
     if(R.reg.k!=='14D8'){
       push(String(R.reg.codLinea),'Impuesto Primera Categoría ('+fmtPct(R.tasa)+'%)',R.idpc);
       R.creditos.forEach(c=>push(c.cod,'  Crédito: '+c.lbl,-c.monto));

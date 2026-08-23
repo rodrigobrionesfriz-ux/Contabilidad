@@ -2,6 +2,7 @@
 import {S, AUTH} from './state.js';
 import {nav} from './ui.js';
 import {FS, logAccion, initFirestore} from './firebase.js';
+import {seccionAplica} from './regimenes.js';
 
 // Callback que app.js registra para arrancar la app tras login exitoso.
 let _onAuthReady=null;
@@ -360,12 +361,37 @@ async function logout(){
 }
 
 // Ocultar items del nav para secciones sin acceso
+// Secciones del menú que dependen del régimen tributario de la empresa activa.
+// Una Pyme del Art. 14 D está liberada de corrección monetaria y un contribuyente
+// de renta presunta no lleva activo fijo tributario ni cierre de RLI: mostrarles
+// esos módulos sólo invita a registrar algo que no corresponde.
+const SECCION_POR_REGIMEN={correccion:'correccion', activofijo:'activofijo',
+                           provisiones:'provisiones', cierre:'cierre'};
+
 function aplicarPermisosUI(){
   document.querySelectorAll('.nav-item[data-s]').forEach(item=>{
     const s=item.getAttribute('data-s');
     if(s==='usuarios')return; // se maneja aparte (solo admin)
-    if(!puedeVer(s))item.style.display='none';
-    else item.style.display='';
+    if(!puedeVer(s)){item.style.display='none';return;}
+    // Régimen: se oculta la sección, pero nunca se borra su dato
+    const clave=Object.keys(SECCION_POR_REGIMEN).find(k=>SECCION_POR_REGIMEN[k]===s);
+    if(clave&&!seccionAplica(S.empresa&&S.empresa.regimen,clave)){item.style.display='none';return;}
+    item.style.display='';
+  });
+  ocultarGruposVacios();
+}
+
+// Un encabezado de grupo del menú ("Activo Fijo", "Cierre de Ejercicio") no
+// debe quedar solo cuando el régimen o los permisos ocultaron todos sus ítems.
+function ocultarGruposVacios(){
+  const nav=document.querySelector('nav')||document;
+  nav.querySelectorAll('.nav-label').forEach(lbl=>{
+    let n=lbl.nextElementSibling, algunoVisible=false;
+    while(n&&!n.classList.contains('nav-label')){
+      if(n.classList.contains('nav-item')&&n.style.display!=='none'){algunoVisible=true;break;}
+      n=n.nextElementSibling;
+    }
+    lbl.style.display=algunoVisible?'':'none';
   });
 }
 

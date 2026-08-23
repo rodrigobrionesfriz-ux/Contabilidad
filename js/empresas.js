@@ -9,6 +9,7 @@
 
 import {toast} from './core.js';
 import {AUTH} from './state.js';
+import {REGIMEN_DEFAULT} from './regimenes.js';
 import {guardarACLEmpresa, borrarACLEmpresa, miembrosDe, aclDisponible} from './acl.js';
 
 // Marcos contables disponibles
@@ -213,12 +214,13 @@ export async function guardarCatalogo(){
 export const empresaActiva=()=>EMPRESAS.todas.find(e=>e.id===EMPRESAS.activa)||null;
 
 // ── Operaciones ──
-export async function crearEmpresa(nombre,rut,marco){
+export async function crearEmpresa(nombre,rut,marco,regimen){
   // El id debe ser único aunque se creen dos empresas en el mismo milisegundo
   // (pasaba al auto-crear la empresa de un usuario justo después de otra).
   let id='emp'+Date.now().toString(36);
   while(EMPRESAS.todas.some(e=>e.id===id))id='emp'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   EMPRESAS.todas.push({id,nombre,rut:rut||'',marco:marco||'tributaria',
+    regimen:regimen||REGIMEN_DEFAULT,
     creada:new Date().toISOString(),
     creadoPor:emailActual()||'',      // dueño = quien la crea
     compartidaCon:[]});

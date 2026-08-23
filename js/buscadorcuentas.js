@@ -120,18 +120,46 @@ export function acElegir(id,cd){
   }
 }
 
-// Al salir del campo: si no eligió nada válido, restaurar el valor previo
+// Al salir del campo (Tab o clic fuera): antes se borraba TODO lo escrito si el
+// usuario no había clicado una sugerencia. Quien tecleaba el código completo y
+// pasaba al campo siguiente perdía la cuenta sin aviso. Ahora, si lo escrito
+// identifica una sola cuenta, se da por elegida y se dispara su onPick.
 export function acCerrarDif(id){
   setTimeout(()=>{
     const inp=document.getElementById(id);
     const box=document.getElementById(id+'-ac');
     if(box)box.style.display='none';
     if(!inp)return;
-    const cd=inp.dataset.cd;
-    if(cd)inp.value=`${cd} – ${pdcNm(cd)}`;
-    else if(inp.value&&!cd)inp.value=''; // texto sin selección válida
+    if(inp.dataset.cd){inp.value=`${inp.dataset.cd} – ${pdcNm(inp.dataset.cd)}`;return;}
+    const texto=String(inp.value||'').trim();
+    if(!texto)return;
+    const cd=resolverCuenta(texto,inp.dataset.filtro||AC_FILTROS[id]||null);
+    if(cd)acElegir(id,cd);      // fija el valor, el data-cd y avisa al formulario
+    else inp.value='';          // texto que no identifica ninguna cuenta
   },160);
 }
+
+// Devuelve el código si el texto identifica UNA sola cuenta imputable.
+// Acepta el código exacto (con o sin puntos), el formato "código – nombre"
+// y un nombre que calce con una única cuenta. Ante cualquier ambigüedad
+// devuelve null: es preferible limpiar el campo que imputar la cuenta errónea.
+export function resolverCuenta(texto,filtro){
+  const t=String(texto||'').trim();
+  if(!t)return null;
+  const pool=poblacionCuentas(filtro);
+  const porCodigo=cd=>{const c=pool.find(x=>String(x.cd)===cd);return c?c.cd:null;};
+  // 1) "1101201 – BANCO ESTADO" → se queda con el código
+  const conGuion=t.match(/^\s*([\d.]+)\s*[\u2013-]/);
+  if(conGuion){const cd=porCodigo(conGuion[1].replace(/\./g,''));if(cd)return cd;}
+  // 2) sólo dígitos (o con puntos): código exacto
+  if(/^[\d.]+$/.test(t)){const cd=porCodigo(t.replace(/\./g,''));if(cd)return cd;}
+  // 3) nombre: sirve sólo si calza con una única cuenta
+  const exactas=pool.filter(c=>norm(c.nm)===norm(t));
+  if(exactas.length===1)return exactas[0].cd;
+  const res=buscarCuentas(t,5,filtro);
+  return res.length===1?res[0].cd:null;
+}
+
 
 // ═══ BUSCADOR DINÁMICO DE CENTROS DE COSTO ═══
 // Reutiliza los mismos patrones que el buscador de cuentas contables.

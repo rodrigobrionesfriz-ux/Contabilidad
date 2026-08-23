@@ -12,7 +12,15 @@ import {fichaAux, fichasAux, guardarFichasAux} from './importadoraux.js';
 import './storage.js';
 
 // Estado del formulario de compras (interno del módulo)
-let CF={editId:null,dist:[]};
+// CF NUNCA debe reasignarse: app.js expone este objeto con Object.assign(window,{CF})
+// una sola vez y los oninput/onchange del HTML generado escriben en window.CF
+// (CF.dist[i].monto, CF.dist[i].cc). Reasignarlo dejaba window.CF apuntando al
+// objeto viejo y la distribución del gasto —montos y centros de costo— se perdía.
+const CF={editId:null,dist:[]};
+function fijarCF(editId,dist){
+  CF.editId=editId==null?null:editId;
+  CF.dist=dist||[];
+}
 
 // ═══ CORRELATIVO MENSUAL PERSISTENTE ═══
 // Cada documento de compra lleva un `corrMes` fijo: el correlativo que se le
@@ -337,7 +345,7 @@ function renderCResumen(){
 
 // — Form Compras —
 function abrirCF(){
-  CF={editId:null,dist:[{cuenta:'',monto:0}]};
+  fijarCF(null,[{cuenta:'',monto:0,cc:''}]);
   const f=document.getElementById('cf-form');f.style.display='block';f.classList.remove('editing');
   document.getElementById('cf-title').textContent='Nuevo Documento de Compra';
   document.getElementById('cf-fecha').value=today();
@@ -352,7 +360,7 @@ function abrirCF(){
 
 function editarCompra(id){
   const d=S.compras.find(x=>x.id===id);if(!d)return;
-  CF={editId:id,dist:d.dist?d.dist.map(l=>({...l})):[{cuenta:'',monto:d.neto||0}]};
+  fijarCF(id,d.dist?d.dist.map(l=>({...l})):[{cuenta:'',monto:d.neto||0,cc:''}]);
   const f=document.getElementById('cf-form');f.style.display='block';f.classList.add('editing');
   document.getElementById('cf-title').textContent='Editando Documento — '+rutFmt(d.rutCodigo,d.rutDV);
   document.getElementById('cf-fecha').value=d.fecha;

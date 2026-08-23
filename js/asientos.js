@@ -13,7 +13,18 @@ import {fichaAux} from './importadoraux.js';
 import './storage.js';
 
 // Estado del formulario de asientos (interno del módulo; se reasigna al abrir/editar)
-let AF={editId:null,lineas:[]};
+// AF NUNCA debe reasignarse. app.js expone este objeto con Object.assign(window,{AF})
+// una sola vez al arrancar, y los onclick/oninput del HTML generado leen
+// window.AF. Si aquí se hiciera AF={...}, window.AF quedaría apuntando al objeto
+// viejo y todo lo que esos handlers escriben (descripción, centro de costo,
+// razón social) se perdería en silencio, además de romper aplicarCT().
+// Por eso el estado se reemplaza mutando las propiedades, no la referencia.
+const AF={editId:null,lineas:[]};
+function fijarAF(editId,lineas){
+  AF.editId=editId==null?null:editId;
+  AF.lineas=lineas||[];
+}
+const lineasEnBlanco=()=>[{cd:'',nm:'',desc:'',debe:0,haber:0},{cd:'',nm:'',desc:'',debe:0,haber:0}];
 
 // ═══ ASIENTOS MANUALES ═══
 // Cuentas que requieren sub-auxiliar (RUT + razón social): clientes, proveedores
@@ -785,7 +796,7 @@ function abrirForm(){
   // otra parte (un botón del Diario, el buscador), primero hay que llevar al
   // usuario ahí; si no, el formulario se abre en una sección invisible.
   irAComprobantes();
-  AF={editId:null,lineas:[{cd:'',nm:'',desc:'',debe:0,haber:0},{cd:'',nm:'',desc:'',debe:0,haber:0}]};
+  fijarAF(null,lineasEnBlanco());
   const f=document.getElementById('as-form');f.style.display='block';f.classList.remove('editing');
   document.getElementById('af-title').textContent='Nuevo Asiento Contable';
   document.getElementById('af-folio-badge').textContent='N° '+proxFolioAsiento()+' (siguiente)';
@@ -800,7 +811,7 @@ function abrirForm(){
 function editarAsiento(id){
   const a=S.asientos.find(x=>x.id===id);if(!a)return;
   irAComprobantes();
-  AF={editId:id,lineas:a.movs.map(m=>({...m}))};
+  fijarAF(id,a.movs.map(m=>({...m})));
   const f=document.getElementById('as-form');f.style.display='block';f.classList.add('editing');
   document.getElementById('af-title').textContent='Editando Asiento';
   document.getElementById('af-folio-badge').textContent='N° '+(a.n||'?');
@@ -816,7 +827,7 @@ function cerrarForm(){
   if(f)f.style.display='none';
   const ls=document.getElementById('af-last-saved');
   if(ls)ls.textContent='';
-  AF={editId:null,lineas:[]};
+  fijarAF(null,[]);
   // Volver a dibujar la lista: si se acaba de guardar, el comprobante nuevo
   // tiene que aparecer sin que el usuario tenga que navegar de nuevo.
   try{ if(window.renderComprobantes)window.renderComprobantes(); }catch(e){}
@@ -832,7 +843,7 @@ function duplicarAsiento(id){
     return l; // sin l.dte
   });
   irAComprobantes();
-  AF={editId:null,lineas};
+  fijarAF(null,lineas);
   const f=document.getElementById('as-form');f.style.display='block';f.classList.remove('editing');
   document.getElementById('af-title').textContent='Nuevo Asiento (duplicado)';
   document.getElementById('af-folio-badge').textContent='N° '+proxFolioAsiento()+' (siguiente)';
@@ -876,7 +887,7 @@ function limpiarFormAsiento(folioGuardado){
   const fechaActual=document.getElementById('af-fecha').value||today();
 
   // Reset estado JS
-  AF={editId:null,lineas:[{cd:'',nm:'',desc:'',debe:0,haber:0},{cd:'',nm:'',desc:'',debe:0,haber:0}]};
+  fijarAF(null,lineasEnBlanco());
 
   // Reset DOM explícito (por si algún input quedó con valor residual)
   const glEl=document.getElementById('af-glosa');if(glEl){glEl.value='';glEl.blur();}

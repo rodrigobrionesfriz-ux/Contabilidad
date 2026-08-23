@@ -85,7 +85,10 @@ nav{width:200px;background:var(--sf);border-right:1px solid var(--bd);overflow-y
 .nav-item.active{border-left-color:var(--ac);color:var(--tx);background:rgba(46,160,67,.09)}
 .nav-icon{font-size:14px;width:18px;text-align:center}
 .nav-badge{margin-left:auto;background:var(--ac);color:#fff;border-radius:100px;font-size:9px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center}
-main{flex:1;overflow-y:auto;padding:22px 24px}
+main{flex:1;overflow-y:auto;overflow-x:hidden;padding:22px 24px;min-width:0}
+/* min-width:0 en los hijos de un grid/flex es lo que les permite encogerse en
+   vez de desbordar: sin esto, un hijo con contenido ancho fija el mínimo. */
+.section,.card,.card-np{min-width:0;max-width:100%}
 .section{display:none}.section.active{display:block}
 .sec-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--bd);gap:12px}
 .sec-title{font-size:17px;font-weight:700}
@@ -150,6 +153,18 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 .as-form{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:20px;margin-bottom:16px}
 .as-form.editing{border-color:var(--info);box-shadow:0 0 0 2px rgba(88,166,255,.15)}
 .as-meta{display:grid;grid-template-columns:180px 1fr;gap:12px;margin-bottom:16px;align-items:end}
+/* Las líneas del asiento tienen columnas de ancho fijo que suman ~900px. En un
+   contenedor más angosto empujaban la página entera. Ahora scrollean dentro de
+   su propia caja: el resto de la pantalla queda quieto. */
+.lineas-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:14px}
+.lineas-scroll .lineas-hdr,.lineas-scroll .lineas-box{min-width:880px}
+.lineas-scroll .lineas-hdr-6,.lineas-scroll .lineas-hdr-6 ~ .lineas-box{min-width:720px}
+@media (max-width:720px){
+  /* Con la vista apilada de móvil no hace falta scroll horizontal */
+  .lineas-scroll .lineas-hdr,.lineas-scroll .lineas-box,
+  .lineas-scroll .lineas-hdr-6,.lineas-scroll .lineas-hdr-6 ~ .lineas-box{min-width:0}
+  .lineas-scroll{overflow-x:visible}
+}
 .lineas-hdr{display:grid;grid-template-columns:36px 200px 150px 110px 110px minmax(230px,1fr) 36px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
 .lineas-hdr-6{grid-template-columns:36px 200px 1fr 110px 110px 36px}
 .lineas-box{border:1px solid var(--bd);border-radius:0 0 6px 6px;margin-bottom:10px;background:var(--bg)}
@@ -223,7 +238,19 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 .asiento-body{display:none;padding:0 16px 14px;border-top:1px solid var(--bd)}
 .asiento-body.open{display:block}
 /* MISC */
-.bal-layout{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.bal-layout{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}
+/* Las dos columnas del balance se apilan cuando NO CABEN, no cuando la pantalla
+   es chica. Con `1fr 1fr` y un breakpoint, en el móvil en "vista de escritorio"
+   —donde el viewport es ancho pero la pantalla no— la columna de pasivos
+   quedaba cortada fuera de la pantalla. `auto-fit` no depende de eso. */
+.bal-layout > *{min-width:0}
+/* `tbody td.tl` lleva white-space:nowrap para las tablas de listado, pero en el
+   balance eso hacía que el nombre de la cuenta empujara la tabla y sacara los
+   montos fuera de la pantalla. Acá el nombre puede ocupar dos líneas; el monto
+   es el que nunca se parte. */
+.bal-layout table{width:100%;table-layout:auto}
+.bal-layout tbody td.tl{white-space:normal;overflow-wrap:anywhere}
+.bal-layout tbody td:not(.tl){white-space:nowrap;text-align:right}
 .rth{background:rgba(46,160,67,.08)!important;color:var(--ach)!important;font-family:var(--sans)!important;font-weight:700!important;font-size:10px;letter-spacing:.05em;text-transform:uppercase}
 .rtot{background:var(--sf2)!important;font-weight:700!important}
 .empty{text-align:center;padding:40px 20px;color:var(--mt)}

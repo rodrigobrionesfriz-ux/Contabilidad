@@ -10,7 +10,13 @@ import {comprobantesTipo, ctInfo, guardarComprobantes, crearComprobante,
         actualizarComprobante, eliminarComprobante, buscarComprobantes,
         lineasDesdeComprobante, resumenComprobante} from './comprobantestipo.js';
 
-let CTF={editId:null,lineas:[]};   // formulario de plantilla
+// Formulario de plantilla. El ENCABEZADO (nombre, descripción, glosa, montos)
+// vive aquí y no sólo en el DOM: renderCTModal() reescribe todo el innerHTML,
+// así que cualquier cosa que sólo estuviera en los inputs se perdía al agregar
+// o borrar una línea — y con el nombre perdido, guardarCT() abortaba.
+const CTF_VACIO=()=>({editId:null,nombre:'',descripcion:'',glosa:'',guardaMontos:false,
+                      lineas:[{cd:'',desc:'',debe:0,haber:0,cc:''},{cd:'',desc:'',debe:0,haber:0,cc:''}]});
+let CTF=CTF_VACIO();               // formulario de plantilla
 let CT_SEL=0;                      // resultado resaltado en el buscador
 
 // ══ BUSCADOR EN EL ENCABEZADO DEL FORMULARIO DE ASIENTOS ══
@@ -79,7 +85,7 @@ export function aplicarCT(id){
 // ══ EDITOR DE COMPROBANTES TIPO (modal) ══
 
 export function abrirCTModal(){
-  CTF={editId:null,lineas:[{cd:'',desc:'',debe:0,haber:0,cc:''},{cd:'',desc:'',debe:0,haber:0,cc:''}]};
+  CTF=CTF_VACIO();
   const m=document.getElementById('ct-modal');
   if(m)m.classList.add('open');
   renderCTModal();
@@ -88,14 +94,16 @@ export function abrirCTModal(){
 export function cerrarCTModal(){
   const m=document.getElementById('ct-modal');
   if(m)m.classList.remove('open');
-  CTF={editId:null,lineas:[]};
+  CTF=CTF_VACIO();
 }
+
+// Escapa un valor para meterlo dentro de un atributo HTML
+const at=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 
 export function renderCTModal(){
   const cont=document.getElementById('ct-modal-body');
   if(!cont)return;
   const editando=!!CTF.editId;
-  const c=editando?ctInfo(CTF.editId):null;
   const lista=comprobantesTipo();
 
   const filas=CTF.lineas.map((l,i)=>`
@@ -114,14 +122,14 @@ export function renderCTModal(){
   cont.innerHTML=`
     <div class="fg">
       <div class="grp"><label>Nombre del comprobante</label>
-        <input type="text" id="ctf-nombre" value="${c?(c.nombre||'').replace(/"/g,'&quot;'):''}" placeholder="Ej: Pago de arriendo mensual"></div>
+        <input type="text" id="ctf-nombre" value="${at(CTF.nombre)}" placeholder="Ej: Pago de arriendo mensual" oninput="setCTHeader('nombre',this.value)"></div>
       <div class="grp"><label>Descripción (opcional)</label>
-        <input type="text" id="ctf-desc" value="${c?(c.descripcion||'').replace(/"/g,'&quot;'):''}" placeholder="Para qué sirve esta plantilla"></div>
+        <input type="text" id="ctf-desc" value="${at(CTF.descripcion)}" placeholder="Para qué sirve esta plantilla" oninput="setCTHeader('descripcion',this.value)"></div>
       <div class="grp full"><label>Glosa sugerida</label>
-        <input type="text" id="ctf-glosa" value="${c?(c.glosa||'').replace(/"/g,'&quot;'):''}" placeholder="Se copiará a la glosa del asiento"></div>
+        <input type="text" id="ctf-glosa" value="${at(CTF.glosa)}" placeholder="Se copiará a la glosa del asiento" oninput="setCTHeader('glosa',this.value)"></div>
       <div class="grp full">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="ctf-montos" ${c&&c.guardaMontos?'checked':''} style="width:16px;height:16px">
+          <input type="checkbox" id="ctf-montos" ${CTF.guardaMontos?'checked':''} onchange="setCTHeader('guardaMontos',this.checked)" style="width:16px;height:16px">
           <span>Guardar también los montos</span>
         </label>
         <div style="font-size:10px;color:var(--mt);margin-top:2px">Si lo dejas sin marcar, la plantilla solo trae las cuentas y tú escribes los montos cada vez.</div>
@@ -135,7 +143,7 @@ export function renderCTModal(){
       ${filas}
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
         <button class="btn btn-i" onclick="addCTLinea()">+ Línea</button>
-        <span style="font-size:11px;color:${cuadra?'var(--ach)':'var(--mt)'}">
+        <span id="ct-cuadre" style="font-size:11px;color:${cuadra?'var(--ach)':'var(--mt)'}">
           Debe ${fmtC(totD)} · Haber ${fmtC(totH)} ${totD||totH?(cuadra?'✓ cuadra':'· diferencia '+fmtC(Math.abs(totD-totH))):''}
         </span>
       </div>
@@ -171,6 +179,14 @@ export function renderCTModal(){
     </div>`:''}`;
 }
 
+// Guarda el encabezado en CTF a medida que se escribe, para que sobreviva a
+// los re-render que provocan «+ Línea» y «✕».
+export function setCTHeader(campo,valor){
+  if(!(campo in CTF))return;
+  CTF[campo]=campo==='guardaMontos'?!!valor:String(valor||'');
+  if(campo==='guardaMontos')actualizarCuadreCT();
+}
+
 export function setCTCuenta(i,cd){
   if(CTF.lineas[i])CTF.lineas[i].cd=cd;
 }
@@ -180,6 +196,20 @@ export function setCTCampo(i,campo,valor){
   // Debe y haber son excluyentes
   if(campo==='debe'&&+valor)CTF.lineas[i].haber=0;
   if(campo==='haber'&&+valor)CTF.lineas[i].debe=0;
+  if(campo==='debe'||campo==='haber')actualizarCuadreCT();
+}
+
+// Refresca sólo la línea de totales. Re-renderizar el modal completo aquí
+// haría perder el foco y el cursor mientras se escribe un monto.
+function actualizarCuadreCT(){
+  const el=document.getElementById('ct-cuadre');
+  if(!el)return;
+  const totD=CTF.lineas.reduce((s,l)=>s+(+l.debe||0),0);
+  const totH=CTF.lineas.reduce((s,l)=>s+(+l.haber||0),0);
+  const cuadra=Math.abs(totD-totH)<1;
+  el.style.color=cuadra?'var(--ach)':'var(--mt)';
+  el.textContent=`Debe ${fmtC(totD)} · Haber ${fmtC(totH)} `+
+    (totD||totH?(cuadra?'✓ cuadra':'· diferencia '+fmtC(Math.abs(totD-totH))):'');
 }
 export function addCTLinea(){CTF.lineas.push({cd:'',desc:'',debe:0,haber:0,cc:''});renderCTModal();}
 export function delCTLinea(i){
@@ -187,27 +217,31 @@ export function delCTLinea(i){
   CTF.lineas.splice(i,1);renderCTModal();
 }
 export function nuevoCT(){
-  CTF={editId:null,lineas:[{cd:'',desc:'',debe:0,haber:0,cc:''},{cd:'',desc:'',debe:0,haber:0,cc:''}]};
+  CTF=CTF_VACIO();
   renderCTModal();
 }
 
 export function editarCT(id){
   const c=ctInfo(id);if(!c)return;
-  CTF={editId:id,lineas:c.lineas.map(l=>({...l}))};
+  CTF={editId:id, nombre:c.nombre||'', descripcion:c.descripcion||'', glosa:c.glosa||'',
+       guardaMontos:!!c.guardaMontos, lineas:(c.lineas||[]).map(l=>({...l}))};
   if(!CTF.lineas.length)CTF.lineas=[{cd:'',desc:'',debe:0,haber:0,cc:''}];
   renderCTModal();
 }
 
 export async function guardarCT(){
-  const nombre=(document.getElementById('ctf-nombre')||{}).value?.trim()||'';
+  // Se leen los inputs por si el usuario escribió y disparó guardar antes de que
+  // corriera el oninput (autocompletar del navegador, pegar con el mouse…).
+  sincronizarEncabezadoCT();
+  const nombre=(CTF.nombre||'').trim();
   if(!nombre){toast('⚠️ Ponle un nombre al comprobante','e');return;}
   const conCuenta=CTF.lineas.filter(l=>l.cd);
   if(!conCuenta.length){toast('⚠️ Agrega al menos una cuenta','e');return;}
   const datos={
     nombre,
-    descripcion:(document.getElementById('ctf-desc')||{}).value?.trim()||'',
-    glosa:(document.getElementById('ctf-glosa')||{}).value?.trim()||'',
-    guardaMontos:!!(document.getElementById('ctf-montos')||{}).checked,
+    descripcion:(CTF.descripcion||'').trim(),
+    glosa:(CTF.glosa||'').trim(),
+    guardaMontos:!!CTF.guardaMontos,
     lineas:conCuenta,
   };
   if(CTF.editId){
@@ -224,6 +258,15 @@ export async function guardarCT(){
   logAccion(CTF.editId?'Editó comprobante tipo':'Creó comprobante tipo',nombre);
   CTF.editId=null;
   nuevoCT();
+}
+
+// Vuelca al estado lo que haya en los inputs del encabezado.
+function sincronizarEncabezadoCT(){
+  const v=id=>{const e=document.getElementById(id);return e?e.value:null;};
+  const n=v('ctf-nombre');      if(n!=null)CTF.nombre=n;
+  const d=v('ctf-desc');        if(d!=null)CTF.descripcion=d;
+  const g=v('ctf-glosa');       if(g!=null)CTF.glosa=g;
+  const m=document.getElementById('ctf-montos'); if(m)CTF.guardaMontos=!!m.checked;
 }
 
 export async function borrarCT(id){

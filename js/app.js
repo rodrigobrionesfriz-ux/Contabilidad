@@ -43,7 +43,7 @@ import {cargarFichasAux, descargarPlantillaAux, abrirImportFichas,
         initImportFichasListener, fichasAux, fichaAux} from './importadoraux.js';
 import {cargarComprobantes} from './comprobantestipo.js';
 import {buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal,
-        renderCTModal, setCTCuenta, setCTCampo, addCTLinea, delCTLinea, nuevoCT,
+        renderCTModal, setCTCuenta, setCTCampo, setCTHeader, addCTLinea, delCTLinea, nuevoCT,
         editarCT, guardarCT, borrarCT, copiarCTaEmpresa} from './comprobantestipo-ui.js';
 import {cargarCentros, cargarCierresCC, ccOpts, ccNombre, costoAcumulado} from './centroscosto.js';
 import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
@@ -515,7 +515,7 @@ Object.assign(window,{
   descargarPlantillaAux, abrirImportFichas, descargarPlantillaAuxActual, abrirImportFichasActual,
   renderImportModalVentas, confirmarImportacionV, cerrarImportModalVentas,
   buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal, renderCTModal,
-  setCTCuenta, setCTCampo, addCTLinea, delCTLinea, nuevoCT, editarCT, guardarCT,
+  setCTCuenta, setCTCampo, setCTHeader, addCTLinea, delCTLinea, nuevoCT, editarCT, guardarCT,
   borrarCT, copiarCTaEmpresa,
   // apertura
   renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut, apLVal,

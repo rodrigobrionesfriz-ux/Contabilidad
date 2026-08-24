@@ -84,7 +84,6 @@ nav{width:200px;background:var(--sf);border-right:1px solid var(--bd);overflow-y
 .nav-item:hover{background:var(--sf2);color:var(--tx)}
 .nav-item.active{border-left-color:var(--ac);color:var(--tx);background:rgba(46,160,67,.09)}
 .nav-icon{font-size:14px;width:18px;text-align:center}
-.nav-badge{margin-left:auto;background:var(--ac);color:#fff;border-radius:100px;font-size:9px;font-weight:700;padding:1px 6px;min-width:18px;text-align:center}
 main{flex:1;overflow-y:auto;overflow-x:hidden;padding:22px 24px;min-width:0}
 /* min-width:0 en los hijos de un grid/flex es lo que les permite encogerse en
    vez de desbordar: sin esto, un hijo con contenido ancho fija el mínimo. */

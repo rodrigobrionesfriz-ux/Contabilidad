@@ -583,3 +583,55 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
   .inicio-marca-icono{width:84px;height:84px;font-size:44px;border-radius:20px}
   .inicio-marca-nombre{font-size:22px}
 }
+
+/* ═══ ESTADO DE CUENTA DE UN AUXILIAR ═══ */
+.aux-nota-hija{background:rgba(88,166,255,.04)}
+#aux-rep-body .mono{font-family:var(--mono)}
+#aux-rep-body .mt{color:var(--mt);font-size:10px}
+#aux-rep-body .num{text-align:right;font-family:var(--mono);white-space:nowrap}
+#aux-rep-body .fuerte{font-weight:700}
+.rep-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+  padding-bottom:12px;border-bottom:2px solid var(--bd);margin-bottom:14px;flex-wrap:wrap}
+.rep-emp{font-size:15px;font-weight:700}
+.rep-emp-sub{font-size:11px;color:var(--mt);margin-top:2px}
+.rep-fecha{text-align:right;font-size:12px;font-weight:600}
+.rep-aux{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+  background:var(--sf2);border-radius:8px;padding:12px 14px;margin-bottom:14px;flex-wrap:wrap}
+.rep-aux-nm{font-size:14px;font-weight:700}
+.rep-saldo{text-align:right}
+.rep-saldo-val{font-family:var(--mono);font-size:18px;font-weight:700;margin-top:2px}
+.rep-vista-lbl{font-size:11px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;
+  font-weight:700;margin-bottom:6px}
+.rep-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.rep-tabla{width:100%;font-size:11px;min-width:620px}
+.rep-tabla th{font-size:10px}
+.rep-tabla td{padding:5px 7px}
+.rep-hija td{background:rgba(88,166,255,.05)}
+.rep-hija td:nth-child(2){padding-left:24px}
+.rep-warn{background:rgba(255,193,7,.15);color:var(--warn);padding:1px 6px;border-radius:3px;
+  font-size:9px;font-weight:700;margin-left:6px}
+.rep-nota{font-size:10px;color:var(--mt);margin-top:10px;line-height:1.5;
+  border-left:2px solid var(--bd);padding-left:10px}
+.rep-acciones{display:flex;gap:8px;align-items:center;margin-top:16px;padding-top:14px;
+  border-top:1px solid var(--bd);flex-wrap:wrap}
+@media(max-width:640px){
+  .rep-tabla{font-size:10px;min-width:560px}
+  .rep-tabla td{padding:4px 4px}
+  .rep-fecha{text-align:left}
+  .rep-acciones .btn{flex:1 1 auto}
+}
+
+/* Al imprimir el estado de cuenta, sólo sale el reporte */
+@media print{
+  body.imprimiendo-reporte>*{display:none!important}
+  body.imprimiendo-reporte #aux-rep-modal{display:block!important;position:static!important;
+    background:#fff!important;padding:0!important;overflow:visible!important}
+  body.imprimiendo-reporte #aux-rep-modal .modal-box{max-width:none!important;width:100%!important;
+    border:none!important;box-shadow:none!important;background:#fff!important;color:#000!important;
+    padding:0!important}
+  body.imprimiendo-reporte .no-print{display:none!important}
+  body.imprimiendo-reporte .rep-aux{background:#f4f4f4!important}
+  body.imprimiendo-reporte .rep-scroll{overflow:visible!important}
+  body.imprimiendo-reporte .rep-tabla{min-width:0!important}
+  body.imprimiendo-reporte .rep-hija td{background:#f7f9fc!important}
+}

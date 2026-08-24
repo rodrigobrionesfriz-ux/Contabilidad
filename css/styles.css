@@ -528,3 +528,18 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 /* Red de seguridad en pantallas muy angostas */
 .cmp-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 @media (max-width:640px){.tbl-cmp{min-width:520px}}
+
+/* ═══ AYUDAS BAJO LA AMPOLLETA ═══
+   Los recuadros .info-tip de cada sección quedan ocultos hasta que el usuario
+   pulsa 💡 en la cabecera. Se hace por CSS y no por JS para que sobreviva a los
+   re-render de cada módulo, que reescriben su contenido completo.
+   Las ayudas dentro de modales no se tocan: se ven al abrir el modal. */
+.section .info-tip{display:none}
+.section.ayuda-on .info-tip{display:block}
+.modal-bkd .info-tip{display:block}
+.btn-ayuda{margin-left:auto;font-size:15px;line-height:1;padding:6px 10px;flex:0 0 auto}
+.btn-ayuda.on{background:rgba(88,166,255,.15);border-color:var(--ac);color:var(--ac)}
+@media(max-width:860px){
+  /* En móvil .sec-hdr apila en columna: el botón no debe estirarse a todo el ancho */
+  .btn-ayuda{margin-left:0;align-self:flex-start}
+}

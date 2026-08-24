@@ -59,6 +59,8 @@ import {DISPOSITIVO, renombrarDispositivo} from './dispositivo.js';
 import {diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos} from './seguridad.js';
 import {initAyuda, toggleAyuda, actualizarAyuda, ayudaAlNavegar} from './ayuda.js';
 import {renderInicio, abrirEmpresaInicio} from './inicio.js';
+import {abrirReporteAux, cerrarReporteAux, setReporteAuxVista, renderReporteAux,
+        imprimirReporteAux, exportarReporteAuxExcel} from './auxreporte.js';
 
 // Negocio
 import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
@@ -117,7 +119,8 @@ import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editar
 import {renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro, togglePagSel, togglePagAll, setPagMontoParcial, ejecutarPago, abrirAsociarNota, cerrarAsociarNota, confirmarAsociar, quitarReferencia} from './pagos.js';
 import {setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux, renderAuxiliares, calcularAging,
         toggleAgingDetalle, AUX_TAB,
-        abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI} from './auxiliares.js';
+        abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
+        auxPorRut, abrirReporteAuxDe} from './auxiliares.js';
 // AUX_TAB también viene de auxiliares.js — se recupera desde window.
 import {renderF29, renderPPM, IVAC, renderCompensacionIVA, generarAsientoIVA,
         setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente,
@@ -574,6 +577,8 @@ Object.assign(window,{
   renderPagoF29, generarAsientoPagoF29, setPagoF29Cuenta, setPagoF29Campo, setPagoF29Monto,
   togglePagoF29, resetPagoF29, usarSugeridoF29,
   setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux, renderAuxiliares, toggleAgingDetalle,
+  auxPorRut, abrirReporteAuxDe, abrirReporteAux, cerrarReporteAux, setReporteAuxVista,
+  renderReporteAux, imprimirReporteAux, exportarReporteAuxExcel,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   // declaración de renta (F22)
   renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,

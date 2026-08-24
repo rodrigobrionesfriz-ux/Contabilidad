@@ -4,6 +4,7 @@ import {S} from './state.js';
 import {todosDocsVentas, todosDocsCompras, CUENTAS_AUX, esAux, abrirAsientoDesde} from './asientos.js';
 import {fichaAux, fichasAux, guardarFichasAux} from './importadoraux.js';
 import {docsApertura, tipoDeCuenta} from './aperturaaux.js';
+import {ordenarConNotas} from './auxdocs.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {ccOpts} from './centroscosto.js';
 import {logAccion} from './firebase.js';
@@ -216,11 +217,14 @@ function renderAuxDetalle(data,el){
 
   keys.forEach(k=>{
     const a=data[k];
-    const docs=[...a.docs].sort((x,y)=>x.fecha.localeCompare(y.fecha));
+    // Las notas de crédito/débito con folio de referencia se pintan colgando de
+    // su factura en vez de sueltas por fecha (ordenarConNotas, en auxdocs.js).
+    const docs=ordenarConNotas(a.docs,AUX_TAB==='c'?'cliente':'proveedor');
     const bodyId='auxb_'+k;
     let saldo=0;
     const rows=docs.map(d=>{
       saldo+=d.montoSigno;
+      const hija=d.__nivel===1;
       if(d.tipo==='doc'){
         const dteInfo=AUX_TAB==='c'?dteV(d.tipoDTE):dteC(d.tipoDTE);
         const dteNm=dteInfo?.nm||'';
@@ -263,9 +267,9 @@ function renderAuxDetalle(data,el){
                    onclick="event.stopPropagation();abrirAsociarNota('${orig.id}','${a.rutCodigo}','${tipoAux}','auxiliares')">⚠ SIN REFERENCIA · Asociar</span>`;
           }
         }
-        return `<tr${neg?' style="color:var(--err)"':''}>
+        return `<tr${neg?' style="color:var(--err)"':''}${hija?' class="aux-nota-hija"':''}>
           <td class="tl" style="font-family:var(--mono);font-size:10px">${d.fecha}${vence}</td>
-          <td class="tl" style="font-size:11px">DTE ${d.tipoDTE}<span style="color:var(--mt);margin-left:5px;font-size:10px">${dteNm.slice(0,16)} N°${d.numero||''}</span>${origenBadge}${estadoPago}${refNota}</td>
+          <td class="tl" style="font-size:11px${hija?';padding-left:22px':''}">${hija?'<span style="color:var(--mt)">↳ </span>':''}DTE ${d.tipoDTE}<span style="color:var(--mt);margin-left:5px;font-size:10px">${dteNm.slice(0,16)} N°${d.numero||''}</span>${origenBadge}${estadoPago}${refNota}</td>
           <td>${d.debe?fmt(d.debe):'–'}</td>
           <td>${d.haber?fmt(d.haber):'–'}</td>
           <td style="font-weight:600;color:${saldo>=0?'var(--ach)':'var(--err)'}">${fmtC(saldo)}</td>
@@ -302,6 +306,7 @@ function renderAuxDetalle(data,el){
       </div>
       <div class="aux-body" id="${bodyId}">
         <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px;margin-bottom:2px">
+          <button class="btn btn-i" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();abrirReporteAuxDe('${a.rutCodigo}')">📄 Estado de cuenta</button>
           <button class="btn btn-i" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();abrirFichaAux('${a.rutCodigo}','${a.rutDV}','${(a.razonSocial||'').replace(/'/g,'&apos;')}')">✏️ Editar ficha</button>
         </div>
         <table style="font-size:11px;margin-top:6px">
@@ -313,6 +318,22 @@ function renderAuxDetalle(data,el){
     </div>`;
   });
   el.innerHTML=h;
+}
+
+// Busca un auxiliar ya calculado por su RUT. Lo usa el reporte por auxiliar
+// para no recalcular todo el sub-libro.
+function auxPorRut(rutCodigo,tipo){
+  if(!AUX_DATA)return null;
+  const bolsa=(tipo||(AUX_TAB==='c'?'cliente':'proveedor'))==='cliente'?AUX_DATA.clientes:AUX_DATA.proveedores;
+  return (bolsa&&bolsa[rutCodigo])||null;
+}
+
+// Abre el estado de cuenta del auxiliar de la pestaña actual
+function abrirReporteAuxDe(rutCodigo){
+  const tipo=AUX_TAB==='c'?'cliente':'proveedor';
+  const a=auxPorRut(rutCodigo,tipo);
+  if(!a){toast('⚠️ No se encontró el auxiliar','e');return;}
+  if(window.abrirReporteAux)window.abrirReporteAux(rutCodigo,tipo,a);
 }
 
 // ═══ AGING (antigüedad de saldos) ═══
@@ -579,4 +600,5 @@ async function guardarFichaAuxUI(){
 }
 
 export {setAuxTab, setAuxView, setAuxQ, verTodosAux, ocultarTodosAux, toggleAux, renderAuxiliares, AGING_BUCKETS, diasEntre, calcularAging, toggleAgingDetalle, renderAuxAging, AUX_TAB,
-        abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI};
+        abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
+        auxPorRut, abrirReporteAuxDe};

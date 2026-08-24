@@ -19,7 +19,10 @@ function prepararImpresion(){
   set('ph-empresa',e.nombre||'(Empresa sin configurar)');
   set('ph-rut',e.rut?'RUT: '+e.rut:'');
   set('ph-giro',e.giro||'');
-  set('ph-titulo',TITULOS_SEC[curSec]||'Reporte');
+  // getCurSec() es una función: antes se leía `curSec` a secas, que no existe.
+  // El error reventaba el manejador de beforeprint justo aquí, así que el
+  // encabezado oficial salía sin título, sin período y sin fecha de emisión.
+  set('ph-titulo',TITULOS_SEC[getCurSec()]||'Reporte');
   const emp=empresaActiva();
   const marcoNm=emp?marcoInfo(emp.marco).nm:'';
   set('ph-periodo','Ejercicio '+(e.anio||new Date().getFullYear())+(marcoNm?' · '+marcoNm:''));

@@ -543,3 +543,43 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
   /* En móvil .sec-hdr apila en columna: el botón no debe estirarse a todo el ancho */
   .btn-ayuda{margin-left:0;align-self:flex-start}
 }
+
+/* ═══ PORTADA (Inicio) ═══
+   Primera pantalla al entrar: las empresas del usuario. Sin ninguna, queda
+   el panel limpio con el icono de la aplicación como marca de agua. */
+#s-inicio .sec-hdr{display:none}
+.inicio-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:22px}
+.inicio-hola{font-size:22px;font-weight:700}
+.inicio-sub{font-size:12px;color:var(--mt);margin-top:4px}
+.inicio-logo{width:42px;height:42px;flex:0 0 auto;background:linear-gradient(135deg,var(--logo1),var(--logo2));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;opacity:.9}
+
+.inicio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.inicio-emp{display:flex;flex-direction:column;gap:5px;text-align:left;width:100%;min-width:0;
+  background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:14px 15px;
+  color:var(--tx);font-family:inherit;cursor:pointer;transition:border-color .15s,transform .1s}
+.inicio-emp:hover{border-color:var(--ac);transform:translateY(-1px)}
+.inicio-emp.activa{border-color:var(--ac);background:rgba(88,166,255,.07)}
+.inicio-emp-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.inicio-emp-nombre{font-size:14px;font-weight:700;overflow-wrap:anywhere}
+.inicio-emp-activa{font-size:10px;color:var(--ac);white-space:nowrap;flex:0 0 auto}
+.inicio-emp-rut{font-family:var(--mono);font-size:11px;color:var(--mt)}
+.inicio-emp-meta{font-size:10px;color:var(--mt);display:flex;gap:5px;flex-wrap:wrap}
+.inicio-emp-pie{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.inicio-pie{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px;padding-top:16px;border-top:1px solid var(--bd)}
+
+/* Panel vacío: sólo la marca de agua */
+.inicio-vacio{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;min-height:58vh;text-align:center}
+.inicio-marca{display:flex;flex-direction:column;align-items:center;gap:12px;
+  opacity:.13;user-select:none;pointer-events:none}
+.inicio-marca-icono{width:104px;height:104px;background:linear-gradient(135deg,var(--logo1),var(--logo2));
+  border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:54px}
+.inicio-marca-nombre{font-size:26px;font-weight:700;letter-spacing:.04em}
+.inicio-vacio-txt{font-size:13px;color:var(--mt);line-height:1.6}
+@media(max-width:640px){
+  .inicio-grid{grid-template-columns:1fr}
+  .inicio-hola{font-size:19px}
+  .inicio-marca-icono{width:84px;height:84px;font-size:44px;border-radius:20px}
+  .inicio-marca-nombre{font-size:22px}
+}

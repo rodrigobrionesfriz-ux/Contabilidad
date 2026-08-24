@@ -57,6 +57,7 @@ import {renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
 import {renderSistema} from './sistema.js';
 import {DISPOSITIVO, renombrarDispositivo} from './dispositivo.js';
 import {diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos} from './seguridad.js';
+import {initAyuda, toggleAyuda, actualizarAyuda, ayudaAlNavegar} from './ayuda.js';
 
 // Negocio
 import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
@@ -369,6 +370,7 @@ function nav(s){
   document.getElementById('s-'+s).classList.add('active');
   document.querySelector('[data-s="'+s+'"]').classList.add('active');
   setCurSec(s);renderSec(s);
+  ayudaAlNavegar(s);   // aplicar la preferencia de ayuda de esta pantalla
   cerrarNavMovil(); // en móvil, cerrar el drawer tras elegir sección
 }
 function renderSec(s){
@@ -572,6 +574,7 @@ Object.assign(window,{
   // declaración de renta (F22)
   renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
   onRegimenEmpresaChange, pintarRegimen, onRegimenChange, aplicarPermisosUI,
+  toggleAyuda, actualizarAyuda,
   addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,
   cargarCartola, autoConciliarCartola,
@@ -597,6 +600,7 @@ function abrirImportFichasActual(){abrirImportFichas(tipoAuxActual());}
 
 // ═══ ARRANQUE ═══
 initTema();
+initAyuda();         // ampolleta 💡 por sección: las ayudas quedan plegadas
 initAvisoSalida();   // aviso si se cierra con cambios sin guardar
 initAutoguardado();  // temporizador + guardado al dejar la pestaña o cerrar
 // storage llama esto cuando frena una escritura sobre una clave no leída

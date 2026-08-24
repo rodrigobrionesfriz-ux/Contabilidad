@@ -99,15 +99,8 @@ function updateHdr(){
   if(hdr)hdr.innerHTML=S.empresa.nombre?`<span>${S.empresa.nombre}</span> &nbsp;|&nbsp; Año ${S.empresa.anio}`:'Configure los datos de empresa';
   const vs=document.getElementById('ventas-sub');if(vs)vs.textContent='Registro por documento — '+S.empresa.anio;
   const cs=document.getElementById('compras-sub');if(cs)cs.textContent='Registro por documento — '+S.empresa.anio;
-  const nba=document.getElementById('nb-as');if(nba)nba.textContent=S.asientos.length||'0';
-  const nbaf=document.getElementById('nb-af');if(nbaf)nbaf.textContent=(S.activos&&S.activos.length)||'0';
-  const nbrem=document.getElementById('nb-rem');if(nbrem)nbrem.textContent=(S.trabajadores&&S.trabajadores.length)||'0';
-  const nbx=document.getElementById('nb-aux');if(nbx){
-    const cli=new Set(),prv=new Set();
-    S.ventas.forEach(v=>{if(v.rutCodigo&&v.formaPago==='clientes')cli.add(v.rutCodigo);});
-    S.compras.forEach(c=>{if(c.rutCodigo)prv.add(c.rutCodigo);});
-    nbx.textContent=(cli.size+prv.size)||'0';
-  }
+  // Las insignias con contadores del menú se retiraron: en producción no
+  // aportaban información accionable y obligaban a recalcular en cada refresco.
 }
 
 

@@ -144,8 +144,8 @@ export function initAvisoSalida(){
     const capa=capaAbierta();
     if(capa){capa.cerrar(capa.el);return;}
 
-    const sec=(window.getCurSec&&window.getCurSec())||'empresa';
-    if(sec!=='empresa'&&window.nav){window.nav('empresa');return;}
+    const sec=(window.getCurSec&&window.getCurSec())||'inicio';
+    if(sec!=='inicio'&&window.nav){window.nav('inicio');return;}
 
     const r=await preguntarSalir(_sucio);
     if(r==='quedarse')return;

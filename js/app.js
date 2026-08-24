@@ -58,6 +58,7 @@ import {renderSistema} from './sistema.js';
 import {DISPOSITIVO, renombrarDispositivo} from './dispositivo.js';
 import {diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos} from './seguridad.js';
 import {initAyuda, toggleAyuda, actualizarAyuda, ayudaAlNavegar} from './ayuda.js';
+import {renderInicio, abrirEmpresaInicio} from './inicio.js';
 
 // Negocio
 import {renderApertura, abrirApertura, cerrarApertura, apRenderLineas, apLCd, apLRut,
@@ -337,7 +338,7 @@ async function initApp(){
       if(S.ventas?.length)await window.storage.set('ventas-'+S.empresa.anio,JSON.stringify(S.ventas));
     }catch(e){console.warn('Error persistiendo migración de folios:',e);}
   }
-  fillEmpresaForm();updateHdr();
+  fillEmpresaForm();updateHdr();renderInicio();
   initImportListener();
   initImportListenerV();
   initImportFichasListener();
@@ -367,8 +368,10 @@ function cerrarNavMovil(){
 function nav(s){
   document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
-  document.getElementById('s-'+s).classList.add('active');
-  document.querySelector('[data-s="'+s+'"]').classList.add('active');
+  const sec=document.getElementById('s-'+s);
+  if(sec)sec.classList.add('active');
+  const item=document.querySelector('[data-s="'+s+'"]');
+  if(item)item.classList.add('active');   // hay secciones sin ítem de menú
   setCurSec(s);renderSec(s);
   ayudaAlNavegar(s);   // aplicar la preferencia de ayuda de esta pantalla
   cerrarNavMovil(); // en móvil, cerrar el drawer tras elegir sección
@@ -377,7 +380,7 @@ function renderSec(s){
   // Verificar permiso de acceso a la sección.
   // 'empresa' y 'usuarios' se excluyen del bloqueo genérico: empresa es la landing,
   // y usuarios tiene su propio control de admin dentro de renderUsuarios().
-  if(AUTH.user&&s!=='empresa'&&s!=='usuarios'&&s!=='auditlog'&&!puedeVer(s)){
+  if(AUTH.user&&s!=='inicio'&&s!=='empresa'&&s!=='usuarios'&&s!=='auditlog'&&!puedeVer(s)){
     const sec=document.getElementById('s-'+s);
     if(sec)sec.innerHTML='<div class="empty"><div class="ei">🚫</div>No tienes permiso para acceder a esta sección.<br><br>Contacta a un administrador para solicitar acceso.</div>';
     return;
@@ -409,6 +412,7 @@ function renderSec(s){
   else if(s==='comprobantes')renderComprobantes();
   else if(s==='pagos')renderPagos();
   else if(s==='f29')renderF29();
+  else if(s==='inicio')renderInicio();
   else if(s==='ppm')renderPPM();
   else if(s==='renta')renderRenta();
   else if(s==='activofijo')renderActivoFijo();
@@ -465,7 +469,7 @@ async function recargarEmpresaActiva(){
   }catch(e){}
   await loadYear(S.empresa.anio);
   await cargarCentros();await cargarCierresCC();await cargarComprobantes();await cargarFichasAux();await cargarLibroRem();
-  fillEmpresaForm();updateHdr();renderSelectorEmpresa();
+  fillEmpresaForm();updateHdr();renderSelectorEmpresa();renderInicio();
   try{aplicarPermisosUI();}catch(e){}
   rerender();
 }
@@ -574,7 +578,7 @@ Object.assign(window,{
   // declaración de renta (F22)
   renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
   onRegimenEmpresaChange, pintarRegimen, onRegimenChange, aplicarPermisosUI,
-  toggleAyuda, actualizarAyuda,
+  toggleAyuda, actualizarAyuda, renderInicio, abrirEmpresaInicio,
   addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,
   renderConciliacion, onSaldoBancoChange, toggleConciliado, marcarTodosConciliados,
   cargarCartola, autoConciliarCartola,

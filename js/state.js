@@ -30,6 +30,6 @@ export const AUTH={
 
 // Sección de navegación actual. Se accede/reasigna vía funciones para
 // permitir que otros módulos lo lean y lo cambien.
-let _curSec='empresa';
+let _curSec='inicio';
 export const getCurSec=()=>_curSec;
 export const setCurSec=s=>{_curSec=s;};

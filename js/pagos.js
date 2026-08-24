@@ -349,11 +349,16 @@ function renderPagosTabla(){
         </span>`:'';
       // Nota de crédito sin referencia imputada automáticamente a esta factura:
       // el saldo ya viene rebajado, por eso se avisa de dónde sale.
-      const badgeNotaAuto=(d.notasAuto&&d.notasAuto.length)?`
-        <span style="background:rgba(88,166,255,.13);color:var(--info);padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px"
-          title="Saldo rebajado por ${d.notasAuto.map(n=>`NC N°${n.numero}: ${fmtC(n.monto)}`).join(' · ')}">
-          ↩ NC APLICADA ${fmtC(d.notasAuto.reduce((s,n)=>s+n.monto,0))}
-        </span>`:'';
+      // Notas imputadas automáticamente por falta de referencia. Antes eran un
+      // simple aviso y la nota desaparecía de la lista, así que no quedaba forma
+      // de corregir a qué factura se aplicó. Ahora cada una es un botón que abre
+      // la asociación para fijarla donde corresponde.
+      const badgeNotaAuto=(d.notasAuto&&d.notasAuto.length)?d.notasAuto.map(n=>`
+        <span style="background:rgba(88,166,255,.13);color:var(--info);padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px;cursor:pointer"
+          title="Aplicada automáticamente por no tener folio de referencia. Pulsa para asociarla a la factura que corresponde."
+          onclick="event.stopPropagation();abrirAsociarNota('${n.id}','${d.rutCodigo}','${PAG.tipo}')">
+          ↩ NC N°${n.numero} ${fmtC(n.monto)} · Asociar
+        </span>`).join(''):'';
 
       h+=`<tr ${sel?'style="background:rgba(46,160,67,.04)"':''}>
         <td style="text-align:center"><input type="checkbox" ${sel?'checked':''} onchange="togglePagSel('${d.id}',this.checked)"></td>
@@ -552,16 +557,22 @@ async function ejecutarPago(){
 // XML del DTE, no en el resumen RCV, así que el usuario debe asociarlas
 // manualmente. Al asociar, la NC se descuenta del saldo pendiente de la factura.
 
-function abrirAsociarNota(notaId,rutCodigo){
-  const arr=PAG.tipo==='proveedor'?S.compras:S.ventas;
+// Estado del modal de asociación. Guarda el tipo con el que se abrió porque
+// ahora también se entra desde Auxiliares, donde PAG.tipo no manda.
+let ASOC={tipo:null,volverA:null};
+
+function abrirAsociarNota(notaId,rutCodigo,tipo,volverA){
+  const t=tipo||PAG.tipo;
+  ASOC={tipo:t, volverA:volverA||null};
+  const arr=t==='proveedor'?S.compras:S.ventas;
   const nota=arr.find(d=>d.id===notaId);
   if(!nota)return;
-  const facturas=facturasDelAuxiliar(PAG.tipo,rutCodigo);
+  const facturas=facturasDelAuxiliar(t,rutCodigo);
   if(!facturas.length){
     toast('⚠️ No hay facturas de este auxiliar para asociar','e');
     return;
   }
-  const dteNotaInfo=PAG.tipo==='proveedor'?dteC(nota.tipoDTE):dteV(nota.tipoDTE);
+  const dteNotaInfo=t==='proveedor'?dteC(nota.tipoDTE):dteV(nota.tipoDTE);
   const nombreNota=dteNotaInfo?.nm||`DTE ${nota.tipoDTE}`;
 
   const box=document.getElementById('asoc-nota-modal-body');
@@ -577,13 +588,20 @@ function abrirAsociarNota(notaId,rutCodigo){
         <div style="font-size:11px;color:var(--mt);margin-top:2px">${nota.razonSocial||''} · ${rutFmt(nota.rutCodigo,nota.rutDV)}</div>
       </div>
 
+      ${nota.folioRef?`<div class="info-tip" style="display:block;margin:0 0 12px">
+        Hoy está asociada a la factura <strong>N°${nota.folioRef}</strong>. Elige otra para cambiarla.
+      </div>`:`<div class="info-tip" style="display:block;margin:0 0 12px">
+        Sin referencia. Mientras no la tenga, el sistema la descuenta de la factura más antigua con saldo,
+        que no siempre es la que corresponde. Al asociarla queda imputada donde tú indiques.
+      </div>`}
+
       <div style="font-size:11px;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:8px">
         Selecciona la factura de referencia
       </div>
 
       <div style="max-height:360px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px">
         ${facturas.map(f=>{
-          const fInfo=PAG.tipo==='proveedor'?dteC(f.tipoDTE):dteV(f.tipoDTE);
+          const fInfo=t==='proveedor'?dteC(f.tipoDTE):dteV(f.tipoDTE);
           const fNm=fInfo?.nm||`DTE ${f.tipoDTE}`;
           return `<div style="padding:10px 14px;border-bottom:1px solid var(--bd);cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="confirmarAsociar('${nota.id}','${f.numero}')" onmouseover="this.style.background='rgba(88,166,255,.06)'" onmouseout="this.style.background=''">
             <div>
@@ -608,32 +626,37 @@ function cerrarAsociarNota(){
 }
 
 async function confirmarAsociar(notaId,folioFactura){
-  const arr=PAG.tipo==='proveedor'?S.compras:S.ventas;
+  const tipo=ASOC.tipo||PAG.tipo;
+  const arr=tipo==='proveedor'?S.compras:S.ventas;
   const nota=arr.find(d=>d.id===notaId);
   if(!nota)return;
   nota.folioRef=String(folioFactura);
-  const clave=PAG.tipo==='proveedor'?'compras':'ventas';
+  const clave=tipo==='proveedor'?'compras':'ventas';
   await window.storage.set(clave+'-'+S.empresa.anio,JSON.stringify(arr)).catch(()=>{});
   logAccion('Asoció NC/ND a factura',`${nota.razonSocial} · Doc N°${nota.numero} → Fact N°${folioFactura}`);
   toast(`✅ Nota asociada a factura N°${folioFactura}`);
   cerrarAsociarNota();
   // Quitar de selección si estaba
   PAG.seleccionados.delete(notaId);
-  renderPagos();
+  // Volver a dibujar la pantalla desde la que se abrió el modal
+  if(ASOC.volverA==='auxiliares'&&window.renderAuxiliares)window.renderAuxiliares();
+  else renderPagos();
 }
 
-async function quitarReferencia(notaId){
-  const arr=PAG.tipo==='proveedor'?S.compras:S.ventas;
+async function quitarReferencia(notaId,tipo){
+  const t=tipo||PAG.tipo;
+  const arr=t==='proveedor'?S.compras:S.ventas;
   const nota=arr.find(d=>d.id===notaId);
   if(!nota)return;
   const conf=confirm('¿Quitar la referencia de esta nota? Volverá a aparecer como documento independiente.');
   if(!conf)return;
   delete nota.folioRef;
-  const clave=PAG.tipo==='proveedor'?'compras':'ventas';
+  const clave=t==='proveedor'?'compras':'ventas';
   await window.storage.set(clave+'-'+S.empresa.anio,JSON.stringify(arr)).catch(()=>{});
   logAccion('Quitó referencia de NC/ND',`${nota.razonSocial} · Doc N°${nota.numero}`);
   toast('Referencia removida');
-  renderPagos();
+  if(window.getCurSec&&window.getCurSec()==='auxiliares'&&window.renderAuxiliares)window.renderAuxiliares();
+  else renderPagos();
 }
 
 export {PAG, renderPagos, setPagTipo, setPagCampo, setPagFiltro, limpiarPagFiltro,

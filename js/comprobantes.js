@@ -44,6 +44,48 @@ export function renderComprobantes(){
   const cont=document.getElementById('comprobantes-content');
   if(!cont)return;
 
+  // Barra de filtros: se pinta UNA sola vez. El input de texto no debe
+  // destruirse en cada tecleo (oninput) o el cursor pierde el foco y hay que
+  // volver a clicar para cada letra — por eso solo el contenido de abajo
+  // (#cmp-body) se re-renderiza al filtrar.
+  const barra=`<div class="filter-row" style="margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
+    <span class="f-lbl">Filtrar:</span>
+    <select id="cmp-mes-sel" onchange="setCmpFiltro('mes',this.value)">${mesOptsCmp()}</select>
+    <select id="cmp-origen-sel" onchange="setCmpFiltro('origen',this.value)">
+      <option value="">Todos los orígenes</option>
+      <option value="apertura" ${CMP_FILTRO.origen==='apertura'?'selected':''}>🔰 Apertura</option>
+      <option value="manual" ${CMP_FILTRO.origen==='manual'?'selected':''}>✏️ Manuales</option>
+      <option value="auto" ${CMP_FILTRO.origen==='auto'?'selected':''}>⚙️ Todos automáticos</option>
+      <option value="ventas" ${CMP_FILTRO.origen==='ventas'?'selected':''}>🛒 Auto ventas</option>
+      <option value="compras" ${CMP_FILTRO.origen==='compras'?'selected':''}>🧾 Auto compras</option>
+      <option value="honorarios" ${CMP_FILTRO.origen==='honorarios'?'selected':''}>📝 Auto honorarios</option>
+      <option value="descuadrados" ${CMP_FILTRO.origen==='descuadrados'?'selected':''}>⚠️ Solo descuadrados</option>
+    </select>
+    <div style="position:relative;min-width:150px">
+      <input type="text" id="cmp-num-input" inputmode="numeric" placeholder="N° comprobante…" autocomplete="off"
+        value="${CMP_FILTRO.numero.replace(/"/g,'&quot;')}"
+        oninput="cmpNumeroBuscar(this.value)"
+        onfocus="cmpNumeroBuscar(this.value)"
+        onblur="setTimeout(()=>renderCmpNumeroList([]),160)"
+        style="width:100%">
+      <div id="cmp-num-list" class="ac-lista" style="display:none;min-width:280px"></div>
+    </div>
+    <input type="text" id="cmp-texto-input" placeholder="Buscar por glosa o cuenta…" value="${CMP_FILTRO.texto.replace(/"/g,'&quot;')}"
+      oninput="setCmpFiltro('texto',this.value)" style="min-width:180px">
+    <button class="btn btn-g" onclick="limpiarCmpFiltro()">Limpiar</button>
+    <span class="doc-count" id="cmp-count"></span>
+  </div>`;
+
+  cont.innerHTML=barra+'<div id="cmp-body"></div>';
+  renderComprobantesBody();
+}
+
+// Re-renderiza SOLO el resultado (alerta + tabla), sin tocar la barra de
+// filtros de arriba — así el input de búsqueda no pierde el foco al escribir.
+function renderComprobantesBody(){
+  const box=document.getElementById('cmp-body');
+  if(!box)return;
+
   let entries=genDiario();
 
   // Filtros
@@ -97,6 +139,9 @@ export function renderComprobantes(){
   const cntAp=entries.filter(e=>e.origen==='apertura').length;
   const totalFiltrado=entries.length;
 
+  const cnt=document.getElementById('cmp-count');
+  if(cnt)cnt.textContent=`${entries.length} comprobantes${cntAp?' · '+cntAp+' apertura':''}${cntAuto?' · '+cntAuto+' automáticos':''}${cntMan?' · '+cntMan+' manuales':''}`;
+
   // Panel de alerta cuando hay descuadres (y no estamos ya filtrando solo por ellos)
   let alerta='';
   if(descuadres.length&&CMP_FILTRO.origen!=='descuadrados'){
@@ -108,40 +153,15 @@ export function renderComprobantes(){
     </div>`;
   }
 
-  let h=alerta+`<div class="filter-row" style="margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
-    <span class="f-lbl">Filtrar:</span>
-    <select onchange="setCmpFiltro('mes',this.value)">${mesOptsCmp()}</select>
-    <select onchange="setCmpFiltro('origen',this.value)">
-      <option value="">Todos los orígenes</option>
-      <option value="apertura" ${CMP_FILTRO.origen==='apertura'?'selected':''}>🔰 Apertura</option>
-      <option value="manual" ${CMP_FILTRO.origen==='manual'?'selected':''}>✏️ Manuales</option>
-      <option value="auto" ${CMP_FILTRO.origen==='auto'?'selected':''}>⚙️ Todos automáticos</option>
-      <option value="ventas" ${CMP_FILTRO.origen==='ventas'?'selected':''}>🛒 Auto ventas</option>
-      <option value="compras" ${CMP_FILTRO.origen==='compras'?'selected':''}>🧾 Auto compras</option>
-      <option value="honorarios" ${CMP_FILTRO.origen==='honorarios'?'selected':''}>📝 Auto honorarios</option>
-      <option value="descuadrados" ${CMP_FILTRO.origen==='descuadrados'?'selected':''}>⚠️ Solo descuadrados</option>
-    </select>
-    <div style="position:relative;min-width:150px">
-      <input type="text" id="cmp-num-input" inputmode="numeric" placeholder="N° comprobante…" autocomplete="off"
-        value="${CMP_FILTRO.numero.replace(/"/g,'&quot;')}"
-        oninput="cmpNumeroBuscar(this.value)"
-        onfocus="cmpNumeroBuscar(this.value)"
-        onblur="setTimeout(()=>renderCmpNumeroList([]),160)"
-        style="width:100%">
-      <div id="cmp-num-list" class="ac-lista" style="display:none;min-width:280px"></div>
-    </div>
-    <input type="text" placeholder="Buscar por glosa o cuenta…" value="${CMP_FILTRO.texto.replace(/"/g,'&quot;')}"
-      oninput="setCmpFiltro('texto',this.value)" style="min-width:180px">
-    <button class="btn btn-g" onclick="limpiarCmpFiltro()">Limpiar</button>
-    <span class="doc-count">${entries.length} comprobantes${cntAp?' · '+cntAp+' apertura':''}${cntAuto?' · '+cntAuto+' automáticos':''}${cntMan?' · '+cntMan+' manuales':''}</span>
-  </div>`;
+  let h=alerta;
 
   if(!entries.length){
     h+=`<div style="text-align:center;padding:40px;color:var(--mt)">
       <div style="font-size:36px;margin-bottom:8px">📖</div>
       No hay comprobantes que coincidan con los filtros
     </div>`;
-    cont.innerHTML=h;
+    box.innerHTML=h;
+    CMP_ENTRIES=[];
     return;
   }
 
@@ -232,13 +252,13 @@ export function renderComprobantes(){
   </tr></tfoot>`;
   h+='</table></div></div>';
 
-  cont.innerHTML=h;
+  box.innerHTML=h;
   CMP_ENTRIES=entries;
 }
 
 function setCmpFiltro(campo,valor){
   CMP_FILTRO[campo]=valor;
-  renderComprobantes();
+  renderComprobantesBody();
 }
 
 // Búsqueda dinámica por N° de comprobante: filtra los entries del año actual
@@ -281,6 +301,8 @@ function cmpNumeroElegir(n){
   CMP_FILTRO.mes=''; CMP_FILTRO.origen=''; CMP_FILTRO.texto='';
   const box=document.getElementById('cmp-num-list');
   if(box){box.style.display='none';box.innerHTML='';}
+  // Se eligió desde la lista (clic), no se está tecleando texto: sí conviene
+  // repintar la barra completa para reflejar mes/origen/texto en blanco.
   renderComprobantes();
   // Auto-abrir el modal del comprobante elegido
   const idx=(CMP_ENTRIES||[]).findIndex(e=>+e.n===+n);

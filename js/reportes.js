@@ -12,8 +12,15 @@ import './storage.js';
 let DIARIO_Q='';   // texto de búsqueda del libro diario
 // Filtros de periodo del Libro Diario y del Libro Mayor. El mes es un atajo:
 // al elegirlo se rellenan desde/hasta con el primer y último día del mes.
-let DIA_F={mes:'',desde:'',hasta:''};
-let MAY_F={mes:'',desde:'',hasta:'',q:''};
+// acum: si está activo, "desde" se fuerza al 1 de enero (ver el ejercicio
+// acumulado hasta ese mes) en vez de solo los movimientos de ese mes.
+let DIA_F={mes:'',desde:'',hasta:'',acum:false};
+let MAY_F={mes:'',desde:'',hasta:'',q:'',acum:false};
+// Filtros de periodo del Balance y del Estado de Resultados. Acumulado
+// (por defecto) = desde el inicio del ejercicio hasta el mes elegido.
+// Sin acumular = solo el movimiento de ese mes.
+let BAL_F={mes:'',acum:true};
+let RES_F={mes:'',acum:true};
 
 // Nombre de archivo estándar para las exportaciones
 function nombreArchivoExport(base,f){
@@ -23,7 +30,7 @@ function nombreArchivoExport(base,f){
 }
 // Etiqueta legible del periodo aplicado
 function etiquetaPeriodo(f){
-  if(f.mes)return `${MESES[+f.mes-1]} ${S.empresa.anio}`;
+  if(f.mes)return `${f.acum?'Acumulado a ':''}${MESES[+f.mes-1]} ${S.empresa.anio}`;
   if(f.desde&&f.hasta)return `${f.desde} a ${f.hasta}`;
   if(f.desde)return `desde ${f.desde}`;
   if(f.hasta)return `hasta ${f.hasta}`;
@@ -284,6 +291,9 @@ function renderDiario(){
   const buscador=`<div class="filter-row" style="margin-bottom:12px">
     <span class="f-lbl">Periodo:</span>
     <select id="diario-mes" onchange="onDiarioMes(this.value)">${mesOpts(DIA_F.mes)}</select>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mt);cursor:pointer" title="Con un mes elegido: acumula desde el 1 de enero hasta ese mes">
+      <input type="checkbox" id="diario-acum" ${DIA_F.acum?'checked':''} onchange="onDiarioAcum(this.checked)" style="width:15px;height:15px;cursor:pointer">Acumulado
+    </label>
     <input type="date" id="diario-desde" value="${DIA_F.desde}" onchange="setDiarioFecha('desde',this.value)" title="Desde">
     <input type="date" id="diario-hasta" value="${DIA_F.hasta}" onchange="setDiarioFecha('hasta',this.value)" title="Hasta">
     <span class="f-lbl">Buscar:</span>
@@ -301,10 +311,20 @@ function renderDiario(){
 // ── Filtros del Libro Diario ──
 function onDiarioMes(v){
   DIA_F.mes=v;
-  if(v){const r=mesRango(+v);DIA_F.desde=r.desde;DIA_F.hasta=r.hasta;}
+  if(v){const r=mesRango(+v,DIA_F.acum);DIA_F.desde=r.desde;DIA_F.hasta=r.hasta;}
   else{DIA_F.desde='';DIA_F.hasta='';}
   const d=document.getElementById('diario-desde'),h=document.getElementById('diario-hasta');
   if(d)d.value=DIA_F.desde;if(h)h.value=DIA_F.hasta;
+  renderDiarioTabla();
+}
+// Alterna el modo Acumulado (desde enero) del filtro de mes
+function onDiarioAcum(v){
+  DIA_F.acum=v;
+  if(DIA_F.mes){
+    const r=mesRango(+DIA_F.mes,DIA_F.acum);DIA_F.desde=r.desde;DIA_F.hasta=r.hasta;
+    const d=document.getElementById('diario-desde'),h=document.getElementById('diario-hasta');
+    if(d)d.value=DIA_F.desde;if(h)h.value=DIA_F.hasta;
+  }
   renderDiarioTabla();
 }
 function setDiarioFecha(k,v){
@@ -314,7 +334,7 @@ function setDiarioFecha(k,v){
   renderDiarioTabla();
 }
 function limpiarFiltrosDiario(){
-  DIA_F={mes:'',desde:'',hasta:''};DIARIO_Q='';
+  DIA_F={mes:'',desde:'',hasta:'',acum:false};DIARIO_Q='';
   renderDiario();
 }
 // Aplica periodo + búsqueda a los asientos del diario
@@ -497,10 +517,20 @@ function buildMayor(desde,hasta){
 // ── Filtros del Libro Mayor ──
 function onMayorMes(v){
   MAY_F.mes=v;
-  if(v){const r=mesRango(+v);MAY_F.desde=r.desde;MAY_F.hasta=r.hasta;}
+  if(v){const r=mesRango(+v,MAY_F.acum);MAY_F.desde=r.desde;MAY_F.hasta=r.hasta;}
   else{MAY_F.desde='';MAY_F.hasta='';}
   const d=document.getElementById('mayor-desde'),h=document.getElementById('mayor-hasta');
   if(d)d.value=MAY_F.desde;if(h)h.value=MAY_F.hasta;
+  renderMayorTabla();
+}
+// Alterna el modo Acumulado (desde enero) del filtro de mes
+function onMayorAcum(v){
+  MAY_F.acum=v;
+  if(MAY_F.mes){
+    const r=mesRango(+MAY_F.mes,MAY_F.acum);MAY_F.desde=r.desde;MAY_F.hasta=r.hasta;
+    const d=document.getElementById('mayor-desde'),h=document.getElementById('mayor-hasta');
+    if(d)d.value=MAY_F.desde;if(h)h.value=MAY_F.hasta;
+  }
   renderMayorTabla();
 }
 function setMayorFecha(k,v){
@@ -510,7 +540,7 @@ function setMayorFecha(k,v){
 }
 function setMayorQ(v){MAY_F.q=v;renderMayorTabla();}
 function limpiarFiltrosMayor(){
-  MAY_F={mes:'',desde:'',hasta:'',q:''};
+  MAY_F={mes:'',desde:'',hasta:'',q:'',acum:false};
   renderMayor();
 }
 // La descripción de la línea suele repetir lo que ya dice la glosa
@@ -590,6 +620,9 @@ function renderMayor(){
   el.innerHTML=`<div class="filter-row" style="margin-bottom:12px">
     <span class="f-lbl">Periodo:</span>
     <select id="mayor-mes" onchange="onMayorMes(this.value)">${mesOpts(MAY_F.mes)}</select>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mt);cursor:pointer" title="Con un mes elegido: acumula desde el 1 de enero hasta ese mes">
+      <input type="checkbox" id="mayor-acum" ${MAY_F.acum?'checked':''} onchange="onMayorAcum(this.checked)" style="width:15px;height:15px;cursor:pointer">Acumulado
+    </label>
     <input type="date" id="mayor-desde" value="${MAY_F.desde}" onchange="setMayorFecha('desde',this.value)" title="Desde">
     <input type="date" id="mayor-hasta" value="${MAY_F.hasta}" onchange="setMayorFecha('hasta',this.value)" title="Hasta">
     <span class="f-lbl">Buscar:</span>
@@ -757,18 +790,40 @@ function saldosInvertidos(M){
   }).sort();
 }
 
+// ── Filtros del Balance ──
+function onBalanceMes(v){BAL_F.mes=v;renderBalance();}
+function onBalanceAcum(v){BAL_F.acum=v;renderBalance();}
+function limpiarFiltrosBalance(){BAL_F={mes:'',acum:true};renderBalance();}
+
 async function renderBalance(){
-  const M=buildMayor();
+  // Sin mes elegido: el balance de siempre (ejercicio completo, a hoy).
+  // Con mes elegido y Acumulado activo: saldo al último día de ese mes (lo normal en un Balance).
+  // Con mes elegido y Acumulado desactivado: solo el movimiento (debe−haber) de ese mes puntual.
+  const hasta=BAL_F.mes?mesRango(+BAL_F.mes,true).hasta:undefined;
+  const desde=BAL_F.mes&&!BAL_F.acum?mesRango(+BAL_F.mes,false).desde:undefined;
+  const M=buildMayor(desde,hasta);
+  const soloMes=!!(BAL_F.mes&&!BAL_F.acum);
+  const valor=a=>soloMes?(a.debe-a.haber):a.saldo;
+
+  const filtro=`<div class="filter-row" style="margin-bottom:14px">
+    <span class="f-lbl">Periodo:</span>
+    <select id="balance-mes" onchange="onBalanceMes(this.value)">${mesOpts(BAL_F.mes)}</select>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mt);cursor:pointer" title="Saldo acumulado desde el inicio del ejercicio hasta el mes elegido; si se desactiva, solo el movimiento de ese mes">
+      <input type="checkbox" id="balance-acum" ${BAL_F.acum?'checked':''} onchange="onBalanceAcum(this.checked)" style="width:15px;height:15px;cursor:pointer">Acumulado
+    </label>
+    ${BAL_F.mes?'<button class="btn btn-g" onclick="limpiarFiltrosBalance()">Limpiar</button>':''}
+  </div>`;
+
   // Agrupación dinámica: recorre todas las cuentas imputables con saldo y las clasifica por prefijo.
   // Activos: 11 (corriente) / 12 (no corriente). Pasivos: 21 (corriente) / 22 (no corriente). Patrimonio: 23.
   // El resultado del ejercicio (ingresos 04 − costos 03) se calcula aparte y se suma al patrimonio.
   const grpPrefijo=(pref,title)=>{
     let tot=0;
-    const cds=Object.keys(M).filter(cd=>cd.length===7&&pref.some(p=>cd.startsWith(p))&&Math.abs(M[cd].saldo)>=0.5)
+    const cds=Object.keys(M).filter(cd=>cd.length===7&&pref.some(p=>cd.startsWith(p))&&Math.abs(valor(M[cd]))>=0.5)
       .sort();
     const rows=cds.map(cd=>{
       // Signo de presentación: nunca valor absoluto (ver nota arriba)
-      const v=saldoPres(cd,M[cd].saldo);
+      const v=saldoPres(cd,valor(M[cd]));
       tot+=v;
       const correctora=cd.startsWith('1')&&esCorrectoraActivo(cd);
       const invertida=v<0&&!correctora;
@@ -786,19 +841,22 @@ async function renderBalance(){
   const gPNC=grpPrefijo(['22'],'PASIVOS NO CORRIENTES');
   // Patrimonio: cuentas del prefijo 23 (capital, revalorización, resultados acumulados)
   const gPat=grpPrefijo(['23'],'PATRIMONIO');
-  const tI=sumaPres(M,Object.keys(M).filter(k=>k.startsWith('4')));
-  const tC=sumaPres(M,Object.keys(M).filter(k=>k.startsWith('3')));
+  const tI=Object.keys(M).filter(k=>k.startsWith('4')).reduce((s,k)=>s+saldoPres(k,valor(M[k])),0);
+  const tC=Object.keys(M).filter(k=>k.startsWith('3')).reduce((s,k)=>s+saldoPres(k,valor(M[k])),0);
   const res=tI-tC;
   const totAct=gAC.tot+gAF.tot;
   const totPas=gPC.tot+gPNC.tot;
   const totPat=gPat.tot+res; // patrimonio contable + resultado del ejercicio corriente
   const totPasYPat=totPas+totPat;
   const ok=Math.abs(totAct-totPasYPat)<2;
-  const invertidas=saldosInvertidos(M);
-  document.getElementById('balance-content').innerHTML=`<div class="card">
+  const invertidas=soloMes?[]:saldosInvertidos(M);
+  const subt=BAL_F.mes
+    ?(soloMes?`Movimientos de ${MESES[+BAL_F.mes-1]} de ${S.empresa.anio}`:`Balance General al último día de ${MESES[+BAL_F.mes-1]} de ${S.empresa.anio}`)
+    :`Balance General al 31 de Diciembre de ${S.empresa.anio}`;
+  document.getElementById('balance-content').innerHTML=`${filtro}<div class="card">
     <div style="text-align:center;margin-bottom:18px">
       <div style="font-size:15px;font-weight:700">${S.empresa.nombre||'(sin empresa)'}</div>
-      <div style="color:var(--mt);font-size:12px;margin-top:3px">Balance General al 31 de Diciembre de ${S.empresa.anio}</div>
+      <div style="color:var(--mt);font-size:12px;margin-top:3px">${subt}</div>
     </div>
     <div class="bal-layout">
       <div>
@@ -899,14 +957,28 @@ async function renderComparativo(targetId,tipo){
   cont.insertAdjacentHTML('afterbegin',panel);
 }
 
+// ── Filtros del Estado de Resultados ──
+function onResultadosMes(v){RES_F.mes=v;renderResultados();}
+function onResultadosAcum(v){RES_F.acum=v;renderResultados();}
+function limpiarFiltrosResultados(){RES_F={mes:'',acum:true};renderResultados();}
+
 // ═══ RESULTADOS ═══
 async function renderResultados(){
-  const M=buildMayor();
-  // Suma el saldo (valor absoluto) de todas las cuentas imputables cuyo código empieza con un prefijo dado
-  const sumaPref=pref=>sumaPres(M,Object.keys(M).filter(k=>k.length===7&&k.startsWith(pref)&&Math.abs(M[k].saldo)>=0.5));
+  // Sin mes: el ejercicio completo (como antes). Con mes + Acumulado: desde
+  // enero hasta ese mes. Con mes sin Acumulado: solo el movimiento de ese mes.
+  const hasta=RES_F.mes?mesRango(+RES_F.mes,true).hasta:undefined;
+  const desde=RES_F.mes&&!RES_F.acum?mesRango(+RES_F.mes,false).desde:undefined;
+  const M=buildMayor(desde,hasta);
+  const soloMes=!!(RES_F.mes&&!RES_F.acum);
+  // Acumulado (o sin filtro): usa el saldo de la cuenta. Solo el mes: usa el
+  // movimiento (debe−haber) restringido a ese periodo.
+  const valorCta=a=>soloMes?(a.debe-a.haber):a.saldo;
+  // Suma el saldo (o movimiento del mes) de todas las cuentas imputables cuyo código empieza con un prefijo dado
+  const sumaPref=pref=>Object.keys(M).filter(k=>k.length===7&&k.startsWith(pref)&&Math.abs(valorCta(M[k]))>=0.5)
+    .reduce((s,k)=>s+saldoPres(k,valorCta(M[k])),0);
   // Filas de detalle por prefijo (cuentas con saldo)
-  const detallePref=pref=>Object.keys(M).filter(k=>k.length===7&&k.startsWith(pref)&&Math.abs(M[k].saldo)>=0.5).sort()
-    .map(k=>`<tr><td class="tl" style="padding:5px 6px 5px 34px;font-size:11px;color:var(--mt)"><span style="font-family:var(--mono);font-size:10px">${k}</span> ${M[k].nm||pdcNm(k)}</td><td style="font-family:var(--mono);font-size:11px;color:var(--mt)">${fmtC(saldoPres(k,M[k].saldo))}</td></tr>`).join('');
+  const detallePref=pref=>Object.keys(M).filter(k=>k.length===7&&k.startsWith(pref)&&Math.abs(valorCta(M[k]))>=0.5).sort()
+    .map(k=>`<tr><td class="tl" style="padding:5px 6px 5px 34px;font-size:11px;color:var(--mt)"><span style="font-family:var(--mono);font-size:10px">${k}</span> ${M[k].nm||pdcNm(k)}</td><td style="font-family:var(--mono);font-size:11px;color:var(--mt)">${fmtC(saldoPres(k,valorCta(M[k])))}</td></tr>`).join('');
 
   // Niveles del EERR
   const ingExp=sumaPref('41');   // Ingresos de explotación
@@ -950,10 +1022,22 @@ async function renderResultados(){
     </tr>`;
   const espacio=`<tr><td colspan="2" style="height:6px;border:none"></td></tr>`;
 
-  document.getElementById('resultados-content').innerHTML=`<div class="card" style="max-width:720px">
+  const filtro=`<div class="filter-row" style="margin-bottom:14px">
+    <span class="f-lbl">Periodo:</span>
+    <select id="resultados-mes" onchange="onResultadosMes(this.value)">${mesOpts(RES_F.mes)}</select>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--mt);cursor:pointer" title="Acumulado desde enero hasta el mes elegido; si se desactiva, solo el movimiento de ese mes">
+      <input type="checkbox" id="resultados-acum" ${RES_F.acum?'checked':''} onchange="onResultadosAcum(this.checked)" style="width:15px;height:15px;cursor:pointer">Acumulado
+    </label>
+    ${RES_F.mes?'<button class="btn btn-g" onclick="limpiarFiltrosResultados()">Limpiar</button>':''}
+  </div>`;
+  const subt=RES_F.mes
+    ?(soloMes?`Estado de Resultados — ${MESES[+RES_F.mes-1]} de ${S.empresa.anio}`:`Estado de Resultados — Acumulado a ${MESES[+RES_F.mes-1]} de ${S.empresa.anio}`)
+    :`Estado de Resultados — Año ${S.empresa.anio}`;
+
+  document.getElementById('resultados-content').innerHTML=`${filtro}<div class="card" style="max-width:720px">
     <div style="text-align:center;margin-bottom:22px">
       <div style="font-size:16px;font-weight:700">${S.empresa.nombre||'(sin empresa)'}</div>
-      <div style="color:var(--mt);font-size:12px;margin-top:3px">Estado de Resultados — Año ${S.empresa.anio}</div>
+      <div style="color:var(--mt);font-size:12px;margin-top:3px">${subt}</div>
       <div style="color:var(--mt);font-size:11px;margin-top:2px">Régimen 14 D N°3 Pro-Pyme General</div>
     </div>
     <table><tbody>
@@ -994,5 +1078,7 @@ async function renderResultados(){
 
 
 export {genDiario, renderDiario, setDiarioQ, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados, corregirDesdeDiario, editarAsientoRef,
-        onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
-        onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel};
+        onDiarioMes, onDiarioAcum, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
+        onMayorMes, onMayorAcum, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
+        onBalanceMes, onBalanceAcum, limpiarFiltrosBalance,
+        onResultadosMes, onResultadosAcum, limpiarFiltrosResultados};

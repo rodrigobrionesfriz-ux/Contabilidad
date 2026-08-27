@@ -108,9 +108,10 @@ import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
 // Reportes
 import {genDiario, renderDiario, setDiarioQ, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados, corregirDesdeDiario, editarAsientoRef,
-        onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
-        onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla,
-        exportarMayorExcel} from './reportes.js';
+        onDiarioMes, onDiarioAcum, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
+        onMayorMes, onMayorAcum, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla,
+        exportarMayorExcel, onBalanceMes, onBalanceAcum, limpiarFiltrosBalance,
+        onResultadosMes, onResultadosAcum, limpiarFiltrosResultados} from './reportes.js';
 import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         eliminarComprobante, anularComprobante,
@@ -568,8 +569,10 @@ Object.assign(window,{
   generarProvisionIncobrables, generarProvisionFeriado, renderCorreccion, previewCM,
   // reportes
   renderDiario, setDiarioQ, renderMayor, renderBalance, onCmpYear, renderResultados,
-  onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
-  onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
+  onDiarioMes, onDiarioAcum, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
+  onMayorMes, onMayorAcum, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
+  onBalanceMes, onBalanceAcum, limpiarFiltrosBalance,
+  onResultadosMes, onResultadosAcum, limpiarFiltrosResultados,
   renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos, renderSistema,
   diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos,
   renombrarEsteDispositivo,

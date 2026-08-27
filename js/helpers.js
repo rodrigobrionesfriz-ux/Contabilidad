@@ -24,11 +24,13 @@ function foliosMensuales(docs){
   return out;
 }
 
-function mesRango(m){
+// acum=true → desde el 1 de enero hasta el fin del mes elegido (acumulado del ejercicio).
+// acum=false (por defecto) → solo el mes elegido, del día 1 a su último día.
+function mesRango(m,acum=false){
   const anio=S.empresa.anio||new Date().getFullYear();
   const mm=String(m).padStart(2,'0');
   const ultimo=new Date(anio,m,0).getDate(); // día 0 del mes siguiente = último del mes
-  return {desde:`${anio}-${mm}-01`,hasta:`${anio}-${mm}-${String(ultimo).padStart(2,'0')}`};
+  return {desde:acum?`${anio}-01-01`:`${anio}-${mm}-01`,hasta:`${anio}-${mm}-${String(ultimo).padStart(2,'0')}`};
 }
 
 export {dteVentasOpts, mesOpts, foliosMensuales, mesRango};

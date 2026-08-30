@@ -8,11 +8,11 @@
 // automáticos llevan al origen (Libro de Ventas/Compras/Honorarios) para
 // que se corrijan los documentos que los generaron.
 
-import {fmt, fmtC, MESES, pdcNm, today, toast, rutFmt, dteV, dteC, rutParse, DTE_VENTAS, DTE_COMPRAS, IVA} from './core.js';
+import {fmtC, MESES, pdcNm, today, toast, rutFmt, dteV, dteC, rutParse, DTE_VENTAS, DTE_COMPRAS} from './core.js';
 import {S} from './state.js';
 import {nav, rerender} from './ui.js';
 import {genDiario} from './reportes.js';
-import {editarAsiento, proxFolioAsiento, CUENTAS_AUX, esAux} from './asientos.js';
+import {editarAsiento, proxFolioAsiento, CUENTAS_AUX} from './asientos.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {logAccion} from './firebase.js';
 
@@ -96,7 +96,10 @@ function renderComprobantesBody(){
       return em===m;
     });
   }
-  if(CMP_FILTRO.origen){
+  // OJO: 'descuadrados' NO es un origen ni una fuente — es una condición sobre
+  // los montos y se aplica más abajo. Si entra aquí, el filtro por fuente lo
+  // vacía todo (ningún asiento tiene fuente:'descuadrados').
+  if(CMP_FILTRO.origen&&CMP_FILTRO.origen!=='descuadrados'){
     entries=entries.filter(e=>{
       if(CMP_FILTRO.origen==='apertura')return e.origen==='apertura';
       if(CMP_FILTRO.origen==='manual')return e.origen==='manual';
@@ -197,10 +200,11 @@ function renderComprobantesBody(){
     const o=origenLbl(e);
     const totED=e.movs.reduce((s,m)=>s+(m.debe||0),0);
     const totEH=e.movs.reduce((s,m)=>s+(m.haber||0),0);
-    const detId='cmp-det-'+i;
-    const anulado=e.anulado?' opacity:.5;text-decoration:line-through;':'';
     const descuadrado=Math.abs(totED-totEH)>1;
-    const estiloFila=(anulado||descuadrado)?` style="${anulado}${descuadrado?'background:rgba(248,81,73,.05);':''}"`:'';
+    // Un ÚNICO atributo style: antes se emitían dos (`<tr style=".." style="..">`)
+    // y el navegador se quedaba con el primero, perdiendo el cursor:pointer.
+    // Los anulados no llegan hasta aquí: genDiario ya los excluye.
+    const estiloFila=(descuadrado?'background:rgba(248,81,73,.05);':'')+'cursor:pointer';
     const estiloTotal=descuadrado?'color:var(--err);font-weight:700':'font-family:var(--mono)';
     const badgeDescuadre=descuadrado
       ?` <span style="background:rgba(248,81,73,.15);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">⚠ DESCUADRE ${fmtC(Math.abs(totED-totEH))}</span>`
@@ -226,7 +230,7 @@ function renderComprobantesBody(){
 
     // Toda la fila abre el modal de vista/edición del comprobante
     // (el índice del array `entries` va como referencia)
-    h+=`<tr${estiloFila} style="${estiloFila?estiloFila.slice(8,-1)+';':''}cursor:pointer" onclick="abrirCmpModal(${i})">
+    h+=`<tr style="${estiloFila}" onclick="abrirCmpModal(${i})">
       <td class="tl" style="font-family:var(--mono);font-weight:600">${e.n}</td>
       <td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td>
       <td class="tl">
@@ -268,18 +272,20 @@ function cmpNumeroBuscar(q){
   if(!box)return;
   const qs=String(q||'').trim();
   if(!qs){
-    // sin query: limpiar filtro y ocultar lista
+    // Sin query: limpiar el filtro y ocultar la lista. Se re-renderiza SOLO el
+    // cuerpo, nunca la barra: repintarla destruiría este mismo input y el
+    // usuario perdería el foco justo mientras borra (crítico en móvil).
+    renderCmpNumeroList([]);
     if(CMP_FILTRO.numero){
       CMP_FILTRO.numero='';
-      renderComprobantes();
-    }else{
-      renderCmpNumeroList([]);
+      renderComprobantesBody();
     }
     return;
   }
-  // Obtener el universo actual de comprobantes del año
-  const todos=(CMP_ENTRIES&&CMP_ENTRIES.length)?CMP_ENTRIES:genDiario();
-  const filtrados=todos.filter(e=>String(e.n||'').startsWith(qs)).slice(0,15);
+  // Universo COMPLETO de comprobantes del año: sin filtro activo, CMP_ENTRIES
+  // solo cachea los 5 más recientes, así que buscar ahí dejaba fuera todo lo
+  // anterior y el desplegable salía vacío.
+  const filtrados=genDiario().filter(e=>String(e.n||'').startsWith(qs)).slice(0,15);
   renderCmpNumeroList(filtrados);
 }
 
@@ -336,12 +342,6 @@ function limpiarCmpFiltro(){
   CMP_FILTRO={mes:'',origen:'',texto:'',numero:''};
   renderCmpNumeroList([]);
   renderComprobantes();
-}
-
-function toggleCmpDet(id){
-  const t=document.getElementById(id);
-  if(!t)return;
-  t.style.display=t.style.display==='none'?'':'none';
 }
 
 // Editar asiento manual desde Comprobantes: navega a Asientos y abre el editor.
@@ -529,16 +529,6 @@ function eliminarComprobante(){
     }
     logAccion('Eliminó documento',`${libro} — N°${d.numero} ${d.razonSocial||''}`);
     cerrarCmpModal();rerender();toast('🗑 Documento eliminado — el comprobante ya no se genera');
-    return;
-  }
-
-  // ── Honorarios: resumen mensual, sin documento único ──
-  if(e.fuente==='honorarios'){
-    if(confirm(
-      `Este comprobante resume TODAS las boletas de honorarios del mes,\n`+
-      `así que no hay un documento único que eliminar.\n\n`+
-      `¿Quieres ir al libro de Honorarios para borrar las boletas que\n`+
-      `correspondan?`)){cerrarCmpModal();nav('honorarios');}
     return;
   }
 
@@ -1098,7 +1088,7 @@ function guardarCmpEdDte(){
 }
 
 export {abrirComprobantePor,
-        setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
+        setCmpFiltro, limpiarCmpFiltro, editarAsientoDesdeCmp, corregirCmp,
         cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         eliminarComprobante, anularComprobante,

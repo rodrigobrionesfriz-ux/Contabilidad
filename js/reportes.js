@@ -1,6 +1,6 @@
 // reportes.js — Libro Diario, Mayor, Balance, Resultados (núcleo de reportes)
 // genDiario y buildMayor son la base de casi todos los cálculos.
-import {toast, fmtC, fmt, pn, today, MESES, MC, IVA, pdcNm, PDC, CUENTAS_SEL, dteV, dteC} from './core.js';
+import {toast, fmtC, fmt, MESES, IVA, pdcNm, dteV, dteC} from './core.js';
 import {nav} from './ui.js';
 import {retencionHonorarios} from './indicadores.js';
 import {toggleAgingDetalle} from './auxiliares.js';
@@ -572,7 +572,7 @@ function cuentasMayorFiltradas(M){
 
 // Construye el Mayor de OTRO año leyendo su storage, sin alterar el estado actual.
 // Reutiliza genDiario/buildMayor haciendo swap temporal de las colecciones de S.
-async function buildMayorAnio(y){
+async function buildMayorAnio(y,desde,hasta){
   const bak={ventas:S.ventas,compras:S.compras,honorarios:S.honorarios,asientos:S.asientos,apertura:S.apertura,anio:S.empresa.anio};
   const tmp={ventas:[],compras:[],honorarios:[],asientos:[],apertura:null};
   for(const[k,d] of [['ventas-'+y,'ventas'],['compras-'+y,'compras'],['honorarios-'+y,'honorarios'],['asientos-'+y,'asientos']]){
@@ -582,22 +582,41 @@ async function buildMayorAnio(y){
   // Swap
   S.ventas=tmp.ventas;S.compras=tmp.compras;S.honorarios=tmp.honorarios;S.asientos=tmp.asientos;S.apertura=tmp.apertura;S.empresa.anio=y;
   let M;
-  try{M=buildMayor();}finally{
+  try{M=buildMayor(desde,hasta);}finally{
     // Restaurar SIEMPRE
     S.ventas=bak.ventas;S.compras=bak.compras;S.honorarios=bak.honorarios;S.asientos=bak.asientos;S.apertura=bak.apertura;S.empresa.anio=bak.anio;
   }
   return M;
 }
-// Totales agregados de un Mayor (para comparativo)
-function totalesDeMayor(M){
-  const keys=Object.keys(M);
-  const get=cd=>{const a=M[cd];return a?Math.abs(a.saldo):0;};
+// Traduce un filtro de periodo {mes,acum} al rango desde/hasta que espera
+// buildMayor. `anio` permite calcular el mismo tramo sobre otro ejercicio
+// (lo usa el comparativo). soloMes indica que hay que mirar el MOVIMIENTO del
+// periodo (debe−haber) en vez del saldo acumulado de la cuenta.
+function rangoDeFiltro(f,anio){
+  if(!f||!f.mes)return {desde:undefined,hasta:undefined,soloMes:false};
+  const m=+f.mes;
+  const y=anio||S.empresa.anio||new Date().getFullYear();
+  const mm=String(m).padStart(2,'0');
+  const ultimo=new Date(y,m,0).getDate();
+  const finMes=`${y}-${mm}-${String(ultimo).padStart(2,'0')}`;
   return {
-    ingresos:sumaPres(M,keys.filter(k=>k.startsWith('4'))),
-    costos:keys.filter(k=>k.startsWith('3')).reduce((s,k)=>s+M[k].saldo,0),
-    activos:keys.filter(k=>k.startsWith('1')).reduce((s,k)=>s+M[k].saldo,0),
-    pasivos:sumaPres(M,keys.filter(k=>k.startsWith('2')&&!k.startsWith('23'))),
-    capital:sumaPres(M,keys.filter(k=>k.startsWith('23'))),
+    desde:f.acum?undefined:`${y}-${mm}-01`,
+    hasta:finMes,
+    soloMes:!f.acum,
+  };
+}
+// Totales agregados de un Mayor (para comparativo). Con soloMes se usa el
+// movimiento del periodo en vez del saldo, igual que hacen Balance y EERR.
+function totalesDeMayor(M,soloMes){
+  const keys=Object.keys(M);
+  const val=k=>soloMes?(M[k].debe-M[k].haber):M[k].saldo;
+  const suma=ks=>ks.reduce((s,k)=>s+saldoPres(k,val(k)),0);
+  return {
+    ingresos:suma(keys.filter(k=>k.startsWith('4'))),
+    costos:keys.filter(k=>k.startsWith('3')).reduce((s,k)=>s+val(k),0),
+    activos:keys.filter(k=>k.startsWith('1')).reduce((s,k)=>s+val(k),0),
+    pasivos:suma(keys.filter(k=>k.startsWith('2')&&!k.startsWith('23'))),
+    capital:suma(keys.filter(k=>k.startsWith('23'))),
   };
 }
 // Estado del comparativo (año seleccionado para comparar). null = sin comparar.
@@ -615,7 +634,10 @@ function fmtVar(actual,anterior){
 }
 function renderMayor(){
   const el=document.getElementById('mayor-content');
-  if(!Object.keys(buildMayor()).length){el.innerHTML=`<div class="empty"><div class="ei">📊</div>No hay movimientos.</div>`;return;}
+  // El chequeo de "sin movimientos" se hace sobre el diario, que es lo que
+  // buildMayor recorre por dentro: así evitamos construir el mayor completo dos
+  // veces (renderMayorTabla lo vuelve a construir con el periodo aplicado).
+  if(!genDiario().length){el.innerHTML=`<div class="empty"><div class="ei">📊</div>No hay movimientos.</div>`;return;}
   // Barra de filtros fija; solo se re-renderiza el contenido al filtrar.
   el.innerHTML=`<div class="filter-row" style="margin-bottom:12px">
     <span class="f-lbl">Periodo:</span>
@@ -663,17 +685,22 @@ function renderMayorTabla(){
   </div>`;
   keys.forEach(cd=>{
     const a=M[cd];
+    // Signo de presentación (misma regla que Balance/EERR): las cuentas de
+    // naturaleza acreedora se invierten. Antes iba con Math.abs, así que un
+    // saldo contrario a la naturaleza de la cuenta —un banco sobregirado, un
+    // proveedor sobrepagado— se veía positivo y no se distinguía del normal.
+    const pres=v=>saldoPres(cd,v);
     const filaAnt=hayPeriodo
-      ? `<tr style="background:var(--sf2)"><td class="tl" style="font-family:var(--mono);font-size:10px">—</td><td class="cel-trunc" style="font-style:italic;color:var(--mt)">Saldo anterior al ${MAY_F.desde||'inicio'}</td><td>–</td><td>–</td><td style="font-weight:600">${fmtC(Math.abs(a.saldoAnterior))}</td></tr>`
+      ? `<tr style="background:var(--sf2)"><td class="tl" style="font-family:var(--mono);font-size:10px">—</td><td class="cel-trunc" style="font-style:italic;color:var(--mt)">Saldo anterior al ${MAY_F.desde||'inicio'}</td><td>–</td><td>–</td><td style="font-weight:600">${fmtC(pres(a.saldoAnterior))}</td></tr>`
       : '';
     h+=`<div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div><span style="font-family:var(--mono);font-size:11px;color:var(--mt)">${cd}</span><span style="font-size:14px;font-weight:700;margin-left:10px">${a.nm}</span></div>
         <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-          ${hayPeriodo?`<span style="font-size:11px;color:var(--mt)">Ant: ${fmtC(a.saldoAnterior)}</span>`:''}
+          ${hayPeriodo?`<span style="font-size:11px;color:var(--mt)">Ant: ${fmtC(pres(a.saldoAnterior))}</span>`:''}
           <span style="font-size:11px;color:var(--mt)">D: ${fmtC(a.debe)}</span>
           <span style="font-size:11px;color:var(--mt)">H: ${fmtC(a.haber)}</span>
-          <span class="badge ${a.saldo>=0?'bg':'br'}">Saldo: ${fmtC(Math.abs(a.saldo))}</span>
+          <span class="badge ${pres(a.saldo)>=0?'bg':'br'}">Saldo: ${fmtC(pres(a.saldo))}</span>
         </div>
       </div>
       <div class="tw"><table class="tbl-fija" style="font-size:11px">
@@ -683,7 +710,7 @@ function renderMayorTabla(){
         ${a.movs.map(m=>{
           const extra=descAporta(m.glosa,m.desc)?` — ${m.desc}`:'';
           const txt=(m.glosa||'')+extra;
-          return `<tr><td class="tl" style="font-family:var(--mono);font-size:10px">${m.fecha}</td><td class="cel-trunc" title="${attr(txt)}">${m.glosa||''}${extra?`<span style="color:var(--mt)">${extra}</span>`:''}</td><td>${m.debe?fmtC(m.debe):'–'}</td><td>${m.haber?fmtC(m.haber):'–'}</td><td style="font-weight:600">${fmtC(Math.abs(m.saldo))}</td></tr>`;
+          return `<tr><td class="tl" style="font-family:var(--mono);font-size:10px">${m.fecha}</td><td class="cel-trunc" title="${attr(txt)}">${m.glosa||''}${extra?`<span style="color:var(--mt)">${extra}</span>`:''}</td><td>${m.debe?fmtC(m.debe):'–'}</td><td>${m.haber?fmtC(m.haber):'–'}</td><td style="font-weight:600">${fmtC(pres(m.saldo))}</td></tr>`;
         }).join('')
           ||`<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:10px">Sin movimientos en el periodo</td></tr>`}
         </tbody>
@@ -799,10 +826,10 @@ async function renderBalance(){
   // Sin mes elegido: el balance de siempre (ejercicio completo, a hoy).
   // Con mes elegido y Acumulado activo: saldo al último día de ese mes (lo normal en un Balance).
   // Con mes elegido y Acumulado desactivado: solo el movimiento (debe−haber) de ese mes puntual.
-  const hasta=BAL_F.mes?mesRango(+BAL_F.mes,true).hasta:undefined;
-  const desde=BAL_F.mes&&!BAL_F.acum?mesRango(+BAL_F.mes,false).desde:undefined;
+  // Mismo helper que usa el comparativo, para que las dos columnas no se
+  // calculen nunca con criterios distintos.
+  const {desde,hasta,soloMes}=rangoDeFiltro(BAL_F);
   const M=buildMayor(desde,hasta);
-  const soloMes=!!(BAL_F.mes&&!BAL_F.acum);
   const valor=a=>soloMes?(a.debe-a.haber):a.saldo;
 
   const filtro=`<div class="filter-row" style="margin-bottom:14px">
@@ -893,7 +920,7 @@ async function renderBalance(){
     </div>`:''}
   </div>`;
   poblarCmpSelect('cmp-year-bal');
-  if(CMP_YEAR)await renderComparativo('balance-content','balance');
+  if(CMP_YEAR)await renderComparativo('balance-content','balance',BAL_F);
 }
 
 // Poblar selector de años a comparar (todos menos el actual)
@@ -914,13 +941,20 @@ async function onCmpYear(v){
   else if(activa==='s-resultados')await renderResultados();
 }
 // Panel comparativo Actual vs Anterior con variación %
-async function renderComparativo(targetId,tipo){
+// `f` es el filtro de periodo de la sección (BAL_F / RES_F). El comparativo
+// debe mirar el MISMO tramo en los dos años: antes la columna del año actual
+// se calculaba con buildMayor() sin argumentos y salía el ejercicio completo
+// aunque el Balance estuviera filtrado a un mes.
+async function renderComparativo(targetId,tipo,f){
   const cont=document.getElementById(targetId);if(!cont)return;
   const actual=S.empresa.anio;
-  const Mact=buildMayor();
+  const {desde,hasta,soloMes}=rangoDeFiltro(f);
+  const Mact=buildMayor(desde,hasta);
   let Mant;
-  try{Mant=await buildMayorAnio(CMP_YEAR);}catch(e){Mant={};}
-  const tA=totalesDeMayor(Mact),tB=totalesDeMayor(Mant);
+  // Mismo mes/rango pero sobre el año comparado
+  const rAnt=rangoDeFiltro(f,CMP_YEAR);
+  try{Mant=await buildMayorAnio(CMP_YEAR,rAnt.desde,rAnt.hasta);}catch(e){Mant={};}
+  const tA=totalesDeMayor(Mact,soloMes),tB=totalesDeMayor(Mant,soloMes);
   const resA=tA.ingresos-tA.costos,resB=tB.ingresos-tB.costos;
   // Filas según tipo de reporte
   let filas;
@@ -948,7 +982,7 @@ async function renderComparativo(targetId,tipo){
     </tr>`;
   }).join('');
   const panel=`<div class="card" style="margin-bottom:16px;border-color:var(--info)">
-    <div style="font-size:13px;font-weight:700;margin-bottom:10px">📊 Comparativo ${actual} vs ${CMP_YEAR}</div>
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px">📊 Comparativo ${actual} vs ${CMP_YEAR}${f&&f.mes?` · ${f.acum?'acumulado a ':''}${MESES[+f.mes-1]}`:' · ejercicio completo'}</div>
     <table style="font-size:12px"><thead><tr>
       <th class="tl">CONCEPTO</th><th style="text-align:right">${actual}</th><th style="text-align:right">${CMP_YEAR}</th><th style="text-align:right">VAR. %</th>
     </tr></thead><tbody>${rows}</tbody></table>
@@ -966,10 +1000,8 @@ function limpiarFiltrosResultados(){RES_F={mes:'',acum:true};renderResultados();
 async function renderResultados(){
   // Sin mes: el ejercicio completo (como antes). Con mes + Acumulado: desde
   // enero hasta ese mes. Con mes sin Acumulado: solo el movimiento de ese mes.
-  const hasta=RES_F.mes?mesRango(+RES_F.mes,true).hasta:undefined;
-  const desde=RES_F.mes&&!RES_F.acum?mesRango(+RES_F.mes,false).desde:undefined;
+  const {desde,hasta,soloMes}=rangoDeFiltro(RES_F);
   const M=buildMayor(desde,hasta);
-  const soloMes=!!(RES_F.mes&&!RES_F.acum);
   // Acumulado (o sin filtro): usa el saldo de la cuenta. Solo el mes: usa el
   // movimiento (debe−haber) restringido a ese periodo.
   const valorCta=a=>soloMes?(a.debe-a.haber):a.saldo;
@@ -1073,7 +1105,7 @@ async function renderResultados(){
     </div>
   </div>`;
   poblarCmpSelect('cmp-year-res');
-  if(CMP_YEAR)await renderComparativo('resultados-content','resultados');
+  if(CMP_YEAR)await renderComparativo('resultados-content','resultados',RES_F);
 }
 
 

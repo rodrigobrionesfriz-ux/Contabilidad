@@ -112,7 +112,7 @@ import {genDiario, renderDiario, setDiarioQ, buildMayor, renderMayor, renderBala
         onMayorMes, onMayorAcum, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla,
         exportarMayorExcel, onBalanceMes, onBalanceAcum, limpiarFiltrosBalance,
         onResultadosMes, onResultadosAcum, limpiarFiltrosResultados} from './reportes.js';
-import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
+import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         eliminarComprobante, anularComprobante,
         setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
@@ -130,6 +130,7 @@ import {renderF29, renderPPM, IVAC, renderCompensacionIVA, generarAsientoIVA,
 import {renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
         addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,
         resetRenta} from './renta.js';
+import {renderXmlSii, generarXmlSii} from './xmlsii.js';
 import {setFCView, renderFlujoCaja} from './flujocaja.js';
 import {renderConciliacion, onSaldoBancoChange, toggleConciliado,
         marcarTodosConciliados, cargarCartola, autoConciliarCartola} from './conciliacion.js';
@@ -419,6 +420,7 @@ function renderSec(s){
   else if(s==='inicio')renderInicio();
   else if(s==='ppm')renderPPM();
   else if(s==='renta')renderRenta();
+  else if(s==='xmlsii')renderXmlSii();
   else if(s==='activofijo')renderActivoFijo();
   else if(s==='provisiones')renderProvisiones();
   else if(s==='correccion')renderCorreccion();
@@ -515,7 +517,7 @@ Object.assign(window,{
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, cambiarFPVSel,
   abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
-  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
+  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
   abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
   eliminarComprobante, anularComprobante,
   setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
@@ -585,6 +587,8 @@ Object.assign(window,{
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   // declaración de renta (F22)
   renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
+  // exportación XML SII (IECV)
+  renderXmlSii, generarXmlSii,
   onRegimenEmpresaChange, pintarRegimen, onRegimenChange, aplicarPermisosUI,
   toggleAyuda, actualizarAyuda, renderInicio, abrirEmpresaInicio,
   addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,

@@ -67,14 +67,16 @@ function construirWorkbookBD(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(meta),'Empresa');
 
   // VENTAS
-  const ventasHdr=['id','fecha','fechaVencimiento','tipoDTE','numero','rutCodigo','rutDV','razonSocial','neto','exento','iva','otrosImpuestos','total','formaPago'];
+  // 'periodo' = mes tributario del libro, distinto de la fecha cuando el
+  // documento se arrastró por falta de acuse de recibo.
+  const ventasHdr=['id','fecha','periodo','fechaVencimiento','tipoDTE','numero','rutCodigo','rutDV','razonSocial','neto','exento','iva','otrosImpuestos','total','formaPago'];
   const ventasRows=S.ventas.map(v=>ventasHdr.map(k=>v[k]!==undefined?v[k]:''));
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([ventasHdr,...ventasRows]),'Ventas');
 
   // COMPRAS (con distribución serializada como JSON)
-  const comprasHdr=['id','fecha','fechaVencimiento','tipoDTE','numero','rutCodigo','rutDV','razonSocial','neto','exento','iva','otrosImpuestos','total','distJSON'];
+  const comprasHdr=['id','fecha','periodo','fechaVencimiento','tipoDTE','numero','rutCodigo','rutDV','razonSocial','neto','exento','iva','otrosImpuestos','total','distJSON'];
   const comprasRows=S.compras.map(c=>[
-    c.id,c.fecha,c.fechaVencimiento||'',c.tipoDTE,c.numero,c.rutCodigo,c.rutDV,c.razonSocial,
+    c.id,c.fecha,c.periodo||'',c.fechaVencimiento||'',c.tipoDTE,c.numero,c.rutCodigo,c.rutDV,c.razonSocial,
     c.neto||0,c.exento||0,c.iva||0,c.otrosImpuestos||0,c.total||0,JSON.stringify(c.dist||[])
   ]);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([comprasHdr,...comprasRows]),'Compras');
@@ -346,7 +348,7 @@ async function importarExcelBD(file){
     // Restaurar estructuras
     S.ventas=vRows.map(r=>({
       id:r.id||'v_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
-      fecha:r.fecha||'',fechaVencimiento:r.fechaVencimiento||'',
+      fecha:r.fecha||'',periodo:r.periodo||'',fechaVencimiento:r.fechaVencimiento||'',
       tipoDTE:+r.tipoDTE||0,numero:String(r.numero||'').trim(),
       rutCodigo:String(r.rutCodigo||''),rutDV:String(r.rutDV||''),
       razonSocial:r.razonSocial||'',
@@ -359,7 +361,7 @@ async function importarExcelBD(file){
       if(!Array.isArray(dist)||!dist.length)dist=[{cuenta:'',monto:+r.neto||0}];
       return {
         id:r.id||'c_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
-        fecha:r.fecha||'',fechaVencimiento:r.fechaVencimiento||'',
+        fecha:r.fecha||'',periodo:r.periodo||'',fechaVencimiento:r.fechaVencimiento||'',
         tipoDTE:+r.tipoDTE||0,numero:String(r.numero||'').trim(),
         rutCodigo:String(r.rutCodigo||''),rutDV:String(r.rutDV||''),
         razonSocial:r.razonSocial||'',

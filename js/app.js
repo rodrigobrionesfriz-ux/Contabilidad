@@ -55,6 +55,8 @@ import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 import {renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
         initCargaDatosListener, CD} from './cargadatos.js';
 import {renderSistema} from './sistema.js';
+import {initChangelogBadge, abrirChangelog, cerrarChangelog, renderChangelog,
+        bloqueChangelog, pintarPuntoNovedades} from './changelog-ui.js';
 import {DISPOSITIVO, renombrarDispositivo} from './dispositivo.js';
 import {diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos} from './seguridad.js';
 import {initAyuda, toggleAyuda, actualizarAyuda, ayudaAlNavegar} from './ayuda.js';
@@ -138,7 +140,7 @@ import {abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda,
         irAResultado} from './busqueda.js';
 import {prepararImpresion} from './impresion.js';
 import {exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud,
-        importarExcelBD, initBDImportListener, bdRestaurarHandle, BD} from './backup.js';
+        importarExcelBD, initBDImportListener, bdRestaurarHandle, bdStatusSet, BD} from './backup.js';
 
 // ═══ STORAGE ═══
 // Guarda todo el estado en curso. `silencioso` lo usa el autoguardado para no
@@ -274,6 +276,9 @@ async function loadYear(y){
 }
 async function changeYear(y){S.empresa.anio=y;await loadYear(y);rerender();}
 async function init(){
+  // El badge de versión se rellena desde changelog.js (fuente única) y queda
+  // clicable. Va primero porque no depende de sesión ni de nube.
+  initChangelogBadge();
   // Inicializar Firestore primero (necesario para verificar usuario)
   await initFirestore();
   // Inicializar Auth — mostrará el login si no hay sesión
@@ -586,6 +591,8 @@ Object.assign(window,{
   renderReporteAux, imprimirReporteAux, exportarReporteAuxExcel,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   // declaración de renta (F22)
+  // historial de versiones
+  abrirChangelog, cerrarChangelog, renderChangelog, bloqueChangelog,
   renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
   // exportación XML SII (IECV)
   renderXmlSii, generarXmlSii,

@@ -6,7 +6,7 @@ import {fichaAux, fichasAux, guardarFichasAux} from './importadoraux.js';
 import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
-import {mesRango, mesOpts, dteVentasOpts, foliosMensuales} from './helpers.js';
+import {mesRango, mesOpts, dteVentasOpts, foliosMensuales, periodoDoc} from './helpers.js';
 import {todosDocsVentas, abrirAsientoDesde, proxFolioComprobante} from './asientos.js';
 import './storage.js';
 
@@ -17,10 +17,11 @@ let IMV={docs:[]}; // estado del importador SII de ventas
 // ═══ VENTAS — Documentos individuales ═══
 // Computa folio correlativo por mes: retorna {[docId]: folioNumero}
 // Al elegir un mes en el select, auto-poblar desde/hasta con primer y último día
+// El selector de mes filtra por PERIODO TRIBUTARIO (el libro al que pertenece
+// el documento), no por la fecha. Ya no rellena desde/hasta: esos dos quedan
+// como filtro independiente sobre la fecha real, que es otra pregunta
+// ("qué se emitió en tal rango" vs "qué se declaró en tal mes").
 function onMesChangeV(){
-  const m=+(document.getElementById('vf-mes')?.value||0);
-  if(m){const r=mesRango(m);document.getElementById('vf-desde').value=r.desde;document.getElementById('vf-hasta').value=r.hasta;}
-  else{document.getElementById('vf-desde').value='';document.getElementById('vf-hasta').value='';}
   renderVentas();
 }
 function limpiarFiltrosV(){
@@ -85,6 +86,7 @@ function renderVentas(){
   const selDteFlt=document.getElementById('vf-dte-flt');
   if(selDteFlt&&selDteFlt.options.length<=1)selDteFlt.innerHTML='<option value="">Todos los DTE</option>'+DTE_VENTAS.map(d=>`<option value="${d.cod}">${d.cod} — ${d.nm}</option>`).join('');
 
+  const fMes=+(document.getElementById('vf-mes')?.value||0);
   const fDesde=(document.getElementById('vf-desde')?.value||'');
   const fHasta=(document.getElementById('vf-hasta')?.value||'');
   const fDte=+(document.getElementById('vf-dte-flt')?.value||0);
@@ -93,6 +95,7 @@ function renderVentas(){
   const docs=[...todos].sort((a,b)=>a.fecha.localeCompare(b.fecha)||(a.numero||'').localeCompare(b.numero||''));
   const folios=foliosMensuales(todos);
   const fDocs=docs.filter(d=>{
+    if(fMes&&+periodoDoc(d).slice(5,7)!==fMes)return false;
     if(fDesde&&d.fecha<fDesde)return false;
     if(fHasta&&d.fecha>fHasta)return false;
     if(fDte&&+d.tipoDTE!==fDte)return false;
@@ -104,7 +107,7 @@ function renderVentas(){
 
   // Sin ningún filtro activo no cargamos las filas. El usuario debe aplicar un
   // filtro de búsqueda para ver documentos.
-  const hayFiltroV=!!(fDesde||fHasta||fDte||fQ);
+  const hayFiltroV=!!(fMes||fDesde||fHasta||fDte||fQ);
   const tb=document.getElementById('v-tbody');
   const tf=document.getElementById('v-tfoot');
   if(!hayFiltroV){
@@ -147,7 +150,9 @@ function renderVentas(){
       tN+=(d.neto||0)*signo;tE+=(d.exento||0)*signo;tI+=(d.iva||0)*signo;tO+=(d.otrosImpuestos||0)*signo;tT+=(d.total||0)*signo;
       const dte=dteV(d.tipoDTE);
       const fpMap={banco:'💵 Banco',clientes:'📇 Cliente',deudores:'📋 Deudor'};
-      const mesSl=(d.fecha||'').slice(5,7);
+      // Mes del PERIODO, no de la fecha: el correlativo va por libro, así que un
+      // documento de agosto arrastrado a septiembre es el 09-00N de ese libro.
+      const mesSl=periodoDoc(d).slice(5,7);
       const folioNum=folios[d.id]||'';
       const esManual=d.origen==='asiento';
       const rowStyle=esManual?' style="background:rgba(88,166,255,.04)"':'';
@@ -281,7 +286,7 @@ function vfCheckDup(){
   if(dup){
     const folios=foliosMensuales(S.ventas);
     const f=folios[dup.id]||'?';
-    const mesSl=dup.fecha.slice(5,7);
+    const mesSl=periodoDoc(dup).slice(5,7);
     warn.className='doc-dup-warn';warn.style.display='';
     warn.innerHTML=`⚠️ <span>DOCUMENTO DUPLICADO</span><span style="font-weight:400;margin-left:auto;font-size:11px">Ya existe: Folio ${mesSl}-${String(f).padStart(3,'0')} · ${dup.fecha} · ${rutFmt(dup.rutCodigo,dup.rutDV)} · DTE ${dup.tipoDTE} N°${dup.numero} · ${fmtC(dup.total)}</span>`;
   }else{warn.style.display='none';}
@@ -340,7 +345,7 @@ function guardarVenta(){
   if(dup){
     const folios=foliosMensuales(S.ventas);
     const f=folios[dup.id]||'?';
-    const mesSl=dup.fecha.slice(5,7);
+    const mesSl=periodoDoc(dup).slice(5,7);
     toast(`⚠️ Documento duplicado — ya existe Folio ${mesSl}-${String(f).padStart(3,'0')} (${dup.fecha}, ${fmtC(dup.total)})`,'e');
     return;
   }
@@ -477,14 +482,14 @@ function aplicarCuentaATodosV(){
 }
 
 function renderImportModalVentas(){
-  const forzar=document.getElementById('impv-forzar-periodo').checked;
   const box=document.getElementById('impv-rows');
-
+  const periodoSel=`${IMV.periodoAnio}-${String(IMV.periodoMes).padStart(2,'0')}`;
 
   const filas=IMV.docs.map((d,i)=>{
-    const fechaMostrar=forzar
-      ? `${IMV.periodoAnio}-${String(IMV.periodoMes).padStart(2,'0')}-${d.fechaOriginal?d.fechaOriginal.slice(8,10):String(d.fecha).slice(8,10)}`
-      : d.fecha;
+    // Se muestra siempre la fecha real. Si es de otro mes que el periodo, se
+    // marca: es lo normal en documentos arrastrados, no un error.
+    const fechaMostrar=d.fecha;
+    const arrastrado=String(d.fecha).slice(0,7)!==periodoSel;
     const estado=d.dup
       ? '<span style="color:var(--warn);font-size:10px">⚠️ duplicado</span>'
       : (d.incluir?'<span style="color:var(--ach);font-size:10px">✓ nuevo</span>':'<span style="color:var(--mt);font-size:10px">omitido</span>');
@@ -498,7 +503,9 @@ function renderImportModalVentas(){
     </select>`;
     return `<div class="imp-row" style="display:grid;grid-template-columns:26px 90px 60px 80px 120px 1fr 90px 80px 80px 100px 180px 110px 80px;gap:6px;padding:6px 8px;border-bottom:1px solid var(--bd);font-size:11px;align-items:center">
       <div style="text-align:center">${d.dup?'':`<input type="checkbox" ${d.incluir?'checked':''} onchange="IMV.docs[${i}].incluir=this.checked;renderImportModalVentas()">`}</div>
-      <div>${fechaMostrar}</div>
+      <div>${arrastrado
+        ? `<span style="color:var(--info)" title="Fecha de otro mes: se declara en ${periodoSel} por arrastre">${fechaMostrar} ↩</span>`
+        : fechaMostrar}</div>
       <div>${d.tipoDTE}</div>
       <div>${d.numero}</div>
       <div>${rutFmt(d.rutCodigo,d.rutDV)}</div>
@@ -524,7 +531,11 @@ function renderImportModalVentas(){
     summary.innerHTML=`📄 <strong>${IMV.docs.length}</strong> documentos detectados en <em>${IMV.archivo||''}</em> · <strong>${nuevos}</strong> nuevos · <strong>${IMV.docs.length-nuevos}</strong> duplicados${IMV.descartados?' · '+IMV.descartados+' descartados':''}`;
   }
   const info=document.getElementById('impv-periodo-info');
-  if(info)info.textContent=`${incluidos} para importar · ${conCuenta} con cuenta asignada`;
+  if(info){
+    const arr=IMV.docs.filter(d=>d.incluir&&String(d.fecha).slice(0,7)!==periodoSel).length;
+    info.innerHTML=`${incluidos} para importar · ${conCuenta} con cuenta asignada`
+      +(arr?`<br><span style="color:var(--info)">↩ ${arr} documento${arr===1?'':'s'} con fecha de otro mes: conservan su fecha y se declaran en ${periodoSel}</span>`:'');
+  }
   const cnt=document.getElementById('impv-count');
   if(cnt)cnt.textContent=`${incluidos} seleccionados`;
 }
@@ -537,8 +548,10 @@ function confirmarImportacionV(){
     if(!confirm(`⚠️ Hay ${sinCuenta.length} documentos sin cuenta de ingreso asignada.\n\nSe importarán igual pero deberás asignarles cuenta después. ¿Continuar?`))return;
   }
 
-  const forzar=document.getElementById('impv-forzar-periodo').checked;
   const anio=IMV.periodoAnio, mes=String(IMV.periodoMes).padStart(2,'0');
+  // Periodo tributario del libro completo: todo lo que trae un RCV pertenece al
+  // mismo periodo, aunque algunos documentos lleven fecha del mes anterior.
+  const periodo=`${anio}-${mes}`;
 
   // Detectar clientes nuevos
   const rutsExistentes=new Set(todosDocsVentas().map(v=>v.rutCodigo));
@@ -563,15 +576,13 @@ function confirmarImportacionV(){
   // Reservar rango de folios de comprobante para las ventas.
   let folioNext=proxFolioComprobante();
   incluidos.forEach((d,i)=>{
-    let fecha=d.fecha;
-    if(forzar){
-      const dia=String(d.fecha).slice(8,10)||'01';
-      fecha=`${anio}-${mes}-${dia}`;
-    }
+    // La fecha del documento NO se toca: es la de emisión y de ella dependen el
+    // asiento, el vencimiento y el aging. El mes del libro va aparte, en
+    // `periodo`.
     S.ventas.push({
       id:'v_imp_'+Date.now()+'_'+i,
       folioComp:folioNext++,   // correlativo único de comprobante contable
-      fecha, tipoDTE:d.tipoDTE, numero:d.numero,
+      fecha:d.fecha, periodo, tipoDTE:d.tipoDTE, numero:d.numero,
       fechaVencimiento:'',
       rutCodigo:d.rutCodigo, rutDV:d.rutDV, razonSocial:d.razonSocial,
       neto:d.neto, exento:d.exento, iva:d.iva,

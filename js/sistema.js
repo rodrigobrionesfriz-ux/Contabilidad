@@ -14,6 +14,7 @@ import {TEMAS} from './tema.js';
 import {bloqueSeguridad} from './seguridad.js';
 import {AG, OPCIONES_INTERVALO, etiquetaIntervalo} from './autoguardado.js';
 import {DISPOSITIVO} from './dispositivo.js';
+import {bloqueChangelog} from './changelog-ui.js';
 
 // Lee el texto que los módulos de sincronización dejaron en los indicadores
 function estadoTexto(id,fallback){
@@ -44,6 +45,10 @@ function renderSistema(){
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px">
+
+      ${tarjeta('📜','Versión e historial',
+        'Qué versión está corriendo en este dispositivo y qué cambió en cada entrega.',
+        bloqueChangelog())}
 
       ${tarjeta('📡','Estado de sincronización',
         'Cómo está guardada tu información en este momento.',

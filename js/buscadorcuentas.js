@@ -25,30 +25,6 @@ function poblacionCuentas(filtro){
 const norm=s=>String(s||'').toLowerCase()
   .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
-// Las listas de sugerencias (.ac-lista) viven dentro de .lineas-scroll, que
-// tiene scroll propio (overflow-x:auto → por spec CSS eso también recorta el
-// overflow vertical). Con position:absolute, una sugerencia que aparece cerca
-// del borde inferior de esa caja queda tapada por lo que sigue más abajo
-// (el botón "+ Agregar línea"), aunque el z-index sea alto: el recorte lo
-// causa el overflow del contenedor, no el apilamiento de capas.
-// Solución: al mostrarlas, se posicionan con position:fixed usando las
-// coordenadas reales del input (getBoundingClientRect), así quedan fuera de
-// cualquier contenedor con scroll y se ven completas.
-function posicionarAC(inp,box){
-  const r=inp.getBoundingClientRect();
-  box.style.position='fixed';
-  box.style.left=r.left+'px';
-  box.style.top=(r.bottom+2)+'px';
-  box.style.width=Math.max(r.width,280)+'px';
-  box.style.right='auto';
-}
-// Si la página se desplaza (o el scroll interno de las líneas del asiento)
-// mientras una lista está abierta, las coordenadas quedan obsoletas: mejor
-// cerrarla que dejarla flotando en un lugar equivocado.
-document.addEventListener('scroll',()=>{
-  document.querySelectorAll('.ac-lista').forEach(b=>{if(b.style.display!=='none')b.style.display='none';});
-},true);
-
 // Busca cuentas por código o nombre. Todas las palabras deben aparecer.
 export function buscarCuentas(q,limite=40,filtro=null){
   const t=norm(q).trim();
@@ -96,7 +72,6 @@ export function acBuscar(id){
   const q=inp.value===`${inp.dataset.cd} – ${pdcNm(inp.dataset.cd)}`?'':inp.value;
   AC_RES=buscarCuentas(q,40,filtro);
   AC_ACTIVO=id;AC_SEL=0;
-  posicionarAC(inp,box);
   if(!AC_RES.length){
     box.innerHTML='<div class="ac-item" style="color:var(--mt)">Sin coincidencias</div>';
     box.style.display='block';return;
@@ -234,7 +209,6 @@ export function ccAcBuscar(id){
   const q=inp.value===ccNombreCompleto(inp.dataset.cc)?'':inp.value;
   CC_RES=buscarCC(q);
   CC_ACTIVO=id; CC_SEL=0;
-  posicionarAC(inp,box);
   if(!CC_RES.length){
     box.innerHTML='<div class="ac-item" style="color:var(--mt)">Sin centros de costo definidos</div>';
     box.style.display='block';return;
@@ -345,7 +319,6 @@ export function axAcBuscar(id){
   const tipo=inp.dataset.tipo||'proveedor';
   AX_RES=buscarAux(tipo,inp.value);
   AX_SEL=0;
-  posicionarAC(inp,box);
   if(!AX_RES.length){
     box.innerHTML=`<div class="ac-item" style="color:var(--mt)">
       ${Object.keys(fichasDe(tipo)).length

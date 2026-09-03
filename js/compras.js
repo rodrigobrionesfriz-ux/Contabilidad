@@ -3,7 +3,7 @@ import {toast, fmt, pn, today, MESES, IVA, DTE_COMPRAS, dteC, rutParse, rutFmt, 
 import {rerender} from './ui.js';
 import {S} from './state.js';
 import {logAccion} from './firebase.js';
-import {mesOpts, mesRango, periodoDoc} from './helpers.js';
+import {mesOpts, mesRango} from './helpers.js';
 import {todosDocsCompras, abrirAsientoDesde, proxFolioComprobante} from './asientos.js';
 import {ccOpts} from './centroscosto.js';
 import {inputCuenta} from './buscadorcuentas.js';
@@ -47,7 +47,7 @@ function proxCorrMesCompra(fecha,excluirId=null){
 function migrarCorrelativosCompras(){
   const porMes={};
   S.compras.forEach(d=>{
-    const m=periodoDoc(d);if(!m)return;   // por PERIODO del libro, no por fecha
+    const m=(d.fecha||'').slice(0,7);if(!m)return;
     (porMes[m]||(porMes[m]=[])).push(d);
   });
   let cambios=false;
@@ -132,9 +132,10 @@ function renderCDupAlert(){
   </div>`;
 }
 
-// El mes filtra por PERIODO TRIBUTARIO (mes del libro). Desde/hasta siguen
-// filtrando por la fecha real de emisión, que es una pregunta distinta.
 function onMesChangeC(){
+  const m=+(document.getElementById('cf-mes')?.value||0);
+  if(m){const r=mesRango(m);document.getElementById('cf-desde').value=r.desde;document.getElementById('cf-hasta').value=r.hasta;}
+  else{document.getElementById('cf-desde').value='';document.getElementById('cf-hasta').value='';}
   renderCompras();
 }
 
@@ -196,7 +197,6 @@ function renderCompras(){
   // Aviso de documentos duplicados (se calcula sobre todo el libro, con o sin filtro)
   renderCDupAlert();
 
-  const fMes=+(document.getElementById('cf-mes')?.value||0);
   const fDesde=(document.getElementById('cf-desde')?.value||'');
   const fHasta=(document.getElementById('cf-hasta')?.value||'');
   const fDte=+(document.getElementById('cf-dte-flt')?.value||0);
@@ -207,12 +207,11 @@ function renderCompras(){
   // asientos manuales continúan la secuencia del mes (máximo del libro + N).
   const corr={};
   const maxMes={};
-  todos.forEach(d=>{if(d.origen==='libro'&&typeof d.corrMes==='number'){corr[d.id]=d.corrMes;const m=periodoDoc(d);if(!maxMes[m]||d.corrMes>maxMes[m])maxMes[m]=d.corrMes;}});
+  todos.forEach(d=>{if(d.origen==='libro'&&typeof d.corrMes==='number'){corr[d.id]=d.corrMes;const m=(d.fecha||'').slice(0,7);if(!maxMes[m]||d.corrMes>maxMes[m])maxMes[m]=d.corrMes;}});
   [...todos].filter(d=>d.origen!=='libro')
     .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.numero||'').localeCompare(b.numero||''))
-    .forEach(d=>{const m=periodoDoc(d);maxMes[m]=(maxMes[m]||0)+1;corr[d.id]=maxMes[m];});
+    .forEach(d=>{const m=(d.fecha||'').slice(0,7);maxMes[m]=(maxMes[m]||0)+1;corr[d.id]=maxMes[m];});
   const fDocs=docs.filter(d=>{
-    if(fMes&&+periodoDoc(d).slice(5,7)!==fMes)return false;
     if(fDesde&&d.fecha<fDesde)return false;
     if(fHasta&&d.fecha>fHasta)return false;
     if(fDte&&+d.tipoDTE!==fDte)return false;
@@ -224,7 +223,7 @@ function renderCompras(){
 
   // Sin ningún filtro activo no cargamos las filas (pueden ser cientos). El
   // usuario debe aplicar un filtro de búsqueda para ver documentos.
-  const hayFiltroC=!!(fMes||fDesde||fHasta||fDte||fQ);
+  const hayFiltroC=!!(fDesde||fHasta||fDte||fQ);
   const tb=document.getElementById('c-tbody');
   const tf=document.getElementById('c-tfoot');
   if(!hayFiltroC){
@@ -265,9 +264,7 @@ function renderCompras(){
       const signo=(dteC(d.tipoDTE)?.signo)||1;
       tN+=(d.neto||0)*signo;tE+=(d.exento||0)*signo;tI+=(d.iva||0)*signo;tO+=(d.otrosImpuestos||0)*signo;tT+=(d.total||0)*signo;
       const dte=dteC(d.tipoDTE);
-      // Mes del PERIODO, no de la fecha: el correlativo va por libro, así que un
-      // documento de agosto arrastrado a septiembre es el 09-00N de ese libro.
-      const mesSl=periodoDoc(d).slice(5,7);
+      const mesSl=(d.fecha||'').slice(5,7);
       const folioNum=corr[d.id]||'';
       const esManual=d.origen==='asiento';
       const rowStyle=esManual?' style="background:rgba(88,166,255,.04)"':'';
@@ -738,6 +735,18 @@ function cerrarImportModal(){
   IM.docs=[];  // limpiar in-place (no reasignar; ver nota en cargarArchivoSII)
 }
 
+// Devuelve la fecha efectiva que se guardará: si "forzar" está activo y el doc está fuera del
+// periodo, retornar el último día del mes del periodo; si no, usar la fecha original.
+function fechaEfectivaImport(d){
+  const forzar=document.getElementById('imp-forzar-periodo')?.checked;
+  const [yOrig,mOrig]=d.fechaOriginal.split('-');
+  const fueraPeriodo=(+yOrig!==IM.periodoAnio||+mOrig!==IM.periodoMes);
+  if(!forzar||!fueraPeriodo)return d.fechaOriginal;
+  // Forzar al último día del mes del periodo (para preservar orden cronológico al cierre)
+  const ultDia=new Date(IM.periodoAnio,IM.periodoMes,0).getDate();
+  return `${IM.periodoAnio}-${String(IM.periodoMes).padStart(2,'0')}-${String(ultDia).padStart(2,'0')}`;
+}
+
 function renderImportModal(){
   const total=IM.docs.length;
   const dups=IM.docs.filter(d=>d.dup).length;
@@ -750,7 +759,8 @@ function renderImportModal(){
     const [y,m]=d.fechaOriginal.split('-');
     return +y!==IM.periodoAnio||+m!==IM.periodoMes;
   }).length;
-  let periodoInfo=`Periodo tributario del libro: <strong>${periodoStr}</strong>`;
+  const forzar=document.getElementById('imp-forzar-periodo')?.checked;
+  let periodoInfo=`Periodo seleccionado: <strong>${periodoStr}</strong>`;
   if(IM.periodos&&IM.periodos.length>1){
     const detallado=IM.periodos.map(([p,c])=>{
       const [y,m]=p.split('-');
@@ -759,10 +769,7 @@ function renderImportModal(){
     periodoInfo+=`<br><span style="color:var(--mt);font-size:10px">Detectado en archivo: ${detallado}</span>`;
   }
   if(fuera>0){
-    // Documentos arrastrados: fecha del mes anterior que entran en este libro
-    // por no haberse dado acuse de recibo a tiempo. Es lo normal, no un error:
-    // conservan su fecha y se declaran en el periodo seleccionado.
-    periodoInfo+=`<br><span style="color:var(--info);font-size:11px;margin-top:2px;display:inline-block">↩ ${fuera} documento${fuera===1?'':'s'} con fecha de otro mes: conserva${fuera===1?'':'n'} su fecha y se declara${fuera===1?'':'n'} en ${periodoStr}</span>`;
+    periodoInfo+=`<br><span style="color:${forzar?'var(--info)':'var(--err)'};font-size:11px;margin-top:2px;display:inline-block">${forzar?'✓':'⚠️'} ${fuera} documento${fuera===1?'':'s'} con fecha fuera del periodo ${forzar?`se ajustarán al último día de ${periodoStr}`:'se importarán con su fecha original'}</span>`;
   }
   document.getElementById('imp-periodo-info').innerHTML=periodoInfo;
 
@@ -808,7 +815,7 @@ function renderImportModal(){
     const [y,m]=d.fechaOriginal.split('-');
     const fueraP=+y!==IM.periodoAnio||+m!==IM.periodoMes;
     const fechaShow=fueraP
-      ? `<span style="color:var(--info)" title="Fecha de otro mes: se declara en ${periodoStr} por arrastre">${d.fechaOriginal} ↩</span>`
+      ? `<span style="color:var(--err)" title="Fuera del periodo">${d.fechaOriginal}</span>${forzar?`<div style="font-size:9px;color:var(--info)">→ ${fechaEfectivaImport(d)}</div>`:''}`
       : d.fechaOriginal;
     const estado=(d.dup&&!sobre)
       ?`<span class="dup-badge">DUPLICADO</span>`
@@ -929,9 +936,7 @@ function confirmarImportacion(){
   }
 
   // Crear registros de compras
-  let agregados=0,arrastrados=0;
-  // Periodo tributario del libro: uno solo para todo el archivo importado.
-  const periodoLibro=`${IM.periodoAnio}-${String(IM.periodoMes).padStart(2,'0')}`;
+  let agregados=0,normalizados=0;
   const sinCorr=[];   // docs que quedaron sin correlativo (se asigna al final)
   const ts=Date.now();
   // Reservar el rango de folios de comprobante ANTES de crear los docs, así
@@ -942,11 +947,8 @@ function confirmarImportacion(){
   // tomar números que no choquen con ellos.
   const sinFolio=[];
   incluidos.forEach((d,i)=>{
-    // La fecha del documento se respeta siempre: es la de emisión y de ella
-    // dependen el asiento, el vencimiento y el aging. Lo que cambia es el
-    // periodo del libro, que va aparte.
-    const fechaFinal=d.fechaOriginal;
-    if(String(fechaFinal).slice(0,7)!==periodoLibro)arrastrados++;
+    const fechaFinal=fechaEfectivaImport(d);
+    if(fechaFinal!==d.fechaOriginal)normalizados++;
     // Calculamos el gasto como (total - IVA recuperable). Es lo que
     // efectivamente le cuesta a la empresa. Con esta fórmula:
     //   - El asiento SIEMPRE cuadra: DEBE(gasto) + DEBE(IVA) = HABER(prov)
@@ -968,7 +970,6 @@ function confirmarImportacion(){
       id:prev?prev.id:'c_imp_'+ts+'_'+i,
       folioComp:(prev&&+prev.folioComp)||0,   // correlativo único de comprobante contable
       fecha:fechaFinal,
-      periodo:periodoLibro,
       fechaVencimiento:prev?.fechaVencimiento||'',
       tipoDTE:d.tipoDTE,
       numero:d.numero,
@@ -1081,7 +1082,7 @@ function confirmarImportacion(){
     toast(`♻️ ${periodoStr} reemplazado — ${agregados} documento${agregados===1?'':'s'} · ${reemplazados} conservaron su correlativo${depurados?` · ${depurados} eliminado${depurados===1?'':'s'}`:''}${msgFichas}`);
     logAccion('Sobrescribió compras SII',`${periodoStr}: ${agregados} documentos, ${reemplazados} correlativos reutilizados, ${depurados} eliminados`);
   }else{
-    toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${arrastrados?` (${arrastrados} arrastrado${arrastrados===1?'':'s'} de otro mes)`:''}${msgProv}${msgFichas}`);
+    toast(`✅ ${agregados} documento${agregados===1?'':'s'} importado${agregados===1?'':'s'} al periodo ${periodoStr}${normalizados?` (${normalizados} con fecha normalizada)`:''}${msgProv}${msgFichas}`);
     logAccion('Importó compras SII',`${agregados} documentos${msgFichas}`);
   }
   rerender();
@@ -1098,5 +1099,5 @@ function initImportListener(){
 
 
 export {onMesChangeC, limpiarFiltrosC, dteComprasOpts, cuentasGastoOpts, renderCompras, renderCResumen,
-        renderCDupAlert, gruposDuplicadosCompras, verDuplicadoC, cambiarModoImport, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setImportCC, aplicarCCATodos, setBulkCuentaImp, confirmarImportacion, initImportListener,
+        renderCDupAlert, gruposDuplicadosCompras, verDuplicadoC, cambiarModoImport, abrirCF, editarCompra, cerrarCF, cfRutInput, cfCheckDup, cfCalcTotals, renderDist, addDist, delDist, updCfCheck, guardarCompra, eliminarCompra, IM,  abrirImportSII, handleFileImport,  mostrarDocsImportados, abrirImportModal, cambiarPeriodoImport, cerrarImportModal, fechaEfectivaImport, renderImportModal, toggleImportDoc, toggleAllImport, setImportCuenta, aplicarCuentaATodos, setImportCC, aplicarCCATodos, setBulkCuentaImp, confirmarImportacion, initImportListener,
         toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, CF};

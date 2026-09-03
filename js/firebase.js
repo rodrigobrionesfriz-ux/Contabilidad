@@ -62,10 +62,35 @@ async function initFirestore(){
 }
 
 
+// ═══ QUÉ SE AUDITA ═══
+//
+// El registro era una bitácora de todo: inicios de sesión, exportaciones,
+// cambios de indicadores… y con eso se volvía ilegible justo cuando hace falta,
+// que es al buscar quién tocó un comprobante. Ahora sólo entra lo que MODIFICA
+// o DESTRUYE un comprobante ya registrado; lo demás se descarta en silencio.
+//
+// La política vive aquí y no en cada llamada: así se lee de un vistazo y una
+// llamada nueva no se cuela en el registro sin pasar por esta lista.
+const ACCIONES_AUDITADAS=[
+  // Asientos y comprobantes
+  /^(Editó|Eliminó|Anuló|Reactivó) asiento/i,
+  /^Editó (asiento manual|balance de apertura) desde Comprobantes/i,
+  /^Convertió comprobante auto/i,
+  /^Eliminó (documento|apertura)/i,
+  // Documentos de los libros, que son los comprobantes automáticos
+  /^Editó (venta|compra)$/i,
+  /^Eliminó (ventas|compras) masivamente$/i,
+  // Borrar una empresa con sus datos elimina TODOS sus comprobantes de una vez:
+  // es la eliminación más grande que permite el sistema y por eso queda.
+  /^Eliminó empresa \(con datos\)$/i,
+];
+const seAudita=accion=>ACCIONES_AUDITADAS.some(re=>re.test(String(accion||'')));
+
 // logAccion — registro de auditoría (escritura). Vive aquí (capa infraestructura)
 // para no depender de auth.js y evitar ciclos. Lee AUTH/S de state.
 function logAccion(accion,detalle){
   if(!FS.enabled||!FS.db)return;
+  if(!seAudita(accion))return;
   try{
     const email=(AUTH.user&&AUTH.user.email)||'desconocido';
     const nombre=(AUTH.user&&AUTH.user.nombre)||email;
@@ -79,4 +104,4 @@ function logAccion(accion,detalle){
   }catch(e){}
 }
 
-export {FS, fsStatusSet, initFirestore, FIREBASE_CONFIG, logAccion};
+export {FS, fsStatusSet, initFirestore, FIREBASE_CONFIG, logAccion, seAudita, ACCIONES_AUDITADAS};

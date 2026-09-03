@@ -8,11 +8,11 @@
 // automáticos llevan al origen (Libro de Ventas/Compras/Honorarios) para
 // que se corrijan los documentos que los generaron.
 
-import {fmtC, MESES, pdcNm, today, toast, rutFmt, dteV, dteC, rutParse, DTE_VENTAS, DTE_COMPRAS} from './core.js';
+import {fmt, fmtC, MESES, pdcNm, today, toast, rutFmt, dteV, dteC, rutParse, DTE_VENTAS, DTE_COMPRAS, IVA} from './core.js';
 import {S} from './state.js';
 import {nav, rerender} from './ui.js';
 import {genDiario} from './reportes.js';
-import {editarAsiento, proxFolioAsiento, CUENTAS_AUX} from './asientos.js';
+import {editarAsiento, proxFolioAsiento, CUENTAS_AUX, esAux} from './asientos.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {logAccion} from './firebase.js';
 
@@ -44,48 +44,6 @@ export function renderComprobantes(){
   const cont=document.getElementById('comprobantes-content');
   if(!cont)return;
 
-  // Barra de filtros: se pinta UNA sola vez. El input de texto no debe
-  // destruirse en cada tecleo (oninput) o el cursor pierde el foco y hay que
-  // volver a clicar para cada letra — por eso solo el contenido de abajo
-  // (#cmp-body) se re-renderiza al filtrar.
-  const barra=`<div class="filter-row" style="margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
-    <span class="f-lbl">Filtrar:</span>
-    <select id="cmp-mes-sel" onchange="setCmpFiltro('mes',this.value)">${mesOptsCmp()}</select>
-    <select id="cmp-origen-sel" onchange="setCmpFiltro('origen',this.value)">
-      <option value="">Todos los orígenes</option>
-      <option value="apertura" ${CMP_FILTRO.origen==='apertura'?'selected':''}>🔰 Apertura</option>
-      <option value="manual" ${CMP_FILTRO.origen==='manual'?'selected':''}>✏️ Manuales</option>
-      <option value="auto" ${CMP_FILTRO.origen==='auto'?'selected':''}>⚙️ Todos automáticos</option>
-      <option value="ventas" ${CMP_FILTRO.origen==='ventas'?'selected':''}>🛒 Auto ventas</option>
-      <option value="compras" ${CMP_FILTRO.origen==='compras'?'selected':''}>🧾 Auto compras</option>
-      <option value="honorarios" ${CMP_FILTRO.origen==='honorarios'?'selected':''}>📝 Auto honorarios</option>
-      <option value="descuadrados" ${CMP_FILTRO.origen==='descuadrados'?'selected':''}>⚠️ Solo descuadrados</option>
-    </select>
-    <div style="position:relative;min-width:150px">
-      <input type="text" id="cmp-num-input" inputmode="numeric" placeholder="N° comprobante…" autocomplete="off"
-        value="${CMP_FILTRO.numero.replace(/"/g,'&quot;')}"
-        oninput="cmpNumeroBuscar(this.value)"
-        onfocus="cmpNumeroBuscar(this.value)"
-        onblur="setTimeout(()=>renderCmpNumeroList([]),160)"
-        style="width:100%">
-      <div id="cmp-num-list" class="ac-lista" style="display:none;min-width:280px"></div>
-    </div>
-    <input type="text" id="cmp-texto-input" placeholder="Buscar por glosa o cuenta…" value="${CMP_FILTRO.texto.replace(/"/g,'&quot;')}"
-      oninput="setCmpFiltro('texto',this.value)" style="min-width:180px">
-    <button class="btn btn-g" onclick="limpiarCmpFiltro()">Limpiar</button>
-    <span class="doc-count" id="cmp-count"></span>
-  </div>`;
-
-  cont.innerHTML=barra+'<div id="cmp-body"></div>';
-  renderComprobantesBody();
-}
-
-// Re-renderiza SOLO el resultado (alerta + tabla), sin tocar la barra de
-// filtros de arriba — así el input de búsqueda no pierde el foco al escribir.
-function renderComprobantesBody(){
-  const box=document.getElementById('cmp-body');
-  if(!box)return;
-
   let entries=genDiario();
 
   // Filtros
@@ -96,10 +54,7 @@ function renderComprobantesBody(){
       return em===m;
     });
   }
-  // OJO: 'descuadrados' NO es un origen ni una fuente — es una condición sobre
-  // los montos y se aplica más abajo. Si entra aquí, el filtro por fuente lo
-  // vacía todo (ningún asiento tiene fuente:'descuadrados').
-  if(CMP_FILTRO.origen&&CMP_FILTRO.origen!=='descuadrados'){
+  if(CMP_FILTRO.origen){
     entries=entries.filter(e=>{
       if(CMP_FILTRO.origen==='apertura')return e.origen==='apertura';
       if(CMP_FILTRO.origen==='manual')return e.origen==='manual';
@@ -142,9 +97,6 @@ function renderComprobantesBody(){
   const cntAp=entries.filter(e=>e.origen==='apertura').length;
   const totalFiltrado=entries.length;
 
-  const cnt=document.getElementById('cmp-count');
-  if(cnt)cnt.textContent=`${entries.length} comprobantes${cntAp?' · '+cntAp+' apertura':''}${cntAuto?' · '+cntAuto+' automáticos':''}${cntMan?' · '+cntMan+' manuales':''}`;
-
   // Panel de alerta cuando hay descuadres (y no estamos ya filtrando solo por ellos)
   let alerta='';
   if(descuadres.length&&CMP_FILTRO.origen!=='descuadrados'){
@@ -156,15 +108,40 @@ function renderComprobantesBody(){
     </div>`;
   }
 
-  let h=alerta;
+  let h=alerta+`<div class="filter-row" style="margin-bottom:14px;flex-wrap:wrap;align-items:flex-end">
+    <span class="f-lbl">Filtrar:</span>
+    <select onchange="setCmpFiltro('mes',this.value)">${mesOptsCmp()}</select>
+    <select onchange="setCmpFiltro('origen',this.value)">
+      <option value="">Todos los orígenes</option>
+      <option value="apertura" ${CMP_FILTRO.origen==='apertura'?'selected':''}>🔰 Apertura</option>
+      <option value="manual" ${CMP_FILTRO.origen==='manual'?'selected':''}>✏️ Manuales</option>
+      <option value="auto" ${CMP_FILTRO.origen==='auto'?'selected':''}>⚙️ Todos automáticos</option>
+      <option value="ventas" ${CMP_FILTRO.origen==='ventas'?'selected':''}>🛒 Auto ventas</option>
+      <option value="compras" ${CMP_FILTRO.origen==='compras'?'selected':''}>🧾 Auto compras</option>
+      <option value="honorarios" ${CMP_FILTRO.origen==='honorarios'?'selected':''}>📝 Auto honorarios</option>
+      <option value="descuadrados" ${CMP_FILTRO.origen==='descuadrados'?'selected':''}>⚠️ Solo descuadrados</option>
+    </select>
+    <div style="position:relative;min-width:150px">
+      <input type="text" id="cmp-num-input" inputmode="numeric" placeholder="N° comprobante…" autocomplete="off"
+        value="${CMP_FILTRO.numero.replace(/"/g,'&quot;')}"
+        oninput="cmpNumeroBuscar(this.value)"
+        onfocus="cmpNumeroBuscar(this.value)"
+        onblur="setTimeout(()=>renderCmpNumeroList([]),160)"
+        style="width:100%">
+      <div id="cmp-num-list" class="ac-lista" style="display:none;min-width:280px"></div>
+    </div>
+    <input type="text" placeholder="Buscar por glosa o cuenta…" value="${CMP_FILTRO.texto.replace(/"/g,'&quot;')}"
+      oninput="setCmpFiltro('texto',this.value)" style="min-width:180px">
+    <button class="btn btn-g" onclick="limpiarCmpFiltro()">Limpiar</button>
+    <span class="doc-count">${entries.length} comprobantes${cntAp?' · '+cntAp+' apertura':''}${cntAuto?' · '+cntAuto+' automáticos':''}${cntMan?' · '+cntMan+' manuales':''}</span>
+  </div>`;
 
   if(!entries.length){
     h+=`<div style="text-align:center;padding:40px;color:var(--mt)">
       <div style="font-size:36px;margin-bottom:8px">📖</div>
       No hay comprobantes que coincidan con los filtros
     </div>`;
-    box.innerHTML=h;
-    CMP_ENTRIES=[];
+    cont.innerHTML=h;
     return;
   }
 
@@ -200,11 +177,10 @@ function renderComprobantesBody(){
     const o=origenLbl(e);
     const totED=e.movs.reduce((s,m)=>s+(m.debe||0),0);
     const totEH=e.movs.reduce((s,m)=>s+(m.haber||0),0);
+    const detId='cmp-det-'+i;
+    const anulado=e.anulado?' opacity:.5;text-decoration:line-through;':'';
     const descuadrado=Math.abs(totED-totEH)>1;
-    // Un ÚNICO atributo style: antes se emitían dos (`<tr style=".." style="..">`)
-    // y el navegador se quedaba con el primero, perdiendo el cursor:pointer.
-    // Los anulados no llegan hasta aquí: genDiario ya los excluye.
-    const estiloFila=(descuadrado?'background:rgba(248,81,73,.05);':'')+'cursor:pointer';
+    const estiloFila=(anulado||descuadrado)?` style="${anulado}${descuadrado?'background:rgba(248,81,73,.05);':''}"`:'';
     const estiloTotal=descuadrado?'color:var(--err);font-weight:700':'font-family:var(--mono)';
     const badgeDescuadre=descuadrado
       ?` <span style="background:rgba(248,81,73,.15);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">⚠ DESCUADRE ${fmtC(Math.abs(totED-totEH))}</span>`
@@ -230,7 +206,7 @@ function renderComprobantesBody(){
 
     // Toda la fila abre el modal de vista/edición del comprobante
     // (el índice del array `entries` va como referencia)
-    h+=`<tr style="${estiloFila}" onclick="abrirCmpModal(${i})">
+    h+=`<tr${estiloFila} style="${estiloFila?estiloFila.slice(8,-1)+';':''}cursor:pointer" onclick="abrirCmpModal(${i})">
       <td class="tl" style="font-family:var(--mono);font-weight:600">${e.n}</td>
       <td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td>
       <td class="tl">
@@ -256,13 +232,13 @@ function renderComprobantesBody(){
   </tr></tfoot>`;
   h+='</table></div></div>';
 
-  box.innerHTML=h;
+  cont.innerHTML=h;
   CMP_ENTRIES=entries;
 }
 
 function setCmpFiltro(campo,valor){
   CMP_FILTRO[campo]=valor;
-  renderComprobantesBody();
+  renderComprobantes();
 }
 
 // Búsqueda dinámica por N° de comprobante: filtra los entries del año actual
@@ -272,20 +248,18 @@ function cmpNumeroBuscar(q){
   if(!box)return;
   const qs=String(q||'').trim();
   if(!qs){
-    // Sin query: limpiar el filtro y ocultar la lista. Se re-renderiza SOLO el
-    // cuerpo, nunca la barra: repintarla destruiría este mismo input y el
-    // usuario perdería el foco justo mientras borra (crítico en móvil).
-    renderCmpNumeroList([]);
+    // sin query: limpiar filtro y ocultar lista
     if(CMP_FILTRO.numero){
       CMP_FILTRO.numero='';
-      renderComprobantesBody();
+      renderComprobantes();
+    }else{
+      renderCmpNumeroList([]);
     }
     return;
   }
-  // Universo COMPLETO de comprobantes del año: sin filtro activo, CMP_ENTRIES
-  // solo cachea los 5 más recientes, así que buscar ahí dejaba fuera todo lo
-  // anterior y el desplegable salía vacío.
-  const filtrados=genDiario().filter(e=>String(e.n||'').startsWith(qs)).slice(0,15);
+  // Obtener el universo actual de comprobantes del año
+  const todos=(CMP_ENTRIES&&CMP_ENTRIES.length)?CMP_ENTRIES:genDiario();
+  const filtrados=todos.filter(e=>String(e.n||'').startsWith(qs)).slice(0,15);
   renderCmpNumeroList(filtrados);
 }
 
@@ -307,8 +281,6 @@ function cmpNumeroElegir(n){
   CMP_FILTRO.mes=''; CMP_FILTRO.origen=''; CMP_FILTRO.texto='';
   const box=document.getElementById('cmp-num-list');
   if(box){box.style.display='none';box.innerHTML='';}
-  // Se eligió desde la lista (clic), no se está tecleando texto: sí conviene
-  // repintar la barra completa para reflejar mes/origen/texto en blanco.
   renderComprobantes();
   // Auto-abrir el modal del comprobante elegido
   const idx=(CMP_ENTRIES||[]).findIndex(e=>+e.n===+n);
@@ -342,6 +314,12 @@ function limpiarCmpFiltro(){
   CMP_FILTRO={mes:'',origen:'',texto:'',numero:''};
   renderCmpNumeroList([]);
   renderComprobantes();
+}
+
+function toggleCmpDet(id){
+  const t=document.getElementById(id);
+  if(!t)return;
+  t.style.display=t.style.display==='none'?'':'none';
 }
 
 // Editar asiento manual desde Comprobantes: navega a Asientos y abre el editor.
@@ -529,6 +507,16 @@ function eliminarComprobante(){
     }
     logAccion('Eliminó documento',`${libro} — N°${d.numero} ${d.razonSocial||''}`);
     cerrarCmpModal();rerender();toast('🗑 Documento eliminado — el comprobante ya no se genera');
+    return;
+  }
+
+  // ── Honorarios: resumen mensual, sin documento único ──
+  if(e.fuente==='honorarios'){
+    if(confirm(
+      `Este comprobante resume TODAS las boletas de honorarios del mes,\n`+
+      `así que no hay un documento único que eliminar.\n\n`+
+      `¿Quieres ir al libro de Honorarios para borrar las boletas que\n`+
+      `correspondan?`)){cerrarCmpModal();nav('honorarios');}
     return;
   }
 
@@ -1088,7 +1076,7 @@ function guardarCmpEdDte(){
 }
 
 export {abrirComprobantePor,
-        setCmpFiltro, limpiarCmpFiltro, editarAsientoDesdeCmp, corregirCmp,
+        setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
         cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         eliminarComprobante, anularComprobante,

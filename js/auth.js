@@ -1,7 +1,7 @@
 // auth.js — Autenticación, roles y permisos
 import {S, AUTH} from './state.js';
 import {nav} from './ui.js';
-import {FS, logAccion, initFirestore} from './firebase.js';
+import {FS, initFirestore} from './firebase.js';
 import {seccionAplica} from './regimenes.js';
 
 // Callback que app.js registra para arrancar la app tras login exitoso.
@@ -59,7 +59,6 @@ const SECCIONES=[
   {id:'f29',lbl:'Formulario 29'},
   {id:'ppm',lbl:'PPM'},
   {id:'renta',lbl:'Declaración de Renta'},
-  {id:'xmlsii',lbl:'Exportar XML SII'},
   {id:'activofijo',lbl:'Activos Fijos'},
   {id:'provisiones',lbl:'Provisiones'},
   {id:'correccion',lbl:'Corrección Monetaria'},
@@ -324,7 +323,6 @@ async function verificarUsuarioAutorizado(fbUser){
       document.getElementById('nav-usuarios').style.display='';
       const na=document.getElementById('nav-auditlog');if(na)na.style.display='';
     }
-    logAccion('Inició sesión','');
     // Aplicar filtros de permisos a la UI
     aplicarPermisosUI();
     // Iniciar la app si aún no ha iniciado

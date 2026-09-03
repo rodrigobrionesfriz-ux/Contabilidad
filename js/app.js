@@ -55,8 +55,6 @@ import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 import {renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
         initCargaDatosListener, CD} from './cargadatos.js';
 import {renderSistema} from './sistema.js';
-import {initChangelogBadge, abrirChangelog, cerrarChangelog, renderChangelog,
-        bloqueChangelog, pintarPuntoNovedades} from './changelog-ui.js';
 import {DISPOSITIVO, renombrarDispositivo} from './dispositivo.js';
 import {diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos} from './seguridad.js';
 import {initAyuda, toggleAyuda, actualizarAyuda, ayudaAlNavegar} from './ayuda.js';
@@ -110,11 +108,10 @@ import {renderCierre, generarAsientoCierre, renderProvisiones, previewProvInc,
 // Reportes
 import {genDiario, renderDiario, setDiarioQ, buildMayor, renderMayor, renderBalance,
         poblarCmpSelect, onCmpYear, renderResultados, corregirDesdeDiario, editarAsientoRef,
-        onDiarioMes, onDiarioAcum, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
-        onMayorMes, onMayorAcum, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla,
-        exportarMayorExcel, onBalanceMes, onBalanceAcum, limpiarFiltrosBalance,
-        onResultadosMes, onResultadosAcum, limpiarFiltrosResultados} from './reportes.js';
-import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
+        onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
+        onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla,
+        exportarMayorExcel} from './reportes.js';
+import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         eliminarComprobante, anularComprobante,
         setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
@@ -132,7 +129,6 @@ import {renderF29, renderPPM, IVAC, renderCompensacionIVA, generarAsientoIVA,
 import {renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
         addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,
         resetRenta} from './renta.js';
-import {renderXmlSii, generarXmlSii} from './xmlsii.js';
 import {setFCView, renderFlujoCaja} from './flujocaja.js';
 import {renderConciliacion, onSaldoBancoChange, toggleConciliado,
         marcarTodosConciliados, cargarCartola, autoConciliarCartola} from './conciliacion.js';
@@ -140,7 +136,7 @@ import {abrirBusqueda, cerrarBusqueda, ejecutarBusqueda, navBusqueda,
         irAResultado} from './busqueda.js';
 import {prepararImpresion} from './impresion.js';
 import {exportarExcelManual, conectarBD, fsBackupToCloud, fsRestoreFromCloud,
-        importarExcelBD, initBDImportListener, bdRestaurarHandle, bdStatusSet, BD} from './backup.js';
+        importarExcelBD, initBDImportListener, bdRestaurarHandle, BD} from './backup.js';
 
 // ═══ STORAGE ═══
 // Guarda todo el estado en curso. `silencioso` lo usa el autoguardado para no
@@ -276,9 +272,6 @@ async function loadYear(y){
 }
 async function changeYear(y){S.empresa.anio=y;await loadYear(y);rerender();}
 async function init(){
-  // El badge de versión se rellena desde changelog.js (fuente única) y queda
-  // clicable. Va primero porque no depende de sesión ni de nube.
-  initChangelogBadge();
   // Inicializar Firestore primero (necesario para verificar usuario)
   await initFirestore();
   // Inicializar Auth — mostrará el login si no hay sesión
@@ -425,7 +418,6 @@ function renderSec(s){
   else if(s==='inicio')renderInicio();
   else if(s==='ppm')renderPPM();
   else if(s==='renta')renderRenta();
-  else if(s==='xmlsii')renderXmlSii();
   else if(s==='activofijo')renderActivoFijo();
   else if(s==='provisiones')renderProvisiones();
   else if(s==='correccion')renderCorreccion();
@@ -522,7 +514,7 @@ Object.assign(window,{
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, cambiarFPVSel,
   abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
-  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
+  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
   abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
   eliminarComprobante, anularComprobante,
   setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
@@ -576,10 +568,8 @@ Object.assign(window,{
   generarProvisionIncobrables, generarProvisionFeriado, renderCorreccion, previewCM,
   // reportes
   renderDiario, setDiarioQ, renderMayor, renderBalance, onCmpYear, renderResultados,
-  onDiarioMes, onDiarioAcum, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
-  onMayorMes, onMayorAcum, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
-  onBalanceMes, onBalanceAcum, limpiarFiltrosBalance,
-  onResultadosMes, onResultadosAcum, limpiarFiltrosResultados,
+  onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
+  onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel,
   renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos, renderSistema,
   diagnosticarSeguridad, prepararAislamiento, repararAccesos, repararDocumentos,
   renombrarEsteDispositivo,
@@ -591,11 +581,7 @@ Object.assign(window,{
   renderReporteAux, imprimirReporteAux, exportarReporteAuxExcel,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
   // declaración de renta (F22)
-  // historial de versiones
-  abrirChangelog, cerrarChangelog, renderChangelog, bloqueChangelog,
   renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
-  // exportación XML SII (IECV)
-  renderXmlSii, generarXmlSii,
   onRegimenEmpresaChange, pintarRegimen, onRegimenChange, aplicarPermisosUI,
   toggleAyuda, actualizarAyuda, renderInicio, abrirEmpresaInicio,
   addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,

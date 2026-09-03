@@ -990,6 +990,7 @@ function guardarAsiento(){
     const idx=S.asientos.findIndex(x=>x.id===AF.editId);
     if(idx>=0){S.asientos[idx]={...S.asientos[idx],fecha,glosa,movs:movsClean};folioGuardado=S.asientos[idx].n;}
     toast('✅ Asiento N°'+folioGuardado+' actualizado');
+    logAccion('Editó asiento',`N°${folioGuardado} — ${glosa}`);
     window.storage.set('asientos-'+S.empresa.anio,JSON.stringify(S.asientos)).catch(()=>toast('❌ Error al guardar en storage','e'));
     // Tras editar, cerrar el form (el usuario no suele editar en cadena)
     cerrarForm();rerender();

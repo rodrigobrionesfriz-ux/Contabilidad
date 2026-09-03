@@ -14,7 +14,7 @@ async function renderAuditLog(){
   el.innerHTML='<div style="padding:20px;text-align:center;color:var(--mt)">⏳ Cargando actividad...</div>';
   try{
     const snap=await FS.db.collection('audit_log').orderBy('ts','desc').limit(200).get();
-    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">📜</div>No hay actividad registrada aún.</div>';return;}
+    if(snap.empty){el.innerHTML='<div class="empty"><div class="ei">📜</div>No se ha editado ni eliminado ningún comprobante.</div>';return;}
     const icoAccion=a=>{
       if(a.includes('creó')||a.includes('registró')||a.includes('Creó'))return '➕';
       if(a.includes('eliminó')||a.includes('Eliminó'))return '🗑';
@@ -35,7 +35,7 @@ async function renderAuditLog(){
         <td class="tl" style="font-family:var(--mono);font-size:10px;color:var(--mt)">${fechaStr}</td>
       </tr>`;
     });
-    el.innerHTML=`<div class="info-tip" style="margin-bottom:14px">📜 Últimas ${snap.size} acciones registradas. Se guarda automáticamente quién crea, edita, elimina o anula registros.</div>
+    el.innerHTML=`<div class="info-tip" style="margin-bottom:14px">📜 Últimas ${snap.size} acciones registradas. Sólo se guardan las <strong>ediciones y eliminaciones de comprobantes</strong> —incluidas las anulaciones y el borrado de una empresa con sus datos—, que es lo que hay que poder reconstruir después. El resto de la operación diaria no se registra.</div>
     <div class="card-np"><div class="tw"><table>
       <thead><tr><th style="width:40px"></th><th class="tl">ACCIÓN</th><th class="tl">USUARIO</th><th class="tl">FECHA</th></tr></thead>
       <tbody>${rows}</tbody>

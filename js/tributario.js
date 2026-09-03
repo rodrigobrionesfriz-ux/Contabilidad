@@ -9,7 +9,6 @@ import {logAccion} from './firebase.js';
 import {rerender} from './ui.js';
 import {savePDC} from './pdc.js';
 import {S} from './state.js';
-import {periodoDoc} from './helpers.js';
 import './storage.js';
 
 // ═══ FORMULARIO 29 (IVA mensual + PPM + retenciones) ═══
@@ -21,9 +20,7 @@ function calcularF29Anual(){
   const tasaPPM=(S.empresa.tasaPPM!=null?+S.empresa.tasaPPM:0)/100;
   for(let m=1;m<=12;m++){
     // Ventas del mes (débito fiscal)
-    // Por PERIODO TRIBUTARIO: un DTE de agosto arrastrado al RCV de septiembre
-    // se declara en el F29 de septiembre, no en el de agosto.
-    const vs=todosDocsVentas().filter(d=>+periodoDoc(d).slice(5,7)===m);
+    const vs=todosDocsVentas().filter(d=>+d.fecha.slice(5,7)===m);
     let ventasNetas=0,ventasExentas=0,debito=0;
     vs.forEach(d=>{
       const signo=(dteV(d.tipoDTE)?.signo)||1;
@@ -32,7 +29,7 @@ function calcularF29Anual(){
       debito+=(d.iva||0)*signo;
     });
     // Compras del mes (crédito fiscal)
-    const cs=todosDocsCompras().filter(d=>+periodoDoc(d).slice(5,7)===m);
+    const cs=todosDocsCompras().filter(d=>+d.fecha.slice(5,7)===m);
     let comprasNetas=0,credito=0,ivaRetenido=0;
     cs.forEach(d=>{
       const signo=(dteC(d.tipoDTE)?.signo)||1;
@@ -502,7 +499,7 @@ const CONCEPTOS_F29=[
 // IVA retenido en facturas de compra (DTE 46) del período
 function ivaRetenidoDTE46(mes){
   return Math.round(todosDocsCompras()
-    .filter(d=>+d.tipoDTE===46&&+periodoDoc(d).slice(5,7)===mes)
+    .filter(d=>+d.tipoDTE===46&&+((d.fecha||'').slice(5,7))===mes)
     .reduce((s,d)=>s+(d.iva||0)*((dteC(d.tipoDTE)?.signo)||1),0));
 }
 // Impuesto único estimado con las liquidaciones vigentes

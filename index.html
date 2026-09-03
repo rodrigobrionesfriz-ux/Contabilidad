@@ -2,8 +2,26 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Contabilidad – Sistema Contable</title>
+
+<!-- ═══ APLICACIÓN INSTALABLE (PWA) ═══
+     Con el manifiesto y el service worker, el navegador ofrece «Instalar» y la
+     aplicación queda con icono propio en el escritorio o en el teléfono, sin
+     barra de direcciones. Antes sólo se podía crear un acceso directo, que
+     tomaba un icono genérico. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1117">
+<meta name="description" content="Sistema contable multi empresa: libros de ventas y compras, auxiliares, balance y declaraciones al SII.">
+<link rel="icon" href="icons/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<!-- iOS ignora el manifiesto: necesita sus propias etiquetas -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Contabilidad">
+<meta name="mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -58,7 +76,7 @@
 
 <header>
   <button id="nav-toggle" onclick="toggleNav()" title="Menú" style="display:none;background:none;border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:18px;cursor:pointer;padding:4px 10px;line-height:1">☰</button>
-  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.08.24-1520</span></div>
+  <div class="logo"><div class="logo-icon">📊</div><span>Contabilidad</span><span style="font-size:9px;color:var(--mt);margin-left:6px;font-weight:400" title="Versión desplegada">v2026.09.03-2200</span></div>
   <span id="save-indicator" style="font-size:10px;color:var(--mt);white-space:nowrap;margin-left:auto"></span>
   <button class="btn-save-all" id="btn-guardar-todo" onclick="guardarTodoAhora()" title="Guardar todo">💾 Guardar</button>
   <!-- Los indicadores de sincronización viven ahora en Configuración → Sistema,
@@ -1238,68 +1256,97 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/acl.js": "./js/acl.js?v=1788469887",
-    "./js/activofijo.js": "./js/activofijo.js?v=1788469887",
-    "./js/apertura.js": "./js/apertura.js?v=1788469887",
-    "./js/aperturaaux.js": "./js/aperturaaux.js?v=1788469887",
-    "./js/app.js": "./js/app.js?v=1788469887",
-    "./js/asientos.js": "./js/asientos.js?v=1788469887",
-    "./js/audit.js": "./js/audit.js?v=1788469887",
-    "./js/auth.js": "./js/auth.js?v=1788469887",
-    "./js/autoguardado.js": "./js/autoguardado.js?v=1788469887",
-    "./js/auxdocs.js": "./js/auxdocs.js?v=1788469887",
-    "./js/auxiliares.js": "./js/auxiliares.js?v=1788469887",
-    "./js/auxreporte.js": "./js/auxreporte.js?v=1788469887",
-    "./js/ayuda.js": "./js/ayuda.js?v=1788469887",
-    "./js/backup.js": "./js/backup.js?v=1788469887",
-    "./js/buscadorcuentas.js": "./js/buscadorcuentas.js?v=1788469887",
-    "./js/busqueda.js": "./js/busqueda.js?v=1788469887",
-    "./js/cargadatos.js": "./js/cargadatos.js?v=1788469887",
-    "./js/centroscosto-ui.js": "./js/centroscosto-ui.js?v=1788469887",
-    "./js/centroscosto.js": "./js/centroscosto.js?v=1788469887",
-    "./js/cierre.js": "./js/cierre.js?v=1788469887",
-    "./js/compras.js": "./js/compras.js?v=1788469887",
-    "./js/comprobantes.js": "./js/comprobantes.js?v=1788469887",
-    "./js/comprobantestipo-ui.js": "./js/comprobantestipo-ui.js?v=1788469887",
-    "./js/comprobantestipo.js": "./js/comprobantestipo.js?v=1788469887",
-    "./js/conciliacion.js": "./js/conciliacion.js?v=1788469887",
-    "./js/core.js": "./js/core.js?v=1788469887",
-    "./js/dispositivo.js": "./js/dispositivo.js?v=1788469887",
-    "./js/empresa.js": "./js/empresa.js?v=1788469887",
-    "./js/empresas-ui.js": "./js/empresas-ui.js?v=1788469887",
-    "./js/empresas.js": "./js/empresas.js?v=1788469887",
-    "./js/firebase.js": "./js/firebase.js?v=1788469887",
-    "./js/flujocaja.js": "./js/flujocaja.js?v=1788469887",
-    "./js/helpers.js": "./js/helpers.js?v=1788469887",
-    "./js/honorarios.js": "./js/honorarios.js?v=1788469887",
-    "./js/importadoraux.js": "./js/importadoraux.js?v=1788469887",
-    "./js/importadorsii.js": "./js/importadorsii.js?v=1788469887",
-    "./js/impresion.js": "./js/impresion.js?v=1788469887",
-    "./js/indicadores.js": "./js/indicadores.js?v=1788469887",
-    "./js/inicio.js": "./js/inicio.js?v=1788469887",
-    "./js/libroremuneraciones.js": "./js/libroremuneraciones.js?v=1788469887",
-    "./js/pagos.js": "./js/pagos.js?v=1788469887",
-    "./js/pdc.js": "./js/pdc.js?v=1788469887",
-    "./js/previsional-ui.js": "./js/previsional-ui.js?v=1788469887",
-    "./js/previsional.js": "./js/previsional.js?v=1788469887",
-    "./js/regimenes.js": "./js/regimenes.js?v=1788469887",
-    "./js/remuneraciones.js": "./js/remuneraciones.js?v=1788469887",
-    "./js/renta.js": "./js/renta.js?v=1788469887",
-    "./js/reportes.js": "./js/reportes.js?v=1788469887",
-    "./js/salida.js": "./js/salida.js?v=1788469887",
-    "./js/seguridad.js": "./js/seguridad.js?v=1788469887",
-    "./js/sistema.js": "./js/sistema.js?v=1788469887",
-    "./js/state.js": "./js/state.js?v=1788469887",
-    "./js/storage.js": "./js/storage.js?v=1788469887",
-    "./js/tema.js": "./js/tema.js?v=1788469887",
-    "./js/tributario.js": "./js/tributario.js?v=1788469887",
-    "./js/ui.js": "./js/ui.js?v=1788469887",
-    "./js/usuarios.js": "./js/usuarios.js?v=1788469887",
-    "./js/ventas.js": "./js/ventas.js?v=1788469887",
-    "./js/xmlsii.js": "./js/xmlsii.js?v=1788469887"
+    "./js/acl.js": "./js/acl.js?v=1788470845",
+    "./js/activofijo.js": "./js/activofijo.js?v=1788470845",
+    "./js/apertura.js": "./js/apertura.js?v=1788470845",
+    "./js/aperturaaux.js": "./js/aperturaaux.js?v=1788470845",
+    "./js/app.js": "./js/app.js?v=1788470845",
+    "./js/asientos.js": "./js/asientos.js?v=1788470845",
+    "./js/audit.js": "./js/audit.js?v=1788470845",
+    "./js/auth.js": "./js/auth.js?v=1788470845",
+    "./js/autoguardado.js": "./js/autoguardado.js?v=1788470845",
+    "./js/auxdocs.js": "./js/auxdocs.js?v=1788470845",
+    "./js/auxiliares.js": "./js/auxiliares.js?v=1788470845",
+    "./js/auxreporte.js": "./js/auxreporte.js?v=1788470845",
+    "./js/ayuda.js": "./js/ayuda.js?v=1788470845",
+    "./js/backup.js": "./js/backup.js?v=1788470845",
+    "./js/buscadorcuentas.js": "./js/buscadorcuentas.js?v=1788470845",
+    "./js/busqueda.js": "./js/busqueda.js?v=1788470845",
+    "./js/cargadatos.js": "./js/cargadatos.js?v=1788470845",
+    "./js/centroscosto-ui.js": "./js/centroscosto-ui.js?v=1788470845",
+    "./js/centroscosto.js": "./js/centroscosto.js?v=1788470845",
+    "./js/cierre.js": "./js/cierre.js?v=1788470845",
+    "./js/compras.js": "./js/compras.js?v=1788470845",
+    "./js/comprobantes.js": "./js/comprobantes.js?v=1788470845",
+    "./js/comprobantestipo-ui.js": "./js/comprobantestipo-ui.js?v=1788470845",
+    "./js/comprobantestipo.js": "./js/comprobantestipo.js?v=1788470845",
+    "./js/conciliacion.js": "./js/conciliacion.js?v=1788470845",
+    "./js/core.js": "./js/core.js?v=1788470845",
+    "./js/dispositivo.js": "./js/dispositivo.js?v=1788470845",
+    "./js/empresa.js": "./js/empresa.js?v=1788470845",
+    "./js/empresas-ui.js": "./js/empresas-ui.js?v=1788470845",
+    "./js/empresas.js": "./js/empresas.js?v=1788470845",
+    "./js/firebase.js": "./js/firebase.js?v=1788470845",
+    "./js/flujocaja.js": "./js/flujocaja.js?v=1788470845",
+    "./js/helpers.js": "./js/helpers.js?v=1788470845",
+    "./js/honorarios.js": "./js/honorarios.js?v=1788470845",
+    "./js/importadoraux.js": "./js/importadoraux.js?v=1788470845",
+    "./js/importadorsii.js": "./js/importadorsii.js?v=1788470845",
+    "./js/impresion.js": "./js/impresion.js?v=1788470845",
+    "./js/indicadores.js": "./js/indicadores.js?v=1788470845",
+    "./js/inicio.js": "./js/inicio.js?v=1788470845",
+    "./js/libroremuneraciones.js": "./js/libroremuneraciones.js?v=1788470845",
+    "./js/pagos.js": "./js/pagos.js?v=1788470845",
+    "./js/pdc.js": "./js/pdc.js?v=1788470845",
+    "./js/previsional-ui.js": "./js/previsional-ui.js?v=1788470845",
+    "./js/previsional.js": "./js/previsional.js?v=1788470845",
+    "./js/regimenes.js": "./js/regimenes.js?v=1788470845",
+    "./js/remuneraciones.js": "./js/remuneraciones.js?v=1788470845",
+    "./js/renta.js": "./js/renta.js?v=1788470845",
+    "./js/reportes.js": "./js/reportes.js?v=1788470845",
+    "./js/salida.js": "./js/salida.js?v=1788470845",
+    "./js/seguridad.js": "./js/seguridad.js?v=1788470845",
+    "./js/sistema.js": "./js/sistema.js?v=1788470845",
+    "./js/state.js": "./js/state.js?v=1788470845",
+    "./js/storage.js": "./js/storage.js?v=1788470845",
+    "./js/tema.js": "./js/tema.js?v=1788470845",
+    "./js/tributario.js": "./js/tributario.js?v=1788470845",
+    "./js/ui.js": "./js/ui.js?v=1788470845",
+    "./js/usuarios.js": "./js/usuarios.js?v=1788470845",
+    "./js/ventas.js": "./js/ventas.js?v=1788470845",
+    "./js/xmlsii.js": "./js/xmlsii.js?v=1788470845"
   }
 }
 </script>
-<script type="module" src="js/app.js?v=1788469887"></script>
+<script type="module" src="js/app.js?v=1788470845"></script>
+
+<!-- Registro del service worker. Va después de app.js para no competir con la
+     carga de los módulos. Si falla —file://, navegador antiguo, sin HTTPS— la
+     aplicación funciona igual: el service worker sólo añade instalación y
+     arranque sin red, no es parte del funcionamiento normal. -->
+<script>
+(function(){
+  if(!('serviceWorker' in navigator))return;
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      // Si mientras la pestaña está abierta se publica una versión nueva, se
+      // avisa en vez de cambiarla debajo de los pies: podría haber un formulario
+      // a medio llenar.
+      reg.addEventListener('updatefound',function(){
+        var nuevo=reg.installing;
+        if(!nuevo)return;
+        nuevo.addEventListener('statechange',function(){
+          if(nuevo.state==='installed'&&navigator.serviceWorker.controller){
+            try{
+              if(window.toast)window.toast('🔄 Hay una versión nueva — recarga para aplicarla');
+              else console.info('Hay una versión nueva de la aplicación');
+            }catch(e){}
+          }
+        });
+      });
+    }).catch(function(e){console.warn('Service worker no registrado:',e);});
+  });
+})();
+</script>
 </body>
 </html>

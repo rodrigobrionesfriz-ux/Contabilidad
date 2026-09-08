@@ -613,10 +613,10 @@ function dtmRenderDist(){
   if(!DM.dist.length)DM.dist=[{cuenta:'',monto:0}];
   box.innerHTML=DM.dist.map((l,i)=>`<div class="dist-row">
     <div class="dist-num">${i+1}</div>
-    <div>${inputCuenta({id:`dm-cd-${i}`,value:l.cuenta,onPick:`DM.dist[${i}].cuenta='%CD%';dtmUpdDistCheck()`,placeholder:'Cuenta de gasto…',clase:'dist-inp'})}
+    <div class="dist-cd">${inputCuenta({id:`dm-cd-${i}`,value:l.cuenta,onPick:`DM.dist[${i}].cuenta='%CD%';dtmUpdDistCheck()`,placeholder:'Cuenta de gasto…',clase:'dist-inp'})}
       ${l._linea!=null?`<div style="font-size:9px;color:var(--mt);margin-top:2px">↔ línea ${l._linea+1} del asiento</div>`:''}</div>
-    <div><input type="number" class="dist-num-inp" min="0" placeholder="0" value="${l.monto||''}" oninput="DM.dist[${i}].monto=pn(this.value);dtmUpdDistCheck()"></div>
-    <div style="text-align:center"><button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="dtmDelDist(${i})">✕</button></div>
+    <div class="dist-mt"><input type="number" class="dist-num-inp" min="0" placeholder="0" value="${l.monto||''}" oninput="DM.dist[${i}].monto=pn(this.value);dtmUpdDistCheck()"></div>
+    <div class="dist-del"><button class="btn btn-d" onclick="dtmDelDist(${i})" title="Quitar esta línea">✕</button></div>
   </div>`).join('');
   dtmUpdDistCheck();
 }

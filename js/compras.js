@@ -380,7 +380,7 @@ function editarCompra(id){
   f.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-function cerrarCF(){document.getElementById('cf-form').style.display='none';CF={editId:null,dist:[]};}
+function cerrarCF(){document.getElementById('cf-form').style.display='none';fijarCF(null,[]);}
 
 function cfRutInput(val){
   const r=rutParse(val);
@@ -439,12 +439,14 @@ function cfCalcTotals(changed){
 function renderDist(){
   const box=document.getElementById('cf-dist');
   if(!CF.dist.length)CF.dist=[{cuenta:'',monto:0,cc:''}];
+  // Cada celda lleva su clase: en móvil la fila se apila y el CSS necesita saber
+  // qué es cada cosa para colocarla y ponerle su etiqueta.
   box.innerHTML=CF.dist.map((l,i)=>`<div class="dist-row">
     <div class="dist-num">${i+1}</div>
-    <div>${inputCuenta({id:`dist-cd-${i}`,value:l.cuenta,onPick:`CF.dist[${i}].cuenta='%CD%';updCfCheck()`,placeholder:'Cuenta de gasto…',clase:'dist-inp'})}</div>
-    <div><input type="number" class="dist-num-inp" min="0" placeholder="0" value="${l.monto||''}" oninput="CF.dist[${i}].monto=pn(this.value);updCfCheck()"></div>
-    <div><select class="dist-inp" title="Centro de costo" onchange="CF.dist[${i}].cc=this.value">${ccOpts(l.cc||'')}</select></div>
-    <div style="text-align:center"><button class="btn btn-d" style="padding:3px 7px;font-size:10px" onclick="delDist(${i})">✕</button></div>
+    <div class="dist-cd">${inputCuenta({id:`dist-cd-${i}`,value:l.cuenta,onPick:`CF.dist[${i}].cuenta='%CD%';updCfCheck()`,placeholder:'Cuenta de gasto…',clase:'dist-inp'})}</div>
+    <div class="dist-mt"><input type="number" class="dist-num-inp" min="0" placeholder="0" value="${l.monto||''}" oninput="CF.dist[${i}].monto=pn(this.value);updCfCheck()"></div>
+    <div class="dist-ccc"><select class="dist-inp" title="Centro de costo" onchange="CF.dist[${i}].cc=this.value">${ccOpts(l.cc||'')}</select></div>
+    <div class="dist-del"><button class="btn btn-d" onclick="delDist(${i})" title="Quitar esta línea">✕</button></div>
   </div>`).join('');
   updCfCheck();
 }

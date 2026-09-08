@@ -11,7 +11,11 @@ import {todosDocsVentas, abrirAsientoDesde, proxFolioComprobante} from './asient
 import './storage.js';
 
 // Estado del formulario de ventas (interno del módulo)
-let VF={editId:null};
+// Mismo cuidado que con AF y CF: este objeto se publica en window desde app.js,
+// así que se muta, nunca se reasigna. Hoy sólo lo lee este módulo, pero dejarlo
+// como `let` reasignable es la trampa que ya costó dos bugs silenciosos.
+const VF={editId:null};
+const fijarVF=editId=>{VF.editId=editId==null?null:editId;};
 let IMV={docs:[]}; // estado del importador SII de ventas
 
 // ═══ VENTAS — Documentos individuales ═══
@@ -215,7 +219,7 @@ function renderVResumen(){
 
 // — Form Ventas —
 function abrirVF(){
-  VF={editId:null};
+  fijarVF(null);
   const f=document.getElementById('vf-form');f.style.display='block';f.classList.remove('editing');
   document.getElementById('vf-title').textContent='Nuevo Documento de Venta';
   document.getElementById('vf-fecha').value=today();
@@ -232,7 +236,7 @@ function abrirVF(){
 }
 function editarVenta(id){
   const d=S.ventas.find(x=>x.id===id);if(!d)return;
-  VF={editId:id};
+  fijarVF(id);
   const f=document.getElementById('vf-form');f.style.display='block';f.classList.add('editing');
   document.getElementById('vf-title').textContent='Editando Documento — '+rutFmt(d.rutCodigo,d.rutDV);
   document.getElementById('vf-fecha').value=d.fecha;
@@ -256,7 +260,7 @@ function editarVenta(id){
 }
 let _vfCuentaSel='';
 function setVfCuenta(cd){_vfCuentaSel=cd;}
-function cerrarVF(){document.getElementById('vf-form').style.display='none';VF={editId:null};}
+function cerrarVF(){document.getElementById('vf-form').style.display='none';fijarVF(null);}
 
 function vfRutInput(val){
   const r=rutParse(val);

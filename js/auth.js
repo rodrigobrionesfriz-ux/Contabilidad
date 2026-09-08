@@ -59,6 +59,7 @@ const SECCIONES=[
   {id:'f29',lbl:'Formulario 29'},
   {id:'ppm',lbl:'PPM'},
   {id:'renta',lbl:'Declaración de Renta'},
+  {id:'dj',lbl:'Declaraciones Juradas'},
   {id:'activofijo',lbl:'Activos Fijos'},
   {id:'provisiones',lbl:'Provisiones'},
   {id:'correccion',lbl:'Corrección Monetaria'},

@@ -313,17 +313,21 @@ function renderPagosTabla(){
   }
 
   // Tabla agrupada por auxiliar
-  let h='<div class="card-np"><div class="tw"><table style="font-size:12px">';
+  // La razón social y el RUT viven en la fila de cabecera de cada auxiliar, así
+  // que la columna que los anunciaba nunca los mostraba: lo que llevaba era el
+  // vencimiento, y quedaba en blanco salvo que el documento tuviera fecha. Se
+  // retira y el vencimiento pasa bajo la fecha, que es donde se busca. Con esa
+  // columna fuera, las cifras tienen el ancho que necesitan sin desbordarse.
+  let h='<div class="card-np"><div class="tw"><table class="tbl-pagos">';
   h+=`<thead><tr>
-    <th style="width:30px;text-align:center"><input type="checkbox" onchange="togglePagAll(this.checked)"></th>
-    <th class="tl" style="width:90px">FECHA</th>
-    <th class="tl" style="width:110px">DTE</th>
-    <th class="tl" style="width:80px">N°</th>
-    <th class="tl">RAZÓN SOCIAL / RUT</th>
-    <th style="text-align:right;width:110px">TOTAL DOC</th>
-    <th style="text-align:right;width:110px">YA ${PAG.tipo==='proveedor'?'PAGADO':'COBRADO'}</th>
-    <th style="text-align:right;width:110px">SALDO</th>
-    <th style="width:120px">MONTO ${accionLbl.toUpperCase()}</th>
+    <th class="c-chk"><input type="checkbox" onchange="togglePagAll(this.checked)"></th>
+    <th class="tl c-fecha">FECHA</th>
+    <th class="tl c-dte">DOCUMENTO</th>
+    <th class="tl c-num">N°</th>
+    <th class="c-money">TOTAL DOC</th>
+    <th class="c-money">YA ${PAG.tipo==='proveedor'?'PAGADO':'COBRADO'}</th>
+    <th class="c-money">SALDO</th>
+    <th class="c-monto">MONTO ${accionLbl.toUpperCase()}</th>
   </tr></thead><tbody>`;
 
   Object.values(porRut).sort((a,b)=>(a.razonSocial||'').localeCompare(b.razonSocial||'')).forEach(aux=>{
@@ -332,7 +336,7 @@ function renderPagosTabla(){
       <td colspan="4" class="tl" style="font-weight:700;padding:6px 8px">
         ${aux.razonSocial||'(sin razón social)'} <span style="color:var(--mt);font-family:var(--mono);font-size:10px">${rutFmt(aux.rutCodigo,aux.rutDV)}</span>
       </td>
-      <td colspan="4" style="text-align:right;padding:6px 8px;color:var(--mt);font-size:11px">
+      <td colspan="3" style="text-align:right;padding:6px 8px;color:var(--mt);font-size:11px">
         Total pendiente:
       </td>
       <td style="text-align:right;padding:6px 8px;font-family:var(--mono);font-weight:700">${fmtC(aux.total)}</td>
@@ -360,17 +364,19 @@ function renderPagosTabla(){
           ↩ NC N°${n.numero} ${fmtC(n.monto)} · Asociar
         </span>`).join(''):'';
 
+      // Los avisos de nota de crédito van en la celda del documento, que es la
+      // que crece: en la del folio obligaban a esa columna a ser ancha para
+      // nada, y el N° es lo más corto de la fila.
       h+=`<tr ${sel?'style="background:rgba(46,160,67,.04)"':''}>
-        <td style="text-align:center"><input type="checkbox" ${sel?'checked':''} onchange="togglePagSel('${d.id}',this.checked)"></td>
-        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.fecha}</td>
-        <td class="tl" style="font-size:11px">${dteNm}</td>
-        <td class="tl" style="font-family:var(--mono);font-size:11px">${d.numero}${badgeHuerfana}${badgeNotaAuto}</td>
-        <td class="tl" style="color:var(--mt);font-size:11px">${d.fechaVencimiento?'Vence '+d.fechaVencimiento:''}</td>
-        <td style="text-align:right;font-family:var(--mono)">${fmtC(d.totalSigno)}</td>
-        <td style="text-align:right;font-family:var(--mono);color:${d.pagosSum?'var(--ach)':'var(--mt)'}">${d.pagosSum?fmtC(d.pagosSum):'—'}</td>
-        <td style="text-align:right;font-family:var(--mono);font-weight:700;color:${d.saldo<0?'var(--err)':'var(--tx)'}">${fmtC(d.saldo)}</td>
-        <td style="text-align:right">
-          <input type="number" style="width:100px;text-align:right;font-family:var(--mono);font-size:11px;padding:3px 6px"
+        <td class="c-chk"><input type="checkbox" ${sel?'checked':''} onchange="togglePagSel('${d.id}',this.checked)"></td>
+        <td class="tl c-fecha mono11">${d.fecha}${d.fechaVencimiento?`<div class="pag-vence">Vence ${d.fechaVencimiento}</div>`:''}</td>
+        <td class="tl c-dte">${dteNm}${badgeHuerfana}${badgeNotaAuto}</td>
+        <td class="tl c-num mono11">${d.numero}</td>
+        <td class="c-money">${fmtC(d.totalSigno)}</td>
+        <td class="c-money" style="color:${d.pagosSum?'var(--ach)':'var(--mt)'}">${d.pagosSum?fmtC(d.pagosSum):'—'}</td>
+        <td class="c-money" style="font-weight:700;color:${d.saldo<0?'var(--err)':'var(--tx)'}">${fmtC(d.saldo)}</td>
+        <td class="c-monto">
+          <input type="number" class="pag-monto-inp"
             value="${montoDef}" oninput="setPagMontoParcial('${d.id}',this.value)"
             ${sel?'':'disabled style="opacity:.4"'}>
         </td>
@@ -379,18 +385,18 @@ function renderPagosTabla(){
       (d.notas||[]).forEach(n=>{
         const nmN=n.dteInfo?.nm||`DTE ${n.tipoDTE}`;
         const efecto=(n.total||0)*n.signo;
-        h+=`<tr style="background:rgba(88,166,255,.04)">
-          <td></td>
-          <td class="tl" style="font-family:var(--mono);font-size:10px;padding-left:20px;color:var(--mt)">${n.fecha}</td>
-          <td class="tl" style="font-size:10px;color:var(--info)">↳ ${nmN}</td>
-          <td class="tl" style="font-family:var(--mono);font-size:10px;color:var(--mt)">${n.numero}
-            <button class="btn btn-g" style="font-size:9px;padding:1px 5px;margin-left:4px" onclick="quitarReferencia('${n.id}')" title="Quitar referencia a factura">✕</button>
+        h+=`<tr class="pag-sub">
+          <td class="c-chk"></td>
+          <td class="tl c-fecha mono10">${n.fecha}</td>
+          <td class="tl c-dte" style="font-size:10px;color:var(--info)">↳ ${nmN}
+            <span style="color:var(--mt)">· aplicado a N°${d.numero}</span></td>
+          <td class="tl c-num mono10">${n.numero}
+            <button class="btn btn-g pag-quitar" onclick="quitarReferencia('${n.id}')" title="Quitar la referencia a la factura">✕</button>
           </td>
-          <td class="tl" style="color:var(--mt);font-size:10px">aplicado a N°${d.numero}</td>
-          <td style="text-align:right;font-family:var(--mono);font-size:10px;color:${efecto<0?'var(--err)':'var(--ach)'}">${efecto>0?'+':''}${fmtC(efecto)}</td>
-          <td></td>
-          <td></td>
-          <td></td>
+          <td class="c-money" style="font-size:10px;color:${efecto<0?'var(--err)':'var(--ach)'}">${efecto>0?'+':''}${fmtC(efecto)}</td>
+          <td class="c-money"></td>
+          <td class="c-money"></td>
+          <td class="c-monto"></td>
         </tr>`;
       });
     });

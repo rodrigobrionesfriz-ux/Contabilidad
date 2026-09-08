@@ -126,6 +126,8 @@ import {renderF29, renderPPM, IVAC, renderCompensacionIVA, generarAsientoIVA,
         setIvacCuenta, setIvacCampo, resetIvacCuentas, crearCuentaRemanente,
         PAGOF29, renderPagoF29, generarAsientoPagoF29, setPagoF29Cuenta, setPagoF29Campo,
         setPagoF29Monto, togglePagoF29, resetPagoF29, usarSugeridoF29} from './tributario.js';
+import {DJ, renderDJ, cargarDJ, resetDJ, setDJVerTodas, setDJEstado, editarDJ, nuevaDJ,
+        cerrarEditorDJ, guardarDJ, borrarDJ, restaurarCatalogoDJ, exportarDJExcel} from './djrenta.js';
 import {renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
         addRentaLinea, setRentaLinea, delRentaLinea, setRentaCredito, exportRentaXLSX,
         resetRenta} from './renta.js';
@@ -234,6 +236,7 @@ async function loadYear(y){
   S.ventas=[];S.compras=[];S.honorarios=[];S.asientos=[];S.apertura=null;S.activos=[];S.trabajadores=[];
   S.cargaFallida=[];
   resetRenta(); // los ajustes del F22 son por empresa+año: se recargan al entrar a la sección
+  resetDJ();    // ídem el catálogo y el control de declaraciones juradas
 
   const leer=async(clave,aplicar)=>{
     const r=await window.storage.leerConEstado(clave);
@@ -418,6 +421,7 @@ function renderSec(s){
   else if(s==='inicio')renderInicio();
   else if(s==='ppm')renderPPM();
   else if(s==='renta')renderRenta();
+  else if(s==='dj')renderDJ();
   else if(s==='activofijo')renderActivoFijo();
   else if(s==='provisiones')renderProvisiones();
   else if(s==='correccion')renderCorreccion();
@@ -487,7 +491,7 @@ setOnAuthReady(initApp);
 // El HTML usa onclick="renderVentas()" etc. Los módulos ES tienen scope propio,
 // así que hay que publicar esas funciones en window.
 // Objetos de estado usados directamente en onclick del HTML
-Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec, CD, IVAC, PAGOF29});
+Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec, CD, IVAC, PAGOF29, DJ});
 
 Object.assign(window,{
   // utilidades
@@ -580,7 +584,9 @@ Object.assign(window,{
   auxPorRut, abrirReporteAuxDe, abrirReporteAux, cerrarReporteAux, setReporteAuxVista,
   renderReporteAux, imprimirReporteAux, exportarReporteAuxExcel,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
-  // declaración de renta (F22)
+  // declaraciones juradas de renta
+  renderDJ, cargarDJ, resetDJ, setDJVerTodas, setDJEstado, editarDJ, nuevaDJ, cerrarEditorDJ,
+  guardarDJ, borrarDJ, restaurarCatalogoDJ, exportarDJExcel,
   renderRenta, setRentaTab, setRentaParam, restaurarTasaLegal, toggleRechazada,
   onRegimenEmpresaChange, pintarRegimen, onRegimenChange, aplicarPermisosUI,
   toggleAyuda, actualizarAyuda, renderInicio, abrirEmpresaInicio,

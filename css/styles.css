@@ -7,6 +7,7 @@
   --bg:#0d1117;--sf:#161b22;--sf2:#21262d;--bd:#30363d;
   --ac:#2ea043;--ach:#3fb950;--tx:#e6edf3;--mt:#8b949e;
   --err:#f85149;--warn:#d29922;--info:#58a6ff;
+  --acc:#2ea043;  /* alias histórico de --ac */
   --logo1:#2ea043;--logo2:#56d364;
   --mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif;
 }
@@ -24,6 +25,7 @@ html[data-theme="sap-light"]{
   --err:#bb0000;     /* negativo SAP */
   --warn:#e9730c;    /* crítico SAP */
   --info:#0a6ed1;
+  --acc:#0a6ed1;  /* alias histórico de --ac */
   --logo1:#0a6ed1;--logo2:#0854a0;
   --mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif;
 }
@@ -41,6 +43,7 @@ html[data-theme="sap-dark"]{
   --err:#ff8081;
   --warn:#f5a86b;
   --info:#4db1ff;
+  --acc:#4db1ff;  /* alias histórico de --ac */
   --logo1:#0a6ed1;--logo2:#4db1ff;
   --mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif;
 }
@@ -634,4 +637,93 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
   body.imprimiendo-reporte .rep-scroll{overflow:visible!important}
   body.imprimiendo-reporte .rep-tabla{min-width:0!important}
   body.imprimiendo-reporte .rep-hija td{background:#f7f9fc!important}
+}
+
+/* ═══ TABLA DE PAGOS Y COBROS ═══
+   Las cifras chilenas llegan a nueve dígitos más el símbolo ($ 119.000.190),
+   así que las columnas de dinero necesitan ancho fijo y prohibido el corte:
+   antes se apretaban y el encabezado se partía en dos líneas.
+   El folio es lo más corto de la fila y va estrecho; el nombre del documento
+   es la única columna que crece, porque ahí van los avisos de nota de crédito. */
+.tbl-pagos{width:100%;font-size:12px;min-width:940px}
+.tbl-pagos th{white-space:nowrap}
+.tbl-pagos .c-chk{width:34px;text-align:center}
+.tbl-pagos .c-fecha{width:88px}
+.tbl-pagos .c-dte{min-width:170px}
+.tbl-pagos .c-num{width:82px}
+.tbl-pagos .c-money{width:122px;text-align:right;white-space:nowrap;font-family:var(--mono)}
+.tbl-pagos .c-monto{width:124px;text-align:right}
+.tbl-pagos .mono11{font-family:var(--mono);font-size:11px}
+.tbl-pagos .mono10{font-family:var(--mono);font-size:10px;color:var(--mt)}
+.tbl-pagos .pag-vence{font-size:9px;color:var(--mt);margin-top:1px;white-space:nowrap}
+.tbl-pagos .pag-sub{background:rgba(88,166,255,.04)}
+.tbl-pagos .pag-sub .c-fecha{padding-left:20px}
+.tbl-pagos .pag-quitar{font-size:9px;padding:1px 5px;margin-left:4px}
+.pag-monto-inp{width:100%;max-width:112px;text-align:right;font-family:var(--mono);
+  font-size:11px;padding:3px 6px}
+@media(max-width:900px){
+  .tbl-pagos{font-size:11px;min-width:880px}
+  .tbl-pagos .c-money{width:112px}
+  .tbl-pagos .c-monto{width:112px}
+}
+
+/* ═══ DECLARACIONES JURADAS DE RENTA ═══
+   Cada declaración es una tarjeta: a la izquierda qué es y cuándo vence, a la
+   derecha el estado y los botones. Las que no aplican al régimen de la empresa
+   se muestran apagadas cuando se pide ver todo el catálogo. */
+.dj-card{padding:14px 16px;margin-bottom:10px}
+.dj-ajena{opacity:.5}
+.dj-ajena:hover{opacity:.85}
+.dj-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.dj-titulo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:13.5px;font-weight:700;line-height:1.35}
+.dj-num{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--acc);
+  background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.28);
+  border-radius:5px;padding:2px 7px;white-space:nowrap}
+.dj-desc{font-size:11.5px;color:var(--mt);margin-top:5px;line-height:1.5;max-width:74ch}
+.dj-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font-size:10.5px;color:var(--mt);margin-top:7px}
+.dj-meta strong{color:var(--tx);font-weight:600}
+.dj-ctrl{color:var(--mt);opacity:.8}
+.dj-nota{font-size:10.5px;color:var(--warn);margin-top:6px;line-height:1.5;max-width:74ch}
+.dj-acciones{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.dj-estado{font-size:11px;font-weight:600;padding:5px 8px;min-width:118px}
+.dj-badge{font-size:9px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;
+  color:var(--mt);border:1px solid var(--bd);border-radius:4px;padding:1px 5px;white-space:nowrap}
+.dj-propia{color:var(--acc);border-color:rgba(88,166,255,.4)}
+.dj-alerta{font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;
+  border-radius:4px;padding:2px 7px;white-space:nowrap}
+.dj-vencida{color:var(--err);background:rgba(248,81,73,.13);border:1px solid rgba(248,81,73,.35)}
+.dj-pronto{color:var(--warn);background:rgba(210,153,34,.13);border:1px solid rgba(210,153,34,.35)}
+
+/* Datos de la presentación: aparecen sólo cuando la DJ ya está preparada */
+.dj-registro{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--bd)}
+.dj-registro .grp.full{grid-column:1/-1}
+
+/* Cifras de control que el sistema ya conoce */
+.dj-resumen{margin-top:12px;padding:11px 13px;background:var(--sf2);
+  border:1px solid var(--bd);border-radius:8px}
+.dj-resumen-t{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;
+  font-weight:700;color:var(--mt);margin-bottom:7px}
+.dj-tabla{width:100%;font-size:11.5px;border-collapse:collapse}
+.dj-tabla td{padding:3px 0;border:0}
+.dj-tabla .tl{color:var(--mt)}
+.dj-val{text-align:right;font-family:var(--mono);font-weight:600;white-space:nowrap}
+.dj-resumen-p{font-size:10px;color:var(--mt);margin-top:8px;line-height:1.5}
+.dj-resumen-p a{color:var(--acc);text-decoration:none;margin-left:4px}
+.dj-resumen-p a:hover{text-decoration:underline}
+
+/* Casillas de régimen dentro del editor del catálogo */
+.dj-regs{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:6px;margin-top:7px}
+.dj-reg{display:flex;align-items:center;gap:7px;font-size:11.5px;cursor:pointer;
+  padding:6px 9px;border:1px solid var(--bd);border-radius:6px;background:var(--sf2)}
+.dj-reg:hover{border-color:var(--acc)}
+.dj-reg input{width:14px;height:14px;flex-shrink:0;margin:0;cursor:pointer}
+.dj-reg:has(input:checked){border-color:var(--acc);background:rgba(88,166,255,.09)}
+
+@media(max-width:760px){
+  .dj-acciones{width:100%;justify-content:flex-start}
+  .dj-estado{flex:1;min-width:0}
 }

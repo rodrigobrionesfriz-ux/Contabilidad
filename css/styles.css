@@ -270,6 +270,7 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 .doc-grid{display:grid;grid-template-columns:130px 130px 170px 130px;gap:10px;margin-bottom:10px}
 .doc-grid-rut{display:grid;grid-template-columns:170px 1fr;gap:10px;margin-bottom:10px}
 .doc-grid-totals{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+.doc-grid-2{grid-template-columns:1fr 1fr}
 .doc-dup-warn{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.35);color:var(--err);padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;font-weight:600}
 .doc-folio{display:inline-block;background:var(--sf2);color:var(--ac);padding:1px 7px;border-radius:3px;font-family:var(--mono);font-size:10px;font-weight:700}
 .rut-wrap{position:relative}
@@ -277,12 +278,21 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 .rut-dv{position:absolute;right:10px;top:27px;font-family:var(--mono);font-size:11px;color:var(--mt);pointer-events:none;font-weight:700}
 .rut-dv.ok{color:var(--ach)}
 .rut-dv.bad{color:var(--err)}
-/* DISTRIBUTION (compras) */
-.dist-hdr{display:grid;grid-template-columns:36px 1fr 130px 36px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
+/* DISTRIBUTION (compras)
+   Dos formas de fila comparten estas clases: la del Libro de Compras, que lleva
+   centro de costo (5 celdas, marcada con .cc en el encabezado y en la caja), y
+   la del modal de DTE dentro de un asiento, que no lo lleva (4 celdas). */
+.dist-hdr{display:grid;grid-template-columns:34px minmax(0,1fr) 126px 34px;gap:6px;padding:7px 10px;background:var(--sf2);border-radius:6px 6px 0 0;font-size:10px;font-weight:700;color:var(--mt);text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--bd);border-bottom:none}
 .dist-box{border:1px solid var(--bd);border-radius:0 0 6px 6px;margin-bottom:8px;background:var(--bg)}
-.dist-row{display:grid;grid-template-columns:36px 1fr 130px 36px;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(48,54,61,.7);align-items:center}
+.dist-row{display:grid;grid-template-columns:34px minmax(0,1fr) 126px 34px;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(48,54,61,.7);align-items:center}
+.dist-hdr.cc,.dist-box.cc .dist-row{grid-template-columns:34px minmax(0,1fr) 118px 158px 34px}
+/* MONTO va alineado a la derecha sobre su columna de números, así que sin este
+   respiro el rótulo queda pegado al de CENTRO DE COSTO. */
+.dist-hdr.cc>div:nth-child(4){padding-left:8px}
 .dist-row:last-child{border-bottom:none}
 .dist-num{font-family:var(--mono);font-size:11px;color:var(--mt);text-align:center}
+.dist-del{text-align:center}
+.dist-del .btn{padding:3px 7px;font-size:10px}
 .dist-inp{background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:5px 8px;font-family:var(--sans);font-size:12px;width:100%}
 .dist-inp:focus{outline:none;border-color:var(--ac)}
 .dist-num-inp{background:var(--sf);border:1px solid var(--bd);border-radius:5px;color:var(--tx);padding:5px 8px;font-family:var(--mono);font-size:12px;width:100%;text-align:right}
@@ -783,4 +793,76 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 @media(max-width:900px){
   .tbl-asigcc{min-width:900px;font-size:11px}
   .tbl-asigcc .acc-cc{width:210px}
+}
+
+/* ═══ FORMULARIO DE DOCUMENTO EN MÓVIL ═══
+   El formulario de compras y ventas estaba pensado para escritorio: .doc-grid
+   con columnas fijas (130+130+170+130) y .doc-grid-totals con cinco columnas
+   iguales. En un teléfono de 412 px eso significaba dos cosas malas a la vez:
+   el grid se salía por la derecha —el rótulo "TIPO DOCUMENTO" quedaba cortado—
+   y los cinco campos de importe se apretaban a unos 60 px, así que $460.000 se
+   veía "4600" y $5.474.000 "5474". Los montos son justamente lo que hay que
+   poder leer al revisar un documento.
+   Aquí se reordena a rejillas que sí caben, se achica la tipografía de los
+   formularios y la fila de distribución se apila con su etiqueta encima de
+   cada campo. */
+@media (max-width:768px){
+  .doc-form{padding:12px}
+  .doc-form-title{flex-wrap:wrap;gap:8px;font-size:13px;margin-bottom:12px}
+  .doc-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .doc-grid-rut{grid-template-columns:1fr;gap:8px}
+  /* Forma de pago y cuenta de ingreso: el nombre de una cuenta del plan pasa
+     los 40 caracteres, así que en móvil van a lo ancho o no se leen enteros. */
+  .doc-grid.doc-grid-2{grid-template-columns:1fr}
+  .doc-grid-totals{grid-template-columns:1fr 1fr 1fr;gap:8px}
+  /* Etiquetas de dos palabras ("Fecha Vencimiento") caben en dos líneas sin
+     empujar el campo: se les da altura fija para que los inputs queden alineados. */
+  .doc-form label{font-size:9px;line-height:1.25;letter-spacing:.04em}
+  .doc-form input,.doc-form select{font-size:12px;padding:6px 8px}
+  .doc-form input[type=number]{text-align:right}
+  .rut-wrap input{padding-right:34px}
+  .rut-dv{top:auto;bottom:8px;right:8px}
+  /* El detalle del cuadre se va abajo en vez de empujar el mensaje */
+  .dist-check{flex-wrap:wrap;gap:4px 10px;font-size:11px;padding:8px 10px}
+  .dist-check-det{margin-left:0;flex-basis:100%}
+}
+
+@media (max-width:380px){
+  /* Cinco importes en tres columnas dejan celdas de ~100 px, que alcanzan para
+     nueve dígitos en mono de 12 px. Por debajo de 380 ya no, y bajan a dos. */
+  .doc-grid-totals{grid-template-columns:1fr 1fr}
+}
+
+@media (max-width:640px){
+  /* La fila de distribución se apila: no hay forma de meter cuenta, monto y
+     centro de costo en 380 px sin cortar los tres. Como el encabezado de la
+     tabla desaparece, cada campo lleva su propio rótulo. */
+  .dist-hdr{display:none}
+  .dist-box{border-radius:6px}
+  .dist-row,.dist-box.cc .dist-row{
+    grid-template-columns:minmax(0,1fr) 34px;
+    gap:4px 8px;
+    padding:10px 10px 12px;
+    align-items:start;
+  }
+  .dist-row>.dist-num{grid-column:1;grid-row:1;text-align:left;align-self:center;
+    font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase}
+  .dist-row>.dist-num::before{content:'Línea '}
+  .dist-row>.dist-del{grid-column:2;grid-row:1;justify-self:end}
+  .dist-row>.dist-del .btn{padding:5px 9px;font-size:12px}
+  .dist-row>.dist-cd{grid-column:1/-1;grid-row:2}
+  .dist-row>.dist-mt{grid-column:1/-1;grid-row:3}
+  .dist-row>.dist-ccc{grid-column:1/-1;grid-row:4}
+  .dist-row>.dist-cd::before,
+  .dist-row>.dist-mt::before,
+  .dist-row>.dist-ccc::before{
+    display:block;margin-bottom:2px;
+    font-size:9px;font-weight:700;color:var(--mt);
+    text-transform:uppercase;letter-spacing:.06em;
+  }
+  .dist-row>.dist-cd::before{content:'Cuenta de costo o gasto'}
+  .dist-row>.dist-mt::before{content:'Monto'}
+  .dist-row>.dist-ccc::before{content:'Centro de costo'}
+  .dist-row .dist-inp,.dist-row .dist-num-inp{font-size:12px;padding:7px 9px}
 }

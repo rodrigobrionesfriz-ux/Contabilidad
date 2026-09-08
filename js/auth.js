@@ -60,6 +60,7 @@ const SECCIONES=[
   {id:'ppm',lbl:'PPM'},
   {id:'renta',lbl:'Declaración de Renta'},
   {id:'dj',lbl:'Declaraciones Juradas'},
+  {id:'asigcc',lbl:'Asignar Centros de Costo'},
   {id:'activofijo',lbl:'Activos Fijos'},
   {id:'provisiones',lbl:'Provisiones'},
   {id:'correccion',lbl:'Corrección Monetaria'},

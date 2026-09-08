@@ -135,8 +135,11 @@ function irAResultado(i){
     toast('Ese registro no tiene un comprobante propio — te llevo a su libro');
   }
 
-  if(!puedeVer(it.sec)){toast('⚠️ No tienes permiso para ver esa sección','e');return;}
-  nav(it.sec);
+  // Los asientos manuales se editan dentro de Comprobantes: 'asientos' dejó de
+  // ser una sección propia y navegar ahí deja la pantalla en blanco.
+  const destino=(it.tipo==='Asiento'&&it.id)?'comprobantes':it.sec;
+  if(!puedeVer(destino)){toast('⚠️ No tienes permiso para ver esa sección','e');return;}
+  nav(destino);
   if(it.tipo==='Asiento'&&it.id){setTimeout(()=>{if(typeof editarAsiento==='function')editarAsiento(it.id);},150);}
 }
 // Atajo de teclado global Ctrl+K / Cmd+K

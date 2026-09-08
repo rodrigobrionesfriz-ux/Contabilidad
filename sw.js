@@ -18,7 +18,7 @@
 
 // _release.py reescribe esta línea en cada publicación: al cambiar el nombre,
 // la caché anterior se descarta entera en activate.
-const CACHE = 'contabilidad-1788897882';
+const CACHE = 'contabilidad-1788902858';
 
 // Lo mínimo para que la aplicación abra sin red. Los módulos JS y el CSS se van
 // guardando solos a medida que se usan (ver fetch), así no hay que mantener a

@@ -11,7 +11,7 @@
 import {fmt, fmtC, MESES, pdcNm, today, toast, rutFmt, dteV, dteC, rutParse, DTE_VENTAS, DTE_COMPRAS, IVA} from './core.js';
 import {S} from './state.js';
 import {nav, rerender} from './ui.js';
-import {genDiario} from './reportes.js';
+import {genDiario, destinoEdicion} from './reportes.js';
 import {editarAsiento, proxFolioAsiento, CUENTAS_AUX, esAux} from './asientos.js';
 import {inputCuenta} from './buscadorcuentas.js';
 import {logAccion} from './firebase.js';
@@ -186,23 +186,15 @@ export function renderComprobantes(){
       ?` <span style="background:rgba(248,81,73,.15);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">⚠ DESCUADRE ${fmtC(Math.abs(totED-totEH))}</span>`
       :'';
 
-    // Acción según origen — si hay descuadre, ir directo al documento
-    let btnEditar;
-    if(e.origen==='manual'){
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="editarAsientoDesdeCmp(${e.ref})" title="Editar asiento manual">✏️ ${descuadrado?'Corregir':'Editar'}</button>`;
-    }else if(e.origen==='apertura'){
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="nav('apertura')" title="Ir a Balance de Apertura">🔰 ${descuadrado?'Corregir':'Abrir'}</button>`;
-    }else if(e.fuente==='ventas'){
-      const accion=e.docId?`corregirCmp('ventas','${e.docId}')`:`nav('ventas')`;
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="${accion}" title="Editar el documento">🛒 ${descuadrado?'Corregir':'Al doc'}</button>`;
-    }else if(e.fuente==='compras'){
-      const accion=e.docId?`corregirCmp('compras','${e.docId}')`:`nav('compras')`;
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="${accion}" title="Editar el documento">🧾 ${descuadrado?'Corregir':'Al doc'}</button>`;
-    }else if(e.fuente==='honorarios'){
-      btnEditar=`<button class="btn btn-i" style="font-size:10px" onclick="nav('honorarios')" title="Ir al libro de honorarios">📝 ${descuadrado?'Corregir':'Al libro'}</button>`;
-    }else{
-      btnEditar='';
-    }
+    // Acción según origen — el destino lo decide destinoEdicion(), la misma
+    // función que usa el Libro Diario, para que el botón haga lo mismo en las
+    // dos pantallas. Si hay descuadre la etiqueta cambia a "Corregir".
+    // Ningún comprobante queda sin acción: los orígenes que no tienen editor
+    // propio ofrecen abrir el comprobante, donde sí se puede convertir a manual.
+    const dst=destinoEdicion(e);
+    const btnEditar=dst
+      ? `<button class="btn btn-i" style="font-size:10px" onclick="${dst.fn}" title="${attr(dst.hint)}">${dst.ic} ${descuadrado?'Corregir':dst.lbl}</button>`
+      : `<button class="btn btn-g" style="font-size:10px" onclick="abrirCmpModal(${i})" title="Ver el comprobante completo">👁 Ver</button>`;
 
     // Toda la fila abre el modal de vista/edición del comprobante
     // (el índice del array `entries` va como referencia)
@@ -322,26 +314,9 @@ function toggleCmpDet(id){
   t.style.display=t.style.display==='none'?'':'none';
 }
 
-// Editar asiento manual desde Comprobantes: navega a Asientos y abre el editor.
-function editarAsientoDesdeCmp(n){
-  const a=S.asientos.find(x=>x.n===n);
-  if(!a)return;
-  nav('asientos');
-  // pequeña espera para que la sección se muestre antes de abrir el editor
-  setTimeout(()=>editarAsiento(a.id),50);
-}
-
-// Va al documento origen de un asiento automático (ventas/compras) para editarlo.
-function corregirCmp(fuente,docId){
-  if(!docId){nav(fuente);return;}
-  nav(fuente);
-  setTimeout(()=>{
-    try{
-      if(fuente==='compras'&&window.editarCompra)window.editarCompra(docId);
-      else if(fuente==='ventas'&&window.editarVenta)window.editarVenta(docId);
-    }catch(e){}
-  },80);
-}
+// Nota: la navegación a "editar" vive en reportes.js (editarAsientoRef y
+// corregirDesdeDiario), a donde apunta destinoEdicion(). Antes había aquí una
+// copia de ambas y las dos pantallas podían quedar haciendo cosas distintas.
 
 // ═══ MODAL VER / EDITAR COMPROBANTE ═══
 //
@@ -1076,7 +1051,7 @@ function guardarCmpEdDte(){
 }
 
 export {abrirComprobantePor,
-        setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp,
+        setCmpFiltro, limpiarCmpFiltro, toggleCmpDet,
         cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         eliminarComprobante, anularComprobante,

@@ -5,6 +5,7 @@ import {nav} from './ui.js';
 import {retencionHonorarios} from './indicadores.js';
 import {toggleAgingDetalle} from './auxiliares.js';
 import {mesOpts, mesRango} from './helpers.js';
+import {pendientesCC} from './asigcc.js';
 import {S} from './state.js';
 import './storage.js';
 
@@ -193,8 +194,16 @@ function genDiario(){
     const honM=S.honorarios.filter(h=>h.mes===m);
     if(honM.length){
       const tBruto=honM.reduce((s,h)=>s+ +(h.bruto||0),0),tRet=Math.round(tBruto*retencionHonorarios(S.empresa.anio));
+      // El gasto se abre en una línea por centro de costo, para que el honorario
+      // de un predio sume en el costo acumulado de ese predio y no quede en una
+      // bolsa común. Sin centros asignados queda una sola línea, como antes.
+      const porCC={};
+      honM.forEach(h=>{const k=h.cc||'';porCC[k]=(porCC[k]||0)+ +(h.bruto||0);});
+      const lineasGasto=Object.keys(porCC).filter(k=>porCC[k])
+        .sort((a,b)=>porCC[b]-porCC[a])
+        .map(k=>({cd:'3202019',nm:'HONORARIOS',debe:porCC[k],haber:0,cc:k||undefined}));
       entries.push({n:n++,fecha,glosa:`Honorarios ${mesNm} ${anio}`,movs:[
-        {cd:'3202019',nm:'HONORARIOS',debe:tBruto,haber:0},
+        ...(lineasGasto.length?lineasGasto:[{cd:'3202019',nm:'HONORARIOS',debe:tBruto,haber:0}]),
         // La retención de la boleta es un impuesto retenido que se entera al SII
         // en el F29, no una deuda con el profesional: va a RETENCIÓN 2º CATEGORÍA.
         // (Antes se acreditaba en HONORARIOS POR PAGAR, que además es la cuenta
@@ -372,8 +381,8 @@ function renderDiarioTabla(){
   filtrarDiario(todasEntries).forEach(e=>{tD+=e.movs.reduce((s,m)=>s+m.debe,0);tH+=e.movs.reduce((s,m)=>s+m.haber,0);});
 
   let h=aviso+`<div class="card-np"><div class="tw"><table class="tbl-fija">
-    <colgroup><col style="width:42px"><col style="width:92px"><col><col style="width:82px"><col style="width:118px"><col style="width:118px"><col style="width:70px"></colgroup>
-    <thead><tr><th class="tl">N°</th><th class="tl">FECHA</th><th class="tl">GLOSA / CUENTA</th><th class="tl">CÓD.</th><th>DEBE</th><th>HABER</th><th class="tl">ORIGEN</th></tr></thead><tbody>`;
+    <colgroup><col style="width:42px"><col style="width:92px"><col><col style="width:82px"><col style="width:118px"><col style="width:118px"><col style="width:70px"><col style="width:92px"></colgroup>
+    <thead><tr><th class="tl">N°</th><th class="tl">FECHA</th><th class="tl">GLOSA / CUENTA</th><th class="tl">CÓD.</th><th>DEBE</th><th>HABER</th><th class="tl">ORIGEN</th><th class="tl no-print">EDITAR</th></tr></thead><tbody>`;
   entries.forEach(e=>{
     const eD=e.movs.reduce((s,m)=>s+m.debe,0),eH=e.movs.reduce((s,m)=>s+m.haber,0);
     const asDescuadrado=Math.abs(eD-eH)>1;
@@ -381,16 +390,22 @@ function renderDiarioTabla(){
     const ob=e.origen==='manual'?`<span class="badge bb">Manual</span>`:`<span class="badge" style="background:rgba(130,130,130,.12);color:var(--mt)">Auto</span>`;
     const trStyle=asDescuadrado?' style="background:rgba(248,81,73,.05)"':'';
     const badgeDescuadre=asDescuadrado?' <span style="background:rgba(248,81,73,.15);color:var(--err);padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin-left:6px">⚠ DESCUADRE</span>':'';
-    h+=`<tr class="rth"${trStyle}><td class="tl">${e.n}</td><td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td><td class="cel-trunc" colspan="2" title="${attr(e.glosa)}">${e.glosa}${badgeDescuadre}</td><td style="${estiloTotal}">${fmtC(eD)}</td><td style="${estiloTotal}">${fmtC(eH)}</td><td>${ob}</td></tr>`;
+    // Botón de edición por asiento. El destino depende del origen: los manuales
+    // se abren en el editor, los automáticos llevan al documento que los genera.
+    const d=destinoEdicion(e);
+    const btn=d
+      ? `<button class="btn btn-i btn-edit-dia" onclick="${d.fn}" title="${attr(d.hint)}">${d.ic} ${d.lbl}</button>`
+      : `<span style="color:var(--mt);font-size:10px">—</span>`;
+    h+=`<tr class="rth"${trStyle}><td class="tl">${e.n}</td><td class="tl" style="font-family:var(--mono);font-size:11px">${e.fecha}</td><td class="cel-trunc" colspan="2" title="${attr(e.glosa)}">${e.glosa}${badgeDescuadre}</td><td style="${estiloTotal}">${fmtC(eD)}</td><td style="${estiloTotal}">${fmtC(eH)}</td><td>${ob}</td><td class="tl no-print">${btn}</td></tr>`;
     e.movs.forEach(m=>{
       const isH=m.haber>0;
       const nmC=m.nm||pdcNm(m.cd)||'';
       const extra=m.desc?` — ${m.desc}`:'';
-      h+=`<tr><td></td><td></td><td class="cel-trunc" title="${attr(nmC+extra)}" style="${isH?'padding-left:28px;color:var(--mt)':''}">${nmC}${extra?`<span style="color:var(--mt);font-size:11px">${extra}</span>`:''}</td><td class="tl" style="font-family:var(--mono);font-size:11px;color:var(--mt)">${m.cd}</td><td>${m.debe?fmtC(m.debe):''}</td><td>${m.haber?fmtC(m.haber):''}</td><td></td></tr>`;
+      h+=`<tr><td></td><td></td><td class="cel-trunc" title="${attr(nmC+extra)}" style="${isH?'padding-left:28px;color:var(--mt)':''}">${nmC}${extra?`<span style="color:var(--mt);font-size:11px">${extra}</span>`:''}</td><td class="tl" style="font-family:var(--mono);font-size:11px;color:var(--mt)">${m.cd}</td><td>${m.debe?fmtC(m.debe):''}</td><td>${m.haber?fmtC(m.haber):''}</td><td></td><td class="no-print"></td></tr>`;
     });
   });
   const ok=Math.abs(tD-tH)<1;
-  h+=`</tbody><tfoot><tr><td class="tl" colspan="4">TOTALES ${hayFiltro?'— '+etiquetaPeriodo(DIA_F):(ocultos?'(todo el diario)':'')}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tD)}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tH)}</td><td></td></tr></tfoot></table></div></div>`;
+  h+=`</tbody><tfoot><tr><td class="tl" colspan="4">TOTALES ${hayFiltro?'— '+etiquetaPeriodo(DIA_F):(ocultos?'(todo el diario)':'')}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tD)}</td><td style="${ok?'':'color:var(--err);font-weight:700'}">${fmtC(tH)}</td><td></td><td class="no-print"></td></tr></tfoot></table></div></div>`;
   h+=`<div style="margin-top:10px;font-size:12px;color:${ok?'var(--ach)':'var(--err)'}">
     ${ok?'✅ Partida doble cuadrada — Debe = Haber = '+fmtC(tD):'⚠️ Descuadre: Debe '+fmtC(tD)+' | Haber '+fmtC(tH)+' | Diferencia '+fmtC(Math.abs(tD-tH))}</div>`;
   box.innerHTML=h;
@@ -462,11 +477,37 @@ async function corregirDesdeDiario(fuente,docId){
   },80);
 }
 
-// Abre el editor de un asiento manual por su n° correlativo
+// ── A dónde lleva "Editar" un asiento ──
+// Un asiento del diario no siempre se edita en el mismo lugar: los manuales se
+// abren en el editor de asientos, pero los automáticos son el reflejo de un
+// documento y hay que corregir el documento, no el asiento. Esta función
+// resuelve el destino una sola vez y la comparten el Libro Diario y
+// Comprobantes, para que el botón haga lo mismo en las dos pantallas.
+function destinoEdicion(e){
+  if(!e)return null;
+  if(e.origen==='manual'&&e.ref!=null)
+    return {ic:'✏️',lbl:'Editar',hint:`Editar el asiento manual N°${e.ref}`,fn:`editarAsientoRef(${e.ref})`};
+  if(e.origen==='apertura')
+    return {ic:'🔰',lbl:'Abrir',hint:'Ir al Balance de Apertura',fn:`nav('apertura')`};
+  if(e.fuente==='ventas')
+    return {ic:'🛒',lbl:'Al doc',hint:'Este asiento lo genera un documento: se edita en el Libro de Ventas',
+            fn:e.docId?`corregirDesdeDiario('ventas','${e.docId}')`:`nav('ventas')`};
+  if(e.fuente==='compras')
+    return {ic:'🧾',lbl:'Al doc',hint:'Este asiento lo genera un documento: se edita en el Libro de Compras',
+            fn:e.docId?`corregirDesdeDiario('compras','${e.docId}')`:`nav('compras')`};
+  if(e.fuente==='honorarios')
+    return {ic:'📝',lbl:'Al libro',hint:'Este asiento resume las boletas del mes: se edita en Honorarios',
+            fn:`nav('honorarios')`};
+  return null;
+}
+
+// Abre el editor de un asiento manual por su n° correlativo.
+// El destino es 'comprobantes', que es donde vive el formulario de asientos
+// manuales; 's-asientos' ya no existe como sección.
 function editarAsientoRef(n){
   const a=S.asientos.find(x=>x.n===n);
-  if(!a)return;
-  nav('asientos');
+  if(!a){toast('⚠️ No se encontró el asiento N°'+n,'e');return;}
+  nav('comprobantes');
   setTimeout(()=>{try{window.editarAsiento&&window.editarAsiento(a.id);}catch(e){}},50);
 }
 
@@ -950,7 +991,23 @@ async function renderResultados(){
     </tr>`;
   const espacio=`<tr><td colspan="2" style="height:6px;border:none"></td></tr>`;
 
-  document.getElementById('resultados-content').innerHTML=`<div class="card" style="max-width:720px">
+  // Aviso de gasto sin costear. El EERR es donde se mira el gasto, así que es
+  // el lugar natural para enterarse de que una parte no está llegando a ningún
+  // centro de costo — y para ir a repararlo de un clic.
+  let avisoCC='';
+  try{
+    const p=pendientesCC();
+    if(p.n){
+      avisoCC=`<div class="eerr-aviso no-print">
+        <span style="font-size:16px">🎯</span>
+        <span><strong>${p.n} movimiento${p.n===1?'':'s'} de gasto por ${fmtC(p.monto)}</strong>
+        no tiene${p.n===1?'':'n'} centro de costo, así que no suma${p.n===1?'':'n'} en el costo del predio ni del cuartel.</span>
+        <button class="btn btn-g" style="margin-left:auto;font-size:11px" onclick="nav('asigcc')">Asignar centros</button>
+      </div>`;
+    }
+  }catch(e){}
+
+  document.getElementById('resultados-content').innerHTML=avisoCC+`<div class="card" style="max-width:720px">
     <div style="text-align:center;margin-bottom:22px">
       <div style="font-size:16px;font-weight:700">${S.empresa.nombre||'(sin empresa)'}</div>
       <div style="color:var(--mt);font-size:12px;margin-top:3px">Estado de Resultados — Año ${S.empresa.anio}</div>
@@ -993,6 +1050,6 @@ async function renderResultados(){
 }
 
 
-export {genDiario, renderDiario, setDiarioQ, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados, corregirDesdeDiario, editarAsientoRef,
+export {genDiario, renderDiario, setDiarioQ, buildMayor, buildMayorAnio, totalesDeMayor, CMP_YEAR, fmtVar, renderMayor, renderBalance, poblarCmpSelect, onCmpYear, renderComparativo, renderResultados, corregirDesdeDiario, editarAsientoRef, destinoEdicion,
         onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
         onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla, exportarMayorExcel};

@@ -47,6 +47,9 @@ import {buscarCT, cerrarBuscarCT, navCT, aplicarCT, abrirCTModal, cerrarCTModal,
         toggleCTDist, setCTDist, addCTDist, delCTDist, repartirCTDist,
         editarCT, guardarCT, borrarCT, copiarCTaEmpresa} from './comprobantestipo-ui.js';
 import {cargarCentros, cargarCierresCC, ccOpts, ccNombre, costoAcumulado} from './centroscosto.js';
+import {renderAsigCC, resetAsigCC, setAsigCC, limpiarFiltrosCC, setCCMov, toggleSelCC,
+        selTodosCC, limpiarSelCC, setBulkCC, asignarSelCC, exportarAsigCCExcel,
+        pendientesCC, ACC} from './asigcc.js';
 import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
         verDetalleCC, abrirCapitalizar, confirmarCapitalizar, onCurvaChange,
         setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual,
@@ -111,7 +114,7 @@ import {genDiario, renderDiario, setDiarioQ, buildMayor, renderMayor, renderBala
         onDiarioMes, setDiarioFecha, limpiarFiltrosDiario, exportarDiarioExcel,
         onMayorMes, setMayorFecha, setMayorQ, limpiarFiltrosMayor, renderMayorTabla,
         exportarMayorExcel} from './reportes.js';
-import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
+import {renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
         abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
         eliminarComprobante, anularComprobante,
         setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
@@ -237,6 +240,7 @@ async function loadYear(y){
   S.cargaFallida=[];
   resetRenta(); // los ajustes del F22 son por empresa+año: se recargan al entrar a la sección
   resetDJ();    // ídem el catálogo y el control de declaraciones juradas
+  resetAsigCC(); // ídem los filtros de asignación de centros de costo
 
   const leer=async(clave,aplicar)=>{
     const r=await window.storage.leerConEstado(clave);
@@ -422,6 +426,7 @@ function renderSec(s){
   else if(s==='ppm')renderPPM();
   else if(s==='renta')renderRenta();
   else if(s==='dj')renderDJ();
+  else if(s==='asigcc')renderAsigCC();
   else if(s==='activofijo')renderActivoFijo();
   else if(s==='provisiones')renderProvisiones();
   else if(s==='correccion')renderCorreccion();
@@ -491,7 +496,7 @@ setOnAuthReady(initApp);
 // El HTML usa onclick="renderVentas()" etc. Los módulos ES tienen scope propio,
 // así que hay que publicar esas funciones en window.
 // Objetos de estado usados directamente en onclick del HTML
-Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec, CD, IVAC, PAGOF29, DJ});
+Object.assign(window,{AF, VF, CF, REMF, AFB, PF, APF, IMB, IM, IMV, US, BD, S, getCurSec, CD, IVAC, PAGOF29, DJ, ACC});
 
 Object.assign(window,{
   // utilidades
@@ -518,7 +523,7 @@ Object.assign(window,{
   abrirImportSIIVentas, cambiarPeriodoImportV, toggleAllImportV, aplicarCuentaATodosV, setBulkCuentaImpV, setBulkCuentaImp, setImportCC, aplicarCCATodos,
   toggleCSel, toggleCSelAll, limpiarCSel, eliminarCSel, toggleVSel, toggleVSelAll, limpiarVSel, eliminarVSel, cambiarFPVSel,
   abrirFichaAux, abrirFichaAuxNueva, fichaRutInput, cerrarFichaAux, setFichaCuenta, guardarFichaAuxUI,
-  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, editarAsientoDesdeCmp, corregirCmp, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
+  renderComprobantes, setCmpFiltro, limpiarCmpFiltro, toggleCmpDet, cmpNumeroBuscar, renderCmpNumeroList, cmpNumeroElegir,
   abrirCmpModal, cerrarCmpModal, cmpModalEditar, cmpModalCancelar, cmpModalGuardar,
   eliminarComprobante, anularComprobante,
   setCmpEdGlosa, setCmpEdFecha, setCmpEdCuenta, setCmpEdCampo, setCmpEdMonto, setCmpEdMontoBlur, addCmpEdLinea, delCmpEdLinea,
@@ -584,6 +589,9 @@ Object.assign(window,{
   auxPorRut, abrirReporteAuxDe, abrirReporteAux, cerrarReporteAux, setReporteAuxVista,
   renderReporteAux, imprimirReporteAux, exportarReporteAuxExcel,
   renderF29, renderPPM, setFCView, renderFlujoCaja,
+  // asignación manual de centros de costo
+  renderAsigCC, resetAsigCC, setAsigCC, limpiarFiltrosCC, setCCMov, toggleSelCC, selTodosCC,
+  limpiarSelCC, setBulkCC, asignarSelCC, exportarAsigCCExcel, pendientesCC,
   // declaraciones juradas de renta
   renderDJ, cargarDJ, resetDJ, setDJVerTodas, setDJEstado, editarDJ, nuevaDJ, cerrarEditorDJ,
   guardarDJ, borrarDJ, restaurarCatalogoDJ, exportarDJExcel,

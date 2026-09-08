@@ -83,6 +83,7 @@ const ACCIONES_AUDITADAS=[
   // Borrar una empresa con sus datos elimina TODOS sus comprobantes de una vez:
   // es la eliminación más grande que permite el sistema y por eso queda.
   /^Eliminó empresa \(con datos\)$/i,
+  /^Asignó centro de costo/i,
 ];
 const seAudita=accion=>ACCIONES_AUDITADAS.some(re=>re.test(String(accion||'')));
 

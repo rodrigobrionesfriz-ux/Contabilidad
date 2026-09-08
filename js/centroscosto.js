@@ -158,7 +158,10 @@ export function eliminarCentro(id){
 }
 
 // ── Costos acumulados por centro ──
-// Recorre compras y asientos manuales buscando el campo cc (centro de costo).
+// Recorre compras, asientos manuales y boletas de honorarios buscando el campo
+// cc (centro de costo). Son las tres fuentes donde el gasto lleva centro; la
+// pantalla «Asignar Centros de Costo» recorre exactamente las mismas, para que
+// lo que ahí falta sea lo mismo que al centro le falta.
 export function contarMovimientos(idCC){
   let n=0;
   (S.compras||[]).forEach(d=>{
@@ -169,6 +172,7 @@ export function contarMovimientos(idCC){
     if(a.anulado||a.tipoCierreCC)return;
     (a.movs||[]).forEach(m=>{if(m.cc===idCC)n++;});
   });
+  (S.honorarios||[]).forEach(h=>{if(h.cc===idCC)n++;});
   return n;
 }
 
@@ -211,6 +215,19 @@ export function costoAcumulado(idCC,opts={}){
         }
       }
     });
+  });
+
+  // Honorarios: el gasto de la boleta se carga al centro que se le asignó
+  (S.honorarios||[]).forEach(h=>{
+    if(h.cc!==idCC)return;
+    const monto=+h.bruto||0;
+    if(!monto)return;
+    // La boleta no guarda día: se imputa al cierre de su mes, igual que en el
+    // asiento automático que genera el Libro Diario.
+    const fecha=`${S.empresa.anio}-${String(h.mes||1).padStart(2,'0')}-28`;
+    if(!dentroFecha(fecha))return;
+    total+=monto;
+    detalle.push({fecha,origen:'Honorario',doc:'Boleta',glosa:[h.nombre||'',h.rut||''].filter(Boolean).join(' · '),cuenta:'3202019',monto});
   });
 
   detalle.sort((x,y)=>(x.fecha||'').localeCompare(y.fecha||''));

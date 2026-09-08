@@ -507,6 +507,8 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
   /* Ocultar controles interactivos dentro de secciones */
   select,input[type=checkbox],input[type=file],input[type=number],input[type=text]{border:none!important}
   .sec-hdr .btn{display:none!important}
+  /* Columnas de acción: existen para clicar, no tienen sentido en papel */
+  .no-print{display:none!important}
 }
 #print-header{display:none}
 
@@ -667,6 +669,10 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
   .tbl-pagos .c-monto{width:112px}
 }
 
+/* Botón de edición por asiento en el Libro Diario: compacto, para que la
+   columna no le robe ancho a la glosa. */
+.btn-edit-dia{font-size:10px;padding:2px 7px;white-space:nowrap}
+
 /* ═══ DECLARACIONES JURADAS DE RENTA ═══
    Cada declaración es una tarjeta: a la izquierda qué es y cuándo vence, a la
    derecha el estado y los botones. Las que no aplican al régimen de la empresa
@@ -726,4 +732,55 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 @media(max-width:760px){
   .dj-acciones{width:100%;justify-content:flex-start}
   .dj-estado{flex:1;min-width:0}
+}
+
+/* ═══ ASIGNAR CENTROS DE COSTO ═══
+   Una fila por movimiento de gasto. El selector de centro es la columna que
+   importa, así que se le da ancho fijo generoso y el documento es la única
+   columna elástica. Las filas sin centro se marcan al borde izquierdo para
+   poder barrer la lista de un vistazo. */
+.acc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.acc-kpi{padding:10px 13px;background:var(--sf2);border:1px solid var(--bd);border-radius:8px}
+.acc-kpi-l{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--mt);font-weight:700}
+.acc-kpi-v{font-family:var(--mono);font-size:21px;font-weight:700;margin:3px 0 2px}
+.acc-kpi-s{font-size:10.5px;color:var(--mt)}
+.acc-barra{height:6px;border-radius:3px;background:var(--bd);overflow:hidden;margin-top:5px}
+.acc-barra span{display:block;height:100%;background:var(--ac);border-radius:3px}
+
+.acc-bulk{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px;
+  padding:10px 13px;border-radius:8px;
+  background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.28)}
+.acc-bulk-n{font-weight:700;font-size:12px;color:var(--info)}
+
+.tbl-asigcc{width:100%;font-size:12px;min-width:1000px}
+.tbl-asigcc th{white-space:nowrap}
+.tbl-asigcc td{vertical-align:top;padding-top:7px;padding-bottom:7px}
+.tbl-asigcc .acc-chk{width:32px;text-align:center;vertical-align:middle}
+.tbl-asigcc .acc-chk input{width:15px;height:15px;margin:0;cursor:pointer}
+.tbl-asigcc .acc-fecha{width:88px;font-family:var(--mono);font-size:11px}
+.tbl-asigcc .acc-cta{width:190px}
+.tbl-asigcc .acc-cod{font-family:var(--mono);font-size:11px;color:var(--mt)}
+.tbl-asigcc .acc-cta-nm{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-asigcc .acc-doc{min-width:200px}
+.tbl-asigcc .acc-glosa{font-size:10.5px;color:var(--mt);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34ch}
+.tbl-asigcc .acc-monto{width:126px;text-align:right;font-family:var(--mono);white-space:nowrap}
+.tbl-asigcc .acc-cc{width:250px}
+.tbl-asigcc .acc-cc select{width:100%;font-size:11px;padding:4px 6px}
+.tbl-asigcc .acc-hered{font-size:9.5px;color:var(--mt);margin-top:3px}
+.tbl-asigcc .acc-ir{width:44px;text-align:center;vertical-align:middle}
+.tbl-asigcc .acc-ir .btn{padding:3px 8px;font-size:11px}
+.tbl-asigcc .acc-org{display:inline-block;padding:2px 8px;border-radius:100px;
+  font-size:10px;font-weight:600;white-space:nowrap}
+/* Franja al borde de las filas todavía sin centro asignado */
+.tbl-asigcc tbody tr.acc-pend td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
+
+/* Aviso de gasto sin costear, en el Estado de Resultados */
+.eerr-aviso{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:rgba(210,153,34,.09);border:1px solid rgba(210,153,34,.35);
+  border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;max-width:720px}
+
+@media(max-width:900px){
+  .tbl-asigcc{min-width:900px;font-size:11px}
+  .tbl-asigcc .acc-cc{width:210px}
 }

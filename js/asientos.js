@@ -871,9 +871,13 @@ function anularAsiento(id){
   }
 }
 
-// Navegar desde libro al asiento manual que contiene el DTE
+// Navegar desde libro al asiento manual que contiene el DTE.
+// Va a 'comprobantes', NO a 'asientos': el formulario de asientos manuales vive
+// dentro de la sección Comprobantes desde que se unificaron. La sección
+// 's-asientos' ya no existe en el HTML, así que navegar ahí dejaba la pantalla
+// en blanco y el editor invisible aunque el asiento sí se hubiera cargado.
 function abrirAsientoDesde(asientoId){
-  nav('asientos');
+  nav('comprobantes');
   setTimeout(()=>editarAsiento(asientoId),120);
 }
 

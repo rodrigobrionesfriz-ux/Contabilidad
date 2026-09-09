@@ -866,3 +866,91 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
   .dist-row>.dist-ccc::before{content:'Centro de costo'}
   .dist-row .dist-inp,.dist-row .dist-num-inp{font-size:12px;padding:7px 9px}
 }
+
+/* ═══ BALANCE DE APERTURA ═══
+   Las líneas del asiento N°0 eran una rejilla de 36px + 1fr + 110 + 110. En un
+   teléfono el nombre de la cuenta se quedaba con unos 100 px y se partía letra
+   por letra ("BANCO / DE / CHILE / 04"), mientras los importes —que aquí llegan
+   a nueve dígitos— se salían de la tarjeta y quedaban cortados a la derecha.
+   En móvil la línea pasa a dos niveles: cuenta arriba a lo ancho, Debe y Haber
+   abajo con su rótulo. */
+.ap-card{border-left:4px solid var(--ach)}
+.ap-hdr{display:flex;gap:16px;padding:14px 16px;align-items:center}
+.ap-badge{background:var(--ach);color:var(--bg);font-weight:700;padding:4px 12px;
+  border-radius:6px;font-family:var(--mono);font-size:12px;white-space:nowrap}
+.ap-glosa{flex:1;min-width:0}
+.ap-glosa-t{font-weight:600;font-size:13px}
+.ap-glosa-s{color:var(--mt);font-size:11px;margin-top:2px}
+.ap-total{text-align:right}
+.ap-total-v{font-family:var(--mono);font-size:13px;font-weight:700;white-space:nowrap}
+.ap-total-s{font-size:10px}
+.ap-body{display:block;padding:0 16px 14px}
+.ap-linea{display:grid;grid-template-columns:34px minmax(0,1fr) 128px 128px;
+  padding:5px 0;font-size:12px;border-bottom:1px solid var(--bd);align-items:baseline}
+.ap-num{text-align:center;font-family:var(--mono);font-size:10px;color:var(--mt)}
+.ap-cta{padding-left:8px;min-width:0}
+.ap-linea.ap-h .ap-cta{padding-left:20px;color:var(--mt)}
+.ap-cd{font-family:var(--mono);font-size:10px;color:var(--mt)}
+.ap-nm{margin-left:6px}
+.ap-desc{color:var(--mt);font-size:11px}
+.ap-rut{font-size:10px;color:var(--info);margin-top:2px}
+.ap-rut .mono{font-family:var(--mono)}
+.ap-monto{text-align:right;font-family:var(--mono);white-space:nowrap}
+.ap-haber{color:var(--mt)}
+.ap-cero{color:var(--bd)}
+.ap-tot{font-weight:700;border-top:2px solid var(--bd);border-bottom:none;
+  margin-top:6px;padding:8px 0}
+.ap-tot .ap-monto{color:var(--tx)}
+
+/* La tabla de auxiliares de la apertura scrollea dentro de su .tw en vez de
+   apretar las columnas hasta cortar los montos. */
+.tbl-apxres{min-width:620px}
+
+@media (max-width:640px){
+  .ap-linea{
+    grid-template-columns:minmax(0,1fr) 116px 116px;
+    gap:2px 6px;
+    padding:9px 0 10px;
+  }
+  .ap-num{grid-column:1/-1;text-align:left;font-size:9px;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;font-family:var(--sans)}
+  .ap-num:not(:empty)::before{content:'Línea '}
+  .ap-cta,.ap-linea.ap-h .ap-cta{grid-column:1/-1;padding-left:0}
+  .ap-nm{margin-left:0;display:block;margin-top:1px}
+  /* Debe y Haber van los dos a la DERECHA, en columnas de ancho fijo, para que
+     los importes queden alineados entre líneas y se lean como en una columna
+     de balance. El ancho fijo es lo que permite comparar de un vistazo; la
+     tipografía se achica lo necesario para que quepan nueve dígitos. */
+  .ap-monto{margin-top:4px;text-align:right;font-size:11px}
+  .ap-debe{grid-column:2;grid-row:3}
+  .ap-haber{grid-column:3;grid-row:3}
+  /* Sin encabezado de columnas, cada importe dice qué es. El rótulo va encima
+     para no robarle ancho a la cifra. */
+  .ap-monto::before{content:attr(data-lbl);display:block;font-family:var(--sans);
+    font-size:8px;font-weight:700;color:var(--mt);text-transform:uppercase;
+    letter-spacing:.06em;line-height:1.2}
+  .ap-tot{padding-top:10px}
+  /* La cabecera del asiento (N°0, glosa, total) también se apila */
+  .ap-hdr{flex-wrap:wrap;gap:8px;padding:12px}
+  .ap-glosa{flex-basis:100%;order:3}
+  .ap-total{margin-left:auto}
+  .ap-body{padding:0 12px 12px}
+  /* Código y nombre en la misma línea: en un bloque de tres renglones, gastar
+     uno sólo en el código es caro. */
+  .ap-nm{display:inline;margin-left:6px}
+}
+
+@media (max-width:390px){
+  /* Nueve dígitos más el símbolo son 13 caracteres: a 10 px de mono son ~78 px
+     y siguen cabiendo en 104. */
+  .ap-linea{grid-template-columns:minmax(0,1fr) 104px 104px}
+  .ap-monto{font-size:10px}
+}
+
+/* Encabezado de sección en móvil: los botones se reparten en una fila que
+   envuelve, en vez de estirarse cada uno a lo ancho de la pantalla. */
+@media (max-width:768px){
+  .sec-hdr{flex-wrap:wrap}
+  .sec-hdr>div{flex-wrap:wrap;min-width:0;max-width:100%}
+  .sec-hdr .btn{flex:0 0 auto}
+}

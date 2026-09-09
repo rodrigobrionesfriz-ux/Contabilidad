@@ -282,10 +282,16 @@ async function loadYear(y){
 }
 async function changeYear(y){S.empresa.anio=y;await loadYear(y);rerender();}
 async function init(){
-  // Inicializar Firestore primero (necesario para verificar usuario)
-  await initFirestore();
+  // Firestore y Auth arrancan EN PARALELO.
+  // Antes se esperaba a que Firestore terminara de conectar para recién empezar
+  // a autenticar. En un teléfono que reabre la app con la red todavía dormida,
+  // esa espera podía durar varios segundos con la pantalla de login a la vista,
+  // y se leía como "me cerró la sesión". La verificación de permisos ya sabe
+  // esperar a Firestore por su cuenta, así que no hace falta bloquear aquí.
+  const conectando=initFirestore();
   // Inicializar Auth — mostrará el login si no hay sesión
   await initAuth();
+  await conectando;
   // El resto de la inicialización de la app se hace en initApp(), que se llama
   // desde verificarUsuarioAutorizado() una vez que hay usuario válido.
 }

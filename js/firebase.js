@@ -50,15 +50,47 @@ async function initFirestore(){
     FS.db=firebase.firestore();
     // Habilitar persistencia offline (para que funcione sin internet)
     try{await FS.db.enablePersistence({synchronizeTabs:true});}catch(e){/* ya habilitada o multi-tab */}
-    // Probar conexión con un read simple
-    await FS.db.collection('_meta').doc('ping').get();
+    // Probar conexión con un read simple. Con tope de tiempo: sin él, en una
+    // red móvil dormida esta promesa se queda colgada y todo lo que espera a
+    // Firestore se queda esperando con ella.
+    await Promise.race([
+      FS.db.collection('_meta').doc('ping').get(),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('sin respuesta en 8s')),8000)),
+    ]);
     FS.enabled=true;
     fsStatusSet('online');
     console.log('✓ Firestore conectado');
   }catch(e){
     console.error('Error Firestore:',e);
     fsStatusSet('error',e.code||e.message);
+    reintentarConexion();
   }
+}
+
+// Volver a intentar la conexión sola cuando la red vuelva.
+// Antes, si el primer intento fallaba, la app se quedaba en modo local hasta
+// que alguien recargara la página — justo lo que pasa al reabrir la app en el
+// teléfono antes de que el móvil enganche.
+let _reintento=null;
+function reintentarConexion(){
+  if(_reintento||FS.enabled||!FS.db)return;
+  const probar=async()=>{
+    if(FS.enabled){clearInterval(_reintento);_reintento=null;return;}
+    try{
+      fsStatusSet('connecting');
+      await Promise.race([
+        FS.db.collection('_meta').doc('ping').get(),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),8000)),
+      ]);
+      FS.enabled=true;
+      fsStatusSet('online');
+      clearInterval(_reintento);_reintento=null;
+      console.log('✓ Firestore reconectado');
+    }catch(e){ fsStatusSet('error',e.code||e.message); }
+  };
+  _reintento=setInterval(probar,20000);
+  // Si el navegador avisa que volvió la red, no esperar al próximo turno
+  try{window.addEventListener('online',probar);}catch(e){}
 }
 
 

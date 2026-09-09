@@ -1,5 +1,6 @@
 // auth.js — Autenticación, roles y permisos
 import {S, AUTH} from './state.js';
+import {toast} from './core.js';
 import {nav} from './ui.js';
 import {FS, initFirestore} from './firebase.js';
 import {seccionAplica} from './regimenes.js';
@@ -134,6 +135,41 @@ async function initAuth(){
   });
 }
 
+// ── Perfil recordado de este dispositivo ──
+//
+// Firebase restaura la sesión al reabrir la app, pero verificarUsuarioAutorizado
+// no dejaba entrar hasta completar DOS lecturas a Firestore. En el teléfono eso
+// es fatal: Android descarta el proceso, al volver la app arranca de cero y se
+// queda en la pantalla de login mirando "Verificando permisos…" mientras la red
+// móvil despierta —o mostrando un error si no hay señal—. Se ve exactamente
+// como si la sesión se hubiera cerrado, aunque estuviera perfectamente viva.
+//
+// Ahora el perfil autorizado se guarda en este dispositivo. Si Firebase devuelve
+// una sesión y hay perfil recordado para ese mismo correo, se entra de
+// inmediato y la verificación se hace DETRÁS; si resulta que la cuenta fue
+// desactivada o revocada, ahí se cierra sesión y se avisa.
+//
+// Esto no debilita la seguridad: el perfil recordado sólo decide qué se ve en
+// pantalla. Quién puede leer o escribir datos de verdad lo siguen decidiendo
+// las reglas de Firestore, del lado del servidor, en cada operación.
+const CLAVE_PERFIL='cv:perfil';
+
+function perfilRecordado(email){
+  if(!email)return null;
+  try{
+    const p=JSON.parse(localStorage.getItem(CLAVE_PERFIL)||'null');
+    if(p&&p.email&&p.email.toLowerCase()===String(email).toLowerCase()&&p.activo)return p;
+  }catch(e){}
+  return null;
+}
+function recordarPerfil(u){
+  try{localStorage.setItem(CLAVE_PERFIL,JSON.stringify({
+    email:u.email,nombre:u.nombre||'',foto:u.foto||'',
+    rol:u.rol||'consulta',activo:!!u.activo,permisos:u.permisos||null,
+  }));}catch(e){}
+}
+function olvidarPerfil(){try{localStorage.removeItem(CLAVE_PERFIL);}catch(e){}}
+
 // ── Preferencia de sesión de este dispositivo ──
 const CLAVE_SESION='cv:sesion-persistente';
 function sesionPersistente(){
@@ -244,28 +280,61 @@ async function recuperarPassword(){
   }
 }
 
+// Espera antes de reintentar la verificación cuando Firestore aún no responde.
+// Arranca corto y va cediendo: ahora que Auth y Firestore parten en paralelo,
+// lo normal es que falte medio segundo, no tres. Con el reintento fijo de 3 s
+// un login nuevo pagaba esa espera completa aunque la base ya estuviera lista.
+const ESPERAS=[250,500,1000,2000,3000];
+let _intentoVerif=0;
+
 async function verificarUsuarioAutorizado(fbUser){
   const errEl=document.getElementById('login-error');
   const loadEl=document.getElementById('login-loading');
-  loadEl.style.display='';loadEl.textContent='⏳ Verificando permisos...';
+
+  // ── Reanudar de inmediato con el perfil recordado ──
+  // Este es el camino normal al reabrir la app en el teléfono. La verificación
+  // contra Firestore sigue corriendo detrás; si la cuenta ya no está activa, se
+  // cierra sesión abajo.
+  const recordado=perfilRecordado(fbUser.email);
+  if(recordado&&!AUTH.user){
+    entrarConPerfil(recordado);
+  }
+  const yaDentro=!!AUTH.user;
+  if(!yaDentro){loadEl.style.display='';loadEl.textContent='⏳ Verificando permisos...';}
 
   if(!FS.enabled||!FS.db){
-    // Firestore no cargó, no podemos verificar. Bloquear con reintento.
-    errEl.style.display='';errEl.textContent='No hay conexión con la base de datos. Reintentando en 3s...';
-    setTimeout(()=>verificarUsuarioAutorizado(fbUser),3000);
+    // Sin base de datos todavía. Si ya entramos con el perfil recordado esto es
+    // sólo un reintento silencioso; si no, hay que esperar y decirlo sin
+    // aparentar que la sesión se cerró.
+    if(!yaDentro){
+      errEl.style.display='';
+      errEl.textContent=recordado
+        ? 'Reanudando tu sesión… esperando conexión con la base de datos.'
+        : 'Conectando con la base de datos…';
+    }
+    const espera=ESPERAS[Math.min(_intentoVerif++,ESPERAS.length-1)];
+    setTimeout(()=>verificarUsuarioAutorizado(fbUser),espera);
     return;
   }
+  _intentoVerif=0;
 
   try{
     const email=fbUser.email.toLowerCase();
     const doc=await FS.db.collection('usuarios').doc(email).get();
 
-    // ¿Cuántos usuarios hay en el sistema? (para detectar "primer/único usuario")
-    const todos=await FS.db.collection('usuarios').limit(2).get();
-    const esPrimerUsuario=todos.empty;
-    // Red de seguridad: si el ÚNICO documento del sistema es el de este mismo usuario,
-    // debe ser admin (evita quedar bloqueado si el registro inicial falló a medias).
-    const esUnicoYPropio=todos.size===1&&todos.docs[0].id===email;
+    // La cuenta de usuarios sólo hace falta para los casos raros: cuando el
+    // usuario no tiene documento (¿es el primero del sistema?) o cuando su
+    // documento quedó a medias. En el arranque normal esta segunda lectura
+    // duplicaba la espera para no cambiar nada.
+    const dudoso=!doc.exists||!doc.data()||!doc.data().activo||doc.data().rol!=='admin';
+    let esPrimerUsuario=false, esUnicoYPropio=false;
+    if(dudoso){
+      const todos=await FS.db.collection('usuarios').limit(2).get();
+      esPrimerUsuario=todos.empty;
+      // Red de seguridad: si el ÚNICO documento del sistema es el de este mismo usuario,
+      // debe ser admin (evita quedar bloqueado si el registro inicial falló a medias).
+      esUnicoYPropio=todos.size===1&&todos.docs[0].id===email;
+    }
 
     let userData;
     if(!doc.exists){
@@ -298,7 +367,8 @@ async function verificarUsuarioAutorizado(fbUser){
         try{await FS.db.collection('usuarios').doc(email).set(userData);}catch(e){}
         errEl.style.display='';loadEl.style.display='none';
         errEl.innerHTML=`⏳ Cuenta creada. Tu solicitud de acceso está <strong>pendiente de aprobación</strong> por un administrador.<br><br>Email: <strong>${email}</strong><br><br>Contacta al administrador para que apruebe tu cuenta.`;
-        setTimeout(async()=>{await AUTH.auth.signOut();},8000);
+        olvidarPerfil();
+        setTimeout(async()=>{await AUTH.auth.signOut();location.reload();},8000);
         return;
       }
     }else{
@@ -311,13 +381,17 @@ async function verificarUsuarioAutorizado(fbUser){
         console.log('Único usuario del sistema — auto-promovido a admin:',email);
       }
       if(!userData.activo){
+        // Se revocó el acceso: el perfil recordado deja de valer y hay que
+        // sacar al usuario aunque hubiera entrado con él hace un segundo.
+        olvidarPerfil();
+        document.getElementById('login-overlay').style.display='flex';
         errEl.style.display='';loadEl.style.display='none';
         if(userData.pendiente){
           errEl.innerHTML=`⏳ Tu cuenta <strong>${email}</strong> está pendiente de aprobación por un administrador.`;
         }else{
           errEl.innerHTML=`🚫 Tu acceso ha sido revocado. Contacta al administrador.`;
         }
-        setTimeout(async()=>{await AUTH.auth.signOut();},6000);
+        setTimeout(async()=>{await AUTH.auth.signOut();location.reload();},6000);
         return;
       }
       // Actualizar último login (sin bloquear)
@@ -329,6 +403,24 @@ async function verificarUsuarioAutorizado(fbUser){
       }).catch(()=>{});
     }
 
+    recordarPerfil(userData);
+    entrarConPerfil(userData);
+  }catch(e){
+    console.error('Error verificando usuario:',e);
+    // Si ya estábamos dentro con el perfil recordado, un fallo de red al
+    // re-verificar no puede echar al usuario a la calle: se avisa y se sigue.
+    if(AUTH.user){
+      try{toast('⚠️ No se pudieron revisar tus permisos ahora — se usarán los últimos conocidos','e');}catch(e2){}
+      return;
+    }
+    errEl.style.display='';loadEl.style.display='none';
+    errEl.textContent='Error verificando permisos: '+e.message;
+  }
+}
+
+// Pinta la app con un perfil ya resuelto (recién verificado o el recordado)
+function entrarConPerfil(userData){
+    const email=userData.email;
     AUTH.user=userData;
     AUTH.ready=true;
 
@@ -360,11 +452,6 @@ async function verificarUsuarioAutorizado(fbUser){
     aplicarPermisosUI();
     // Iniciar la app si aún no ha iniciado
     if(!window._appInited){window._appInited=true;(_onAuthReady||(()=>{}))();}
-  }catch(e){
-    console.error('Error verificando usuario:',e);
-    errEl.style.display='';loadEl.style.display='none';
-    errEl.textContent='Error verificando permisos: '+e.message;
-  }
 }
 
 function mostrarLogin(){
@@ -390,6 +477,7 @@ async function logout(){
     }catch(e){return;}
   }else if(!confirm('¿Cerrar sesión?'))return;
   try{await AUTH.auth.signOut();}catch(e){}
+  olvidarPerfil();
   // El recorrido y la última pantalla son del usuario que se va
   try{window.olvidarNav&&window.olvidarNav();}catch(e){}
   location.reload();

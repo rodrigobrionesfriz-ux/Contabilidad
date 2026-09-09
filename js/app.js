@@ -19,7 +19,8 @@ import {renderEmpresas, abrirFormEmpresa, cerrarFormEmpresa, editarEmpresaCat,
 // Sistema
 import {initAuth, puedeVer, puedeEditar, esAdmin, ROLES, SECCIONES, permisosDeRol,
         toggleLoginMode, submitLogin, recuperarPassword, mostrarLogin, logout,
-        aplicarPermisosUI, setOnAuthReady} from './auth.js';
+        aplicarPermisosUI, setOnAuthReady,
+        sesionPersistente, setSesionPersistente} from './auth.js';
 import {cargarUsuarios, renderUsuarios, abrirInvitarUsuario, editarUsuario,
         renderPermisosForm, cerrarUsuarioForm, guardarUsuario, aprobarUsuario,
         desactivarUsuario, US} from './usuarios.js';
@@ -36,7 +37,8 @@ import {renderIndicadores, guardarIndicadores, restaurarIndicadoresDefault,
 import {renderPrevisional, guardarPrevisional, restaurarPrevisional} from './previsional-ui.js';
 import {acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif,
         axAcBuscar, axAcTecla, axAcElegir, axAcCerrar} from './buscadorcuentas.js';
-import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar} from './salida.js';
+import {initAvisoSalida, marcarGuardado, marcarSucio, haySinGuardar,
+        recordarNav, ultimaSeccion, olvidarNav} from './salida.js';
 import {initAutoguardado, actualizarBotonGuardar, guardarTodoAhora, setAutoguardado,
         setIntervaloAutoguardado, confirmarSalida, AG} from './autoguardado.js';
 import {cargarFichasAux, descargarPlantillaAux, abrirImportFichas,
@@ -360,6 +362,21 @@ async function initApp(){
   if(BD.supported)await bdRestaurarHandle();
   // Aplicar permisos por si el usuario no puede ver la sección actual
   aplicarPermisosUI();
+  retomarUltimaSeccion();
+}
+
+// Volver a la pantalla donde se estaba.
+// Instalada en el teléfono, Android descarta el proceso de la app apenas pasas
+// un rato en otra aplicación. Al volver, la app arranca de cero: con la sesión
+// recordada ya no pide la contraseña, y con esto tampoco pierde la pantalla.
+function retomarUltimaSeccion(){
+  try{
+    const s=ultimaSeccion();
+    if(!s||s==='inicio')return;
+    if(!document.getElementById('s-'+s))return;   // sección que ya no existe
+    if(!puedeVer(s))return;                        // sin permiso, a la portada
+    nav(s);
+  }catch(e){}
 }
 
 
@@ -384,6 +401,7 @@ function nav(s){
   const item=document.querySelector('[data-s="'+s+'"]');
   if(item)item.classList.add('active');   // hay secciones sin ítem de menú
   setCurSec(s);renderSec(s);
+  recordarNav(s);      // para que el botón atrás deshaga un paso, no salte a Inicio
   ayudaAlNavegar(s);   // aplicar la preferencia de ayuda de esta pantalla
   cerrarNavMovil(); // en móvil, cerrar el drawer tras elegir sección
 }
@@ -506,6 +524,8 @@ Object.assign(window,{
   nav, rerender, renderSec, toggleNav, cerrarNavMovil, changeYear, saveAll, init, initApp,
   // auth / usuarios
   toggleLoginMode, submitLogin, recuperarPassword, mostrarLogin, logout,
+  sesionPersistente, setSesionPersistente,
+  olvidarNav,
   renderUsuarios, abrirInvitarUsuario, editarUsuario, renderPermisosForm,
   cerrarUsuarioForm, guardarUsuario, aprobarUsuario, desactivarUsuario, renderAuditLog,
   // empresa / pdc / indicadores

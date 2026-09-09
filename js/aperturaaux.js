@@ -425,7 +425,7 @@ export function bloqueAperturaAux(){
       anteriores al sistema.
       ${pendientes?`<br><span style="color:var(--warn)">⚠️ ${pendientes} cuenta(s) todavía no cuadran con el balance.</span>`:''}
     </div>
-    <div class="tw"><table>
+    <div class="tw"><table class="tbl-apxres">
       <thead><tr><th class="tl">CUENTA</th><th style="text-align:right">SEGÚN APERTURA</th>
         <th style="text-align:right">CAPTURADO</th><th></th><th></th></tr></thead>
       <tbody>${filas}</tbody>

@@ -9,6 +9,7 @@
 // header oculto porque varios módulos escriben directo sobre ellos; acá se
 // clonan sus contenidos para mostrarlos en la tarjeta de estado.
 
+import {sesionPersistente} from './auth.js';
 import {S, AUTH} from './state.js';
 import {TEMAS} from './tema.js';
 import {bloqueSeguridad} from './seguridad.js';
@@ -73,6 +74,19 @@ function renderSistema(){
             ? `Guarda cada <strong>${etiquetaIntervalo(AG.segundos)}</strong> si hay algo pendiente${AG.ultimo?` · último automático a las ${AG.ultimo.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}`:''}.`
             : 'Con el automático apagado, el botón 💾 de la barra superior se pone <strong>amarillo</strong> cuando hay algo sin guardar.'}
           <br>Al cerrar sesión o cerrar la pestaña con trabajo pendiente, el sistema ofrece guardarlo antes de salir.
+        </div>`)}
+
+      ${tarjeta('🔐','Sesión en este dispositivo',
+        'Si mantienes la sesión abierta, la app no vuelve a pedir la contraseña al reabrirla. Es lo que hace que instalada en el teléfono no parezca cerrarse sola cada vez que cambias de aplicación.',
+        `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn ${sesionPersistente()?'btn-p':'btn-g'}" onclick="setSesionPersistente(true)">🔓 Mantener sesión</button>
+          <button class="btn ${sesionPersistente()?'btn-g':'btn-p'}" onclick="setSesionPersistente(false)">🔒 Pedir contraseña</button>
+        </div>
+        <div style="font-size:10px;color:var(--mt);margin-top:10px;line-height:1.6">
+          ${sesionPersistente()
+            ? 'La sesión sigue abierta en este equipo hasta que cierres sesión a mano. <strong>Elige «Pedir contraseña» si es un computador compartido.</strong>'
+            : 'Se pedirá la contraseña cada vez que cierres el navegador o la app. Más seguro en un equipo compartido, incómodo en el teléfono.'}
+          <br>El cambio se aplica en el <strong>próximo inicio de sesión</strong>.
         </div>`)}
 
       ${tarjeta('🖥','Este dispositivo',

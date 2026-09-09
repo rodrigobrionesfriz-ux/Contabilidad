@@ -102,13 +102,22 @@ async function initAuth(){
   }
   AUTH.auth=firebase.auth();
 
-  // ── Persistencia de sesión: SESSION ──
-  // El token vive mientras la pestaña siga abierta: sobrevive a recargas (F5)
-  // pero se pierde al cerrar la pestaña o el navegador, así que en un equipo
-  // compartido nadie entra sin la contraseña.
-  //   Alternativas: NONE (pide clave hasta al recargar) · LOCAL (recuerda siempre)
+  // ── Persistencia de sesión ──
+  //
+  // Con SESSION el token vive sólo mientras la pestaña siga abierta. En un
+  // computador eso es razonable, pero instalada como app en el teléfono es un
+  // problema real: Android descarta el proceso apenas cambias de aplicación un
+  // rato, y al volver la app arranca de cero y pide la contraseña otra vez. Se
+  // siente como si la app "se cerrara sola".
+  //
+  // Por eso el valor por defecto ahora es LOCAL —la sesión sigue abierta en
+  // este equipo— y queda un interruptor en Sistema para volver a SESSION en un
+  // computador compartido, donde sí conviene que cerrar el navegador cierre la
+  // sesión. La preferencia vive en localStorage, no en Firestore: hay que
+  // leerla antes de que exista sesión, y además es de este dispositivo.
   try{
-    await AUTH.auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+    const P=firebase.auth.Auth.Persistence;
+    await AUTH.auth.setPersistence(sesionPersistente()?P.LOCAL:P.SESSION);
   }catch(e){
     console.warn('No se pudo fijar la persistencia de sesión:',e);
   }
@@ -123,6 +132,28 @@ async function initAuth(){
     // Hay sesión → verificar autorización en Firestore
     await verificarUsuarioAutorizado(user);
   });
+}
+
+// ── Preferencia de sesión de este dispositivo ──
+const CLAVE_SESION='cv:sesion-persistente';
+function sesionPersistente(){
+  try{
+    const v=localStorage.getItem(CLAVE_SESION);
+    return v===null?true:v==='1';   // por defecto: mantener la sesión
+  }catch(e){return true;}
+}
+// Cambiarla sólo afecta al PRÓXIMO inicio de sesión: Firebase fija la
+// persistencia al autenticar, no después. Se dice en la propia pantalla.
+function setSesionPersistente(v){
+  try{localStorage.setItem(CLAVE_SESION,v?'1':'0');}catch(e){}
+  try{
+    const P=firebase.auth.Auth.Persistence;
+    if(AUTH.auth)AUTH.auth.setPersistence(v?P.LOCAL:P.SESSION).catch(()=>{});
+  }catch(e){}
+  try{window.toast&&window.toast(v
+    ?'🔓 La sesión quedará abierta en este equipo'
+    :'🔒 Se pedirá la contraseña al cerrar el navegador');}catch(e){}
+  try{window.renderSistema&&window.renderSistema();}catch(e){}
 }
 
 // Modo del formulario: 'login' (inicio de sesión) o 'register' (registro nuevo usuario)
@@ -359,6 +390,8 @@ async function logout(){
     }catch(e){return;}
   }else if(!confirm('¿Cerrar sesión?'))return;
   try{await AUTH.auth.signOut();}catch(e){}
+  // El recorrido y la última pantalla son del usuario que se va
+  try{window.olvidarNav&&window.olvidarNav();}catch(e){}
   location.reload();
 }
 
@@ -398,4 +431,5 @@ function ocultarGruposVacios(){
 }
 
 
-export {ROLES, SECCIONES, permisosDeRol, permiso, puedeVer, puedeEditar, esAdmin, initAuth, LOGIN_MODE, toggleLoginMode, submitLogin, recuperarPassword, verificarUsuarioAutorizado, mostrarLogin, logout, aplicarPermisosUI};
+export {sesionPersistente, setSesionPersistente,
+  ROLES, SECCIONES, permisosDeRol, permiso, puedeVer, puedeEditar, esAdmin, initAuth, LOGIN_MODE, toggleLoginMode, submitLogin, recuperarPassword, verificarUsuarioAutorizado, mostrarLogin, logout, aplicarPermisosUI};

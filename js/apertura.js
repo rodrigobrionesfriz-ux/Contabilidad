@@ -43,35 +43,35 @@ function renderApertura(){
   const ok=tD===tH&&tD>0;
   document.getElementById('ap-sub').textContent=`Asiento N°0 · ${a.fecha} · ${a.movs.length} líneas · ${ok?'✓ Cuadrado':'⚠️ No cuadra'}`;
 
-  cont.innerHTML=`<div class="asiento-item" style="border-left:4px solid var(--ach)">
-    <div class="asiento-hdr" style="display:flex;gap:16px;padding:14px 16px;align-items:center">
-      <span style="background:var(--ach);color:var(--bg);font-weight:700;padding:4px 12px;border-radius:6px;font-family:var(--mono);font-size:12px">N° 0</span>
-      <div style="flex:1">
-        <div style="font-weight:600;font-size:13px">${a.glosa}</div>
-        <div style="color:var(--mt);font-size:11px;margin-top:2px">${a.fecha} · Balance de Apertura · ${a.movs.length} líneas</div>
+  cont.innerHTML=`<div class="asiento-item ap-card">
+    <div class="asiento-hdr ap-hdr">
+      <span class="ap-badge">N° 0</span>
+      <div class="ap-glosa">
+        <div class="ap-glosa-t">${a.glosa}</div>
+        <div class="ap-glosa-s">${a.fecha} · Balance de Apertura · ${a.movs.length} líneas</div>
       </div>
-      <div style="text-align:right">
-        <div style="font-family:var(--mono);font-size:13px;font-weight:700">${fmtC(tD)}</div>
-        <div style="font-size:10px;color:${ok?'var(--ach)':'var(--err)'}">${ok?'✓ Cuadrado':'⚠️ D≠H'}</div>
+      <div class="ap-total">
+        <div class="ap-total-v">${fmtC(tD)}</div>
+        <div class="ap-total-s" style="color:${ok?'var(--ach)':'var(--err)'}">${ok?'✓ Cuadrado':'⚠️ D≠H'}</div>
       </div>
     </div>
-    <div class="asiento-body" style="display:block;padding:0 16px 14px">
-      ${a.movs.map((m,li)=>`<div style="display:grid;grid-template-columns:36px 1fr 110px 110px;padding:5px 0;font-size:12px;border-bottom:1px solid rgba(48,54,61,.4)">
-        <div style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--mt)">${li+1}</div>
-        <div style="${m.haber>0?'padding-left:20px;color:var(--mt)':'padding-left:8px'}">
-          <span style="font-family:var(--mono);font-size:10px;color:var(--mt)">${m.cd}</span>
-          <span style="margin-left:6px">${m.nm||pdcNm(m.cd)}</span>
-          ${m.desc?`<span style="color:var(--mt);font-size:11px"> — ${m.desc}</span>`:''}
-          ${m.rutCodigo?`<div style="font-size:10px;color:var(--info);margin-top:2px"><span style="font-family:var(--mono)">${rutFmt(m.rutCodigo,m.rutDV)}</span>${m.razonSocial?' · '+m.razonSocial:''}</div>`:''}
+    <div class="asiento-body ap-body">
+      ${a.movs.map((m,li)=>`<div class="ap-linea${m.haber>0?' ap-h':''}">
+        <div class="ap-num">${li+1}</div>
+        <div class="ap-cta">
+          <span class="ap-cd">${m.cd}</span>
+          <span class="ap-nm">${m.nm||pdcNm(m.cd)}</span>
+          ${m.desc?`<span class="ap-desc"> — ${m.desc}</span>`:''}
+          ${m.rutCodigo?`<div class="ap-rut"><span class="mono">${rutFmt(m.rutCodigo,m.rutDV)}</span>${m.razonSocial?' · '+m.razonSocial:''}</div>`:''}
         </div>
-        <div style="text-align:right;font-family:var(--mono);color:${m.debe?'var(--tx)':'var(--bd)'}">${m.debe?fmtC(m.debe):'–'}</div>
-        <div style="text-align:right;font-family:var(--mono);color:${m.haber?'var(--mt)':'var(--bd)'}">${m.haber?fmtC(m.haber):'–'}</div>
+        <div class="ap-monto ap-debe${m.debe?'':' ap-cero'}" data-lbl="Debe">${m.debe?fmtC(m.debe):'–'}</div>
+        <div class="ap-monto ap-haber${m.haber?'':' ap-cero'}" data-lbl="Haber">${m.haber?fmtC(m.haber):'–'}</div>
       </div>`).join('')}
-      <div style="display:grid;grid-template-columns:36px 1fr 110px 110px;padding:8px 0;font-size:12px;font-weight:700;border-top:2px solid var(--bd);margin-top:6px">
-        <div></div>
-        <div>TOTALES</div>
-        <div style="text-align:right;font-family:var(--mono)">${fmtC(tD)}</div>
-        <div style="text-align:right;font-family:var(--mono)">${fmtC(tH)}</div>
+      <div class="ap-linea ap-tot">
+        <div class="ap-num"></div>
+        <div class="ap-cta">TOTALES</div>
+        <div class="ap-monto ap-debe" data-lbl="Debe">${fmtC(tD)}</div>
+        <div class="ap-monto ap-haber" data-lbl="Haber">${fmtC(tH)}</div>
       </div>
     </div>
   </div>`+bloqueAperturaAux();

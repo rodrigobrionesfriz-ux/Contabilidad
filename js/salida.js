@@ -10,6 +10,38 @@ import {toast} from './core.js';
 let _sucio=false;           // hay cambios sin guardar
 let _ultimoGuardado=null;   // marca de tiempo del último guardado
 
+// ── Historial de secciones dentro de la app ──
+// El botón atrás saltaba SIEMPRE a Inicio desde cualquier pantalla, así que
+// entrar a un documento desde el Libro Diario y volver te dejaba en la portada
+// en vez de donde estabas. Ahora se lleva la pista de por dónde pasaste y el
+// atrás deshace un paso a la vez, como en cualquier app.
+const PILA=[];
+let _navAtras=false;
+const CLAVE_SEC='cv:ultima-seccion';
+
+export function recordarNav(s){
+  if(!s)return;
+  // Dónde estoy AHORA se guarda siempre, incluso al volver atrás: si Android
+  // descarta la app mientras estás en otra aplicación, al reabrirla se retoma
+  // esta pantalla y no la última a la que se entró hacia adelante.
+  try{localStorage.setItem(CLAVE_SEC,s);}catch(e){}
+  // El recorrido, en cambio, sólo crece hacia adelante: volver atrás lo
+  // deshace, y repintar la misma sección no cuenta como un paso nuevo.
+  if(_navAtras||PILA[PILA.length-1]===s)return;
+  PILA.push(s);
+  if(PILA.length>50)PILA.shift();
+}
+
+export const ultimaSeccion=()=>{
+  try{return localStorage.getItem(CLAVE_SEC)||'';}catch(e){return '';}
+};
+
+// Al cerrar sesión el recorrido anterior ya no significa nada
+export function olvidarNav(){
+  PILA.length=0;
+  try{localStorage.removeItem(CLAVE_SEC);}catch(e){}
+}
+
 // Marcar que hay trabajo sin guardar (lo llaman los módulos al editar)
 export function marcarSucio(){
   _sucio=true;
@@ -144,8 +176,20 @@ export function initAvisoSalida(){
     const capa=capaAbierta();
     if(capa){capa.cerrar(capa.el);return;}
 
+    // Deshacer un paso del recorrido: la actual sale de la pila y se vuelve a
+    // la anterior. Sólo cuando ya no queda nada atrás se ofrece salir.
     const sec=(window.getCurSec&&window.getCurSec())||'inicio';
-    if(sec!=='inicio'&&window.nav){window.nav('inicio');return;}
+    if(window.nav){
+      if(PILA[PILA.length-1]===sec)PILA.pop();
+      const previa=PILA[PILA.length-1];
+      if(previa&&previa!==sec){
+        _navAtras=true;
+        try{window.nav(previa);}finally{_navAtras=false;}
+        return;
+      }
+      // Sin recorrido guardado pero fuera de la portada: al menos volver a ella
+      if(sec!=='inicio'){window.nav('inicio');return;}
+    }
 
     const r=await preguntarSalir(_sucio);
     if(r==='quedarse')return;

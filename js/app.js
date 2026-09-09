@@ -53,7 +53,7 @@ import {renderAsigCC, resetAsigCC, setAsigCC, limpiarFiltrosCC, setCCMov, toggle
 import {renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
         verDetalleCC, abrirCapitalizar, confirmarCapitalizar, onCurvaChange,
         setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual,
-        revertirCierreMensual} from './centroscosto-ui.js';
+        revertirCierreMensual, onCierreMesChange, resetCierreMes} from './centroscosto-ui.js';
 import {mesOpts, mesRango, foliosMensuales, dteVentasOpts} from './helpers.js';
 import {renderCargaDatos, descargarPlantillaDatos, abrirCargaDatos,
         initCargaDatosListener, CD} from './cargadatos.js';
@@ -241,6 +241,7 @@ async function loadYear(y){
   resetRenta(); // los ajustes del F22 son por empresa+año: se recargan al entrar a la sección
   resetDJ();    // ídem el catálogo y el control de declaraciones juradas
   resetAsigCC(); // ídem los filtros de asignación de centros de costo
+  resetCierreMes(); // el mes elegido para cerrar costos es de este ejercicio
 
   const leer=async(clave,aplicar)=>{
     const r=await window.storage.leerConEstado(clave);
@@ -515,7 +516,8 @@ Object.assign(window,{
   renderPrevisional, guardarPrevisional, restaurarPrevisional,
   renderCentrosCosto, abrirFormCC, editarCC, cerrarFormCC, guardarCC, borrarCC,
   verDetalleCC, abrirCapitalizar, confirmarCapitalizar, ccOpts, ccNombre,
-  onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange, ejecutarCierreMensual, revertirCierreMensual,
+  onCurvaChange, setPct, addPctAnio, delPctAnio, onTipoCentroChange,
+  ejecutarCierreMensual, revertirCierreMensual, onCierreMesChange, resetCierreMes,
   acBuscar, acTecla, acElegir, acCerrarDif, inputCuenta, buscarCuentas, inputCC, ccAcBuscar, ccAcTecla, ccAcElegir, ccAcCerrarDif,
   axAcBuscar, axAcTecla, axAcElegir, axAcCerrar, lAuxElegido,
   marcarGuardado, marcarSucio, haySinGuardar,

@@ -15,6 +15,21 @@ import {MESES} from './core.js';
 let CCF={editId:null,nivel:1};
 let CC_DETALLE=null; // id del cuartel expandido
 
+// ── Mes elegido en el panel de cierre ──
+// Tiene que vivir fuera del DOM. Antes el <select> disparaba renderCentrosCosto(),
+// que vuelve a pintar la sección entera y por lo tanto vuelve a crear el propio
+// <select> marcando como seleccionado el MES DE HOY. Resultado: elegir cualquier
+// otro mes y verlo saltar de vuelta a septiembre, sin forma de cerrar un mes
+// pasado. Ahora el cambio sólo repinta la vista previa y la elección se conserva.
+let CIERRE_MES=null;
+const mesDeHoy=()=>+String(today()).slice(5,7)||1;
+const cierreMes=()=>{
+  const m=+CIERRE_MES;
+  return (m>=1&&m<=12)?m:mesDeHoy();
+};
+// Al cambiar de empresa o de ejercicio no tiene sentido arrastrar la elección.
+export function resetCierreMes(){CIERRE_MES=null;}
+
 export function renderCentrosCosto(){
   const el=document.getElementById('cc-content');
   if(!el)return;
@@ -199,11 +214,11 @@ export function verDetalleCC(id){CC_DETALLE=(CC_DETALLE===id)?null:id;renderCent
 function renderPanelCierre(){
   if(!esAdmin())return '';
   const anio=S.empresa.anio;
-  const mesActual=+String(today()).slice(5,7);
   const enFormacion=cuarteles().filter(c=>c.estado==='formacion');
   if(!enFormacion.length)return ''; // sin inversiones en curso no hay nada que traspasar
 
-  const opciones=MESES.map((m,i)=>`<option value="${i+1}" ${i+1===mesActual?'selected':''}>${m} ${anio}</option>`).join('');
+  const sel=cierreMes();
+  const opciones=MESES.map((m,i)=>`<option value="${i+1}" ${i+1===sel?'selected':''}>${m} ${anio}</option>`).join('');
   return `<div class="card" style="margin-bottom:16px;border-color:var(--ac)">
     <div class="card-title">🔐 Cierre mensual de costos</div>
     <div class="info-tip" style="margin-bottom:12px;font-size:11px">
@@ -212,10 +227,18 @@ function renderPanelCierre(){
       Ejecútalo <strong>solo cuando el mes esté cerrado</strong>: es manual a propósito.
     </div>
     <div class="fg">
-      <div class="grp"><label>Período a cerrar</label><select id="cierre-mes" onchange="renderCentrosCosto()">${opciones}</select></div>
+      <div class="grp"><label>Período a cerrar</label><select id="cierre-mes" onchange="onCierreMesChange(this.value)">${opciones}</select></div>
     </div>
     <div id="cierre-preview"></div>
   </div>`;
+}
+
+// Cambiar el mes NO vuelve a pintar la sección: sólo la vista previa. Así el
+// <select> sobrevive al cambio, conserva el foco y no pierde lo elegido.
+export function onCierreMesChange(v){
+  const m=+v;
+  CIERRE_MES=(m>=1&&m<=12)?m:null;
+  renderPreviewCierre();
 }
 
 // Vista previa del cierre del mes seleccionado
@@ -223,7 +246,7 @@ function renderPreviewCierre(){
   const cont=document.getElementById('cierre-preview');
   if(!cont)return;
   const anio=S.empresa.anio;
-  const mes=+(document.getElementById('cierre-mes')||{}).value||1;
+  const mes=cierreMes();
   const enFormacion=cuarteles().filter(c=>c.estado==='formacion');
   const filas=enFormacion.map(c=>{
     const m=costosDelMes(c.id,anio,mes);
@@ -264,7 +287,7 @@ function renderPreviewCierre(){
 export async function ejecutarCierreMensual(){
   if(!esAdmin()){toast('⚠️ Solo un administrador puede cerrar el mes','e');return;}
   const anio=S.empresa.anio;
-  const mes=+(document.getElementById('cierre-mes')||{}).value||1;
+  const mes=cierreMes();
   const enFormacion=cuarteles().filter(c=>c.estado==='formacion');
   const pendientes=enFormacion
     .map(c=>({centro:c,m:costosDelMes(c.id,anio,mes)}))
@@ -299,7 +322,15 @@ export async function ejecutarCierreMensual(){
 
   const totD=movs.reduce((s,m)=>s+(m.debe||0),0), totH=movs.reduce((s,m)=>s+(m.haber||0),0);
   if(Math.abs(totD-totH)>1){
-    toast(`❌ El asiento no cuadra (D ${fmtC(totD)} / H ${fmtC(totH)}). No se guardó.`,'e');return;
+    // Si hay gasto sin cuenta identificada no se puede saber qué abonar. Decirlo
+    // con todas sus letras: antes salía sólo "no cuadra" y no había pista.
+    const sinCuenta=pendientes.reduce((t,x)=>t+(x.m.porCuenta.SIN||0),0);
+    if(sinCuenta>0){
+      toast(`❌ Hay ${fmtC(sinCuenta)} de gasto sin cuenta identificada: revisa la distribución del gasto de esos documentos antes de cerrar.`,'e');
+    }else{
+      toast(`❌ El asiento de cierre no cuadra (Debe ${fmtC(totD)} / Haber ${fmtC(totH)}). No se guardó.`,'e');
+    }
+    return;
   }
 
   // Último día del mes
@@ -324,14 +355,21 @@ export async function ejecutarCierreMensual(){
 export async function revertirCierreMensual(){
   if(!esAdmin()){toast('⚠️ Solo un administrador puede revertir','e');return;}
   const anio=S.empresa.anio;
-  const mes=+(document.getElementById('cierre-mes')||{}).value||1;
+  const mes=cierreMes();
   const per=`${anio}-${String(mes).padStart(2,'0')}`;
   const regs=cierresCC().filter(c=>c.periodo===per);
   if(!regs.length){toast('⚠️ No hay cierre registrado para ese mes','e');return;}
   const folios=[...new Set(regs.map(r=>r.folio))];
   if(!confirm(`¿Revertir el cierre de ${MESES[mes-1]} ${anio}?\n\nSe anulará el asiento N°${folios.join(', ')} y podrás volver a cerrarlo.`))return;
   // Anular los asientos generados (no se borran, se marcan)
-  S.asientos.forEach(a=>{if(folios.includes(a.n))a.anulado=true;});
+  // Se exige tipoCierreCC además del número: si el asiento de cierre se eliminó
+  // alguna vez, su correlativo pudo reutilizarlo otro asiento y anularíamos uno
+  // que no tiene nada que ver.
+  const anulados=S.asientos.filter(a=>folios.includes(a.n)&&a.tipoCierreCC);
+  if(!anulados.length){
+    toast(`⚠️ No se encontró el asiento de cierre N°${folios.join(', ')} — se limpiará el registro igualmente`,'e');
+  }
+  anulados.forEach(a=>{a.anulado=true;});
   await window.storage.set('asientos-'+anio,JSON.stringify(S.asientos)).catch(()=>{});
   regs.forEach(r=>revertirCierre(r.cc,per));
   await guardarCierresCC();

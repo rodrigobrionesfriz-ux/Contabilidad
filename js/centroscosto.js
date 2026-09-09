@@ -193,10 +193,23 @@ export function costoAcumulado(idCC,opts={}){
         detalle.push({fecha:d.fecha,origen:'Compra',doc:`DTE ${d.tipoDTE} N°${d.numero}`,glosa:d.razonSocial||'',cuenta:x.cuenta||x.cd||'',monto:+x.monto});
       }
     });
-    // Documento completo asignado a un centro y sin distribución por línea
+    // Documento completo asignado a un centro y sin distribución por línea.
+    // Se reparte por las cuentas de su distribución del gasto en vez de anotarlo
+    // como un monto sin cuenta: el cierre mensual necesita saber QUÉ cuenta
+    // abonar, y un detalle sin cuenta dejaba el asiento de traspaso descuadrado
+    // y bloqueaba el cierre sin decir por qué.
     if(d.cc===idCC&&!(d.dist||[]).some(x=>x.cc)){
-      const m=+d.neto||0;
-      if(m){total+=m;detalle.push({fecha:d.fecha,origen:'Compra',doc:`DTE ${d.tipoDTE} N°${d.numero}`,glosa:d.razonSocial||'',cuenta:'',monto:m});}
+      const lineas=(d.dist||[]).filter(x=>+x.monto);
+      if(lineas.length){
+        lineas.forEach(x=>{
+          const m=+x.monto||0;
+          total+=m;
+          detalle.push({fecha:d.fecha,origen:'Compra',doc:`DTE ${d.tipoDTE} N°${d.numero}`,glosa:d.razonSocial||'',cuenta:x.cuenta||'',monto:m});
+        });
+      }else{
+        const m=+d.neto||0;
+        if(m){total+=m;detalle.push({fecha:d.fecha,origen:'Compra',doc:`DTE ${d.tipoDTE} N°${d.numero}`,glosa:d.razonSocial||'',cuenta:'',monto:m});}
+      }
     }
   });
 

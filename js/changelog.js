@@ -8,13 +8,23 @@
 // Módulo puro: sin imports, para que cualquiera pueda leer APP_VERSION sin
 // arrastrar dependencias ni arriesgar ciclos.
 
-const APP_VERSION='v2026.08.29-2216';
+const APP_VERSION='v2026.11.04-2115';
 
 // Historial, de la más reciente a la más antigua.
 //   tipo: 'nuevo' | 'arreglo' | 'cambio'
 // Cada entrada describe QUÉ cambia para quien usa el sistema, no qué función se
 // tocó: esto lo lee un contador, no quien programa.
 const CHANGELOG=[
+  {
+    v:'v2026.11.04-2115',
+    fecha:'2026-11-04',
+    titulo:'Cuadratura del IVA débito fiscal',
+    cambios:[
+      {tipo:'nuevo', txt:'El F29 muestra la cuadratura del IVA débito fiscal mes a mes: lo que dice el F29, lo que abonaron las ventas y lo que cargó la compensación. Si la cuenta no queda en cero, nombra la causa en vez de dejarte el saldo suelto.'},
+      {tipo:'arreglo', txt:'Generar la compensación de IVA de un mes ya compensado ya no crea un segundo asiento. Ahora anula el anterior y lo reemplaza, de modo que el débito no queda cargado dos veces.'},
+      {tipo:'arreglo', txt:'Las compensaciones traídas de otra versión o escritas a mano también se reconocen. Antes solo se veían las que llevaban la marca interna, y una importada pasaba desapercibida: el sistema generaba otra encima y el descuadre recién aparecía en el balance, meses después.'},
+    ],
+  },
   {
     v:'v2026.08.29-2216',
     fecha:'2026-08-29',
